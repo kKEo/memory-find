@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -66,6 +67,10 @@ type readRecentArgs struct {
 	Limit int `json:"limit,omitempty" jsonschema:"Number of recent entries to read (default: 5)"`
 }
 
+type journalStatsArgs struct {
+	// No arguments needed - always shows full stats
+}
+
 func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "process_thoughts",
@@ -91,6 +96,11 @@ func (s *Server) registerTools() {
 		Name:        "read_recent_entries",
 		Description: "Read the full content of your most recent journal entries.",
 	}, s.handleReadRecent)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "journal_stats",
+		Description: "Get statistics and status information about your journal (entry count, date range, section usage, embedding coverage, storage details).",
+	}, s.handleJournalStats)
 }
 
 func (s *Server) handleProcessThoughts(ctx context.Context, _ *mcp.CallToolRequest, args processThoughtsArgs) (*mcp.CallToolResult, any, error) {
@@ -220,6 +230,67 @@ func (s *Server) handleReadRecent(ctx context.Context, _ *mcp.CallToolRequest, a
 		sb.WriteString(r.Content)
 		sb.WriteString("\n\n")
 	}
+
+	return textResult(sb.String()), nil, nil
+}
+
+func (s *Server) handleJournalStats(ctx context.Context, _ *mcp.CallToolRequest, args journalStatsArgs) (*mcp.CallToolResult, any, error) {
+	stats, err := s.search.GetStats(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var sb strings.Builder
+	sb.WriteString("=== Journal Statistics ===\n\n")
+	sb.WriteString(fmt.Sprintf("Total entries: %d\n", stats.TotalEntries))
+
+	if stats.TotalEntries == 0 {
+		sb.WriteString("\nJournal is empty. Use process_thoughts to create your first entry.\n")
+		return textResult(sb.String()), nil, nil
+	}
+
+	// Date range
+	sb.WriteString(fmt.Sprintf("Date range: %s to %s\n",
+		stats.EarliestEntry.Format("2006-01-02"),
+		stats.LatestEntry.Format("2006-01-02")))
+
+	// Embedding coverage
+	coverage := 0.0
+	if stats.TotalEntries > 0 {
+		coverage = float64(stats.EntriesWithEmbeddings) / float64(stats.TotalEntries) * 100
+	}
+	sb.WriteString(fmt.Sprintf("Entries with embeddings: %d/%d (%.1f%%)\n",
+		stats.EntriesWithEmbeddings, stats.TotalEntries, coverage))
+
+	// Recent activity
+	sb.WriteString("\nRecent activity:\n")
+	sb.WriteString(fmt.Sprintf("  Last 7 days: %d entries\n", stats.RecentActivity["7d"]))
+	sb.WriteString(fmt.Sprintf("  Last 30 days: %d entries\n", stats.RecentActivity["30d"]))
+
+	// Section breakdown
+	if len(stats.SectionCounts) > 0 {
+		sb.WriteString("\nSection usage:\n")
+		type sectionCount struct {
+			name  string
+			count int
+		}
+		sections := make([]sectionCount, 0, len(stats.SectionCounts))
+		for name, count := range stats.SectionCounts {
+			sections = append(sections, sectionCount{name, count})
+		}
+		sort.Slice(sections, func(i, j int) bool {
+			return sections[i].count > sections[j].count
+		})
+		for _, sc := range sections {
+			sb.WriteString(fmt.Sprintf("  %s: %d\n", sc.name, sc.count))
+		}
+	}
+
+	// Storage info
+	sb.WriteString("\nStorage:\n")
+	sb.WriteString(fmt.Sprintf("  Location: %s\n", stats.DatabasePath))
+	sb.WriteString(fmt.Sprintf("  Size: %.2f MB\n", stats.DatabaseSizeMB))
+	sb.WriteString(fmt.Sprintf("  Avg entry length: %d characters\n", stats.AvgEntryLength))
 
 	return textResult(sb.String()), nil, nil
 }

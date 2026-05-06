@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -212,6 +213,106 @@ func (s *Service) ReadEntry(ctx context.Context, id string) (string, error) {
 		return "", fmt.Errorf("read entry: %w", err)
 	}
 	return content, nil
+}
+
+type JournalStats struct {
+	TotalEntries          int            `json:"total_entries"`
+	EntriesWithEmbeddings int            `json:"entries_with_embeddings"`
+	EarliestEntry         time.Time      `json:"earliest_entry"`
+	LatestEntry           time.Time      `json:"latest_entry"`
+	SectionCounts         map[string]int `json:"section_counts"`
+	RecentActivity        map[string]int `json:"recent_activity"`
+	DatabasePath          string         `json:"database_path"`
+	DatabaseSizeMB        float64        `json:"database_size_mb"`
+	AvgEntryLength        int            `json:"avg_entry_length"`
+}
+
+func (s *Service) GetStats(ctx context.Context) (*JournalStats, error) {
+	stats := &JournalStats{
+		SectionCounts:  make(map[string]int),
+		RecentActivity: make(map[string]int),
+	}
+
+	// Query 1: Total entries
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM entries`).Scan(&stats.TotalEntries)
+	if err != nil {
+		return nil, fmt.Errorf("count entries: %w", err)
+	}
+
+	if stats.TotalEntries == 0 {
+		return stats, nil
+	}
+
+	// Query 2: Entries with embeddings
+	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM entry_embeddings`).Scan(&stats.EntriesWithEmbeddings)
+	if err != nil {
+		return nil, fmt.Errorf("count embeddings: %w", err)
+	}
+
+	// Query 3: Date range
+	var earliest, latest int64
+	err = s.db.QueryRowContext(ctx, `SELECT MIN(created_at), MAX(created_at) FROM entries`).Scan(&earliest, &latest)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("date range: %w", err)
+	}
+	if err != sql.ErrNoRows {
+		stats.EarliestEntry = time.UnixMilli(earliest)
+		stats.LatestEntry = time.UnixMilli(latest)
+	}
+
+	// Query 4: Section counts
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT json_each.value as section, COUNT(*) as count
+		FROM entries, json_each(entries.sections)
+		GROUP BY json_each.value
+		ORDER BY count DESC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("section counts: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var section string
+		var count int
+		if err := rows.Scan(&section, &count); err != nil {
+			return nil, fmt.Errorf("scan section: %w", err)
+		}
+		stats.SectionCounts[section] = count
+	}
+
+	// Query 5: Recent activity (7 and 30 days)
+	for _, days := range []int{7, 30} {
+		cutoff := time.Now().AddDate(0, 0, -days).UnixMilli()
+		var count int
+		err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM entries WHERE created_at >= ?`, cutoff).Scan(&count)
+		if err != nil {
+			return nil, fmt.Errorf("recent activity %dd: %w", days, err)
+		}
+		stats.RecentActivity[fmt.Sprintf("%dd", days)] = count
+	}
+
+	// Query 6: Average entry length
+	var avgLength sql.NullInt64
+	err = s.db.QueryRowContext(ctx, `SELECT AVG(LENGTH(content)) FROM entries`).Scan(&avgLength)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("avg length: %w", err)
+	}
+	if avgLength.Valid {
+		stats.AvgEntryLength = int(avgLength.Int64)
+	}
+
+	// Query 7: Database path and size
+	var dbPath string
+	err = s.db.QueryRowContext(ctx, `SELECT file FROM pragma_database_list() WHERE name='main'`).Scan(&dbPath)
+	if err == nil {
+		stats.DatabasePath = dbPath
+		if info, err := os.Stat(dbPath); err == nil {
+			stats.DatabaseSizeMB = float64(info.Size()) / (1024 * 1024)
+		}
+	}
+
+	return stats, nil
 }
 
 func hasMatchingSection(entrySections, filterSections []string) bool {

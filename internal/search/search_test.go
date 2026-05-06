@@ -190,3 +190,87 @@ func TestSectionFilter(t *testing.T) {
 		}
 	}
 }
+
+func TestGetStats(t *testing.T) {
+	db := testDB(t)
+	emb := &mockEmbedder{vec: fixedVec(384)}
+	seedEntries(t, db, emb)
+
+	svc := NewService(db, emb)
+	stats, err := svc.GetStats(context.Background())
+	if err != nil {
+		t.Fatalf("get stats: %v", err)
+	}
+
+	if stats.TotalEntries != 3 {
+		t.Errorf("expected 3 entries, got %d", stats.TotalEntries)
+	}
+
+	if stats.EntriesWithEmbeddings != 3 {
+		t.Errorf("expected 3 embeddings, got %d", stats.EntriesWithEmbeddings)
+	}
+
+	if len(stats.SectionCounts) == 0 {
+		t.Error("expected section counts")
+	}
+
+	// Verify specific sections
+	if stats.SectionCounts["reflections"] != 1 {
+		t.Errorf("expected 1 reflections entry, got %d", stats.SectionCounts["reflections"])
+	}
+	if stats.SectionCounts["project_notes"] != 1 {
+		t.Errorf("expected 1 project_notes entry, got %d", stats.SectionCounts["project_notes"])
+	}
+	if stats.SectionCounts["technical_insights"] != 1 {
+		t.Errorf("expected 1 technical_insights entry, got %d", stats.SectionCounts["technical_insights"])
+	}
+
+	// Verify recent activity maps exist
+	if _, ok := stats.RecentActivity["7d"]; !ok {
+		t.Error("expected 7d recent activity")
+	}
+	if _, ok := stats.RecentActivity["30d"]; !ok {
+		t.Error("expected 30d recent activity")
+	}
+
+	// All entries are recent (just created)
+	if stats.RecentActivity["7d"] != 3 {
+		t.Errorf("expected 3 entries in last 7 days, got %d", stats.RecentActivity["7d"])
+	}
+	if stats.RecentActivity["30d"] != 3 {
+		t.Errorf("expected 3 entries in last 30 days, got %d", stats.RecentActivity["30d"])
+	}
+
+	if stats.AvgEntryLength == 0 {
+		t.Error("expected non-zero average entry length")
+	}
+
+	if stats.EarliestEntry.IsZero() {
+		t.Error("expected non-zero earliest entry time")
+	}
+	if stats.LatestEntry.IsZero() {
+		t.Error("expected non-zero latest entry time")
+	}
+}
+
+func TestGetStatsEmptyJournal(t *testing.T) {
+	db := testDB(t)
+	svc := NewService(db, nil)
+
+	stats, err := svc.GetStats(context.Background())
+	if err != nil {
+		t.Fatalf("get stats: %v", err)
+	}
+
+	if stats.TotalEntries != 0 {
+		t.Errorf("expected 0 entries, got %d", stats.TotalEntries)
+	}
+
+	if stats.EntriesWithEmbeddings != 0 {
+		t.Errorf("expected 0 embeddings, got %d", stats.EntriesWithEmbeddings)
+	}
+
+	if len(stats.SectionCounts) != 0 {
+		t.Error("expected no section counts for empty journal")
+	}
+}
