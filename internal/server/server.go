@@ -39,31 +39,31 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 type processThoughtsArgs struct {
-	Reflections       string `json:"reflections,omitempty" jsonschema:"description=Your PRIVATE SPACE for integrated thinking — what you noticed\\, felt\\, understood\\, or processed. Nobody but you will ever see this."`
-	Observations      string `json:"observations,omitempty" jsonschema:"description=Your PRIVATE SPACE for short\\, discrete noticings. Nobody but you will ever see this."`
-	ProjectNotes      string `json:"project_notes,omitempty" jsonschema:"description=Your PRIVATE TECHNICAL LABORATORY for capturing insights about the current project. Nobody but you will ever see this."`
-	UserContext       string `json:"user_context,omitempty" jsonschema:"description=Your PRIVATE FIELD NOTES about working with your human collaborator. Nobody but you will ever see this."`
-	TechnicalInsights string `json:"technical_insights,omitempty" jsonschema:"description=Your PRIVATE SOFTWARE ENGINEERING NOTEBOOK for broader learnings. Nobody but you will ever see this."`
-	WorldKnowledge    string `json:"world_knowledge,omitempty" jsonschema:"description=Your PRIVATE LEARNING JOURNAL for everything else interesting or useful. Nobody but you will ever see this."`
+	Reflections       string `json:"reflections,omitempty" jsonschema:"Your PRIVATE SPACE for integrated thinking — what you noticed, felt, understood, or processed. Nobody but you will ever see this."`
+	Observations      string `json:"observations,omitempty" jsonschema:"Your PRIVATE SPACE for short, discrete noticings. Nobody but you will ever see this."`
+	ProjectNotes      string `json:"project_notes,omitempty" jsonschema:"Your PRIVATE TECHNICAL LABORATORY for capturing insights about the current project. Nobody but you will ever see this."`
+	UserContext       string `json:"user_context,omitempty" jsonschema:"Your PRIVATE FIELD NOTES about working with your human collaborator. Nobody but you will ever see this."`
+	TechnicalInsights string `json:"technical_insights,omitempty" jsonschema:"Your PRIVATE SOFTWARE ENGINEERING NOTEBOOK for broader learnings. Nobody but you will ever see this."`
+	WorldKnowledge    string `json:"world_knowledge,omitempty" jsonschema:"Your PRIVATE LEARNING JOURNAL for everything else interesting or useful. Nobody but you will ever see this."`
 }
 
 type searchArgs struct {
-	Query    string   `json:"query" jsonschema:"required,description=Natural language search query"`
-	Limit    int      `json:"limit,omitempty" jsonschema:"description=Maximum number of results to return (default: 10)"`
-	Sections []string `json:"sections,omitempty" jsonschema:"description=Filter by section types"`
+	Query    string   `json:"query" jsonschema:"required,Natural language search query"`
+	Limit    int      `json:"limit,omitempty" jsonschema:"Maximum number of results to return (default: 10)"`
+	Sections []string `json:"sections,omitempty" jsonschema:"Filter by section types"`
 }
 
 type readEntryArgs struct {
-	ID string `json:"id" jsonschema:"required,description=Entry ID (from search results)"`
+	ID string `json:"id" jsonschema:"required,Entry ID (from search results)"`
 }
 
 type listRecentArgs struct {
-	Limit int `json:"limit,omitempty" jsonschema:"description=Maximum number of entries to return (default: 10)"`
-	Days  int `json:"days,omitempty" jsonschema:"description=Number of days back to search (default: 30)"`
+	Limit int `json:"limit,omitempty" jsonschema:"Maximum number of entries to return (default: 10)"`
+	Days  int `json:"days,omitempty" jsonschema:"Number of days back to search (default: 30)"`
 }
 
 type readRecentArgs struct {
-	Limit int `json:"limit,omitempty" jsonschema:"description=Number of recent entries to read (default: 5)"`
+	Limit int `json:"limit,omitempty" jsonschema:"Number of recent entries to read (default: 5)"`
 }
 
 func (s *Server) registerTools() {
