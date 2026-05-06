@@ -38,9 +38,10 @@ func NewHugotEmbedder(ctx context.Context, modelDir string) (*HugotEmbedder, err
 	}
 
 	pipe, err := hugot.NewPipeline(session, hugot.FeatureExtractionConfig{
-		ModelPath: modelPath,
-		Name:      "journal-embeddings",
-		Options:   []hugot.FeatureExtractionOption{pipelines.WithNormalization()},
+		ModelPath:    modelPath,
+		Name:         "journal-embeddings",
+		OnnxFilename: "model.onnx",
+		Options:      []hugot.FeatureExtractionOption{pipelines.WithNormalization()},
 	})
 	if err != nil {
 		session.Destroy()
@@ -76,7 +77,7 @@ func (e *HugotEmbedder) Destroy() {
 const modelName = "sentence-transformers/all-MiniLM-L6-v2"
 
 func downloadModelWithProgress(ctx context.Context, modelDir string) (string, error) {
-	expectedPath := filepath.Join(modelDir, "all-MiniLM-L6-v2")
+	expectedPath := filepath.Join(modelDir, "sentence-transformers_all-MiniLM-L6-v2")
 	if info, err := os.Stat(expectedPath); err == nil && info.IsDir() {
 		return expectedPath, nil
 	}
@@ -87,7 +88,9 @@ func downloadModelWithProgress(ctx context.Context, modelDir string) (string, er
 
 	fmt.Fprintln(os.Stderr, "Downloading embedding model (first run only)...")
 
-	modelPath, err := hugot.DownloadModel(ctx, modelName, modelDir, hugot.NewDownloadOptions())
+	opts := hugot.NewDownloadOptions()
+	opts.OnnxFilePath = "onnx/model.onnx"
+	modelPath, err := hugot.DownloadModel(ctx, modelName, modelDir, opts)
 	if err != nil {
 		return "", err
 	}
