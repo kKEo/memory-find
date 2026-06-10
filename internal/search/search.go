@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -47,57 +49,113 @@ func (s *Service) Search(ctx context.Context, query string, opts SearchOptions) 
 		opts.Limit = 10
 	}
 
-	if s.embedder == nil {
-		return nil, fmt.Errorf("no embedder available for search")
-	}
-
-	queryVec, err := s.embedder.Embed(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("embed query: %w", err)
-	}
-
-	// sqlite-vec KNN: query vec table, then join with entries
-	// Fetch more than limit to allow post-filtering by section/date
 	fetchLimit := opts.Limit * 3
 	if fetchLimit < 30 {
 		fetchLimit = 30
 	}
 
-	vecRows, err := s.db.QueryContext(ctx,
-		`SELECT entry_id, distance FROM entry_embeddings WHERE embedding MATCH ? ORDER BY distance LIMIT ?`,
-		journal.Float32ToJSON(queryVec), fetchLimit,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("vec search: %w", err)
-	}
-	defer vecRows.Close()
+	vecRanks := make(map[string]int)
+	bm25Ranks := make(map[string]int)
 
-	type vecHit struct {
-		entryID  string
-		distance float64
-	}
-	var hits []vecHit
-	for vecRows.Next() {
-		var h vecHit
-		if err := vecRows.Scan(&h.entryID, &h.distance); err != nil {
-			return nil, fmt.Errorf("scan vec: %w", err)
+	if s.embedder != nil {
+		queryVec, err := s.embedder.Embed(ctx, query)
+		if err != nil {
+			return nil, fmt.Errorf("embed query: %w", err)
 		}
-		hits = append(hits, h)
-	}
-	if err := vecRows.Err(); err != nil {
-		return nil, err
+
+		vecRows, err := s.db.QueryContext(ctx,
+			`SELECT entry_id, distance FROM entry_embeddings WHERE embedding MATCH ? ORDER BY distance LIMIT ?`,
+			journal.Float32ToJSON(queryVec), fetchLimit,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("vec search: %w", err)
+		}
+		rank := 1
+		for vecRows.Next() {
+			var entryID string
+			var distance float64
+			if err := vecRows.Scan(&entryID, &distance); err != nil {
+				vecRows.Close()
+				return nil, fmt.Errorf("scan vec: %w", err)
+			}
+			vecRanks[entryID] = rank
+			rank++
+		}
+		vecRows.Close()
+		if err := vecRows.Err(); err != nil {
+			return nil, err
+		}
 	}
 
-	if len(hits) == 0 {
+	bm25Rows, err := s.db.QueryContext(ctx,
+		`SELECT entry_id, rank FROM entries_fts WHERE content MATCH ? ORDER BY rank LIMIT ?`,
+		fts5Escape(query), fetchLimit,
+	)
+	if err == nil {
+		rank := 1
+		for bm25Rows.Next() {
+			var entryID string
+			var bm25rank float64
+			if err := bm25Rows.Scan(&entryID, &bm25rank); err != nil {
+				break
+			}
+			bm25Ranks[entryID] = rank
+			rank++
+		}
+		bm25Rows.Close()
+	}
+
+	if len(vecRanks) == 0 && len(bm25Ranks) == 0 {
 		return nil, nil
 	}
 
+	const (
+		rrfK           = 60
+		alphaVec       = 0.6
+		alphaBM25      = 0.4
+		missingPenalty = 1000
+	)
+
+	allIDs := make(map[string]struct{})
+	for id := range vecRanks {
+		allIDs[id] = struct{}{}
+	}
+	for id := range bm25Ranks {
+		allIDs[id] = struct{}{}
+	}
+
+	type scored struct {
+		id    string
+		score float64
+	}
+	candidates := make([]scored, 0, len(allIDs))
+	for id := range allIDs {
+		vr := missingPenalty
+		if r, ok := vecRanks[id]; ok {
+			vr = r
+		}
+		br := missingPenalty
+		if r, ok := bm25Ranks[id]; ok {
+			br = r
+		}
+		score := alphaVec/float64(rrfK+vr) + alphaBM25/float64(rrfK+br)
+		candidates = append(candidates, scored{id, score})
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].score > candidates[j].score
+	})
+
+	if len(candidates) > fetchLimit {
+		candidates = candidates[:fetchLimit]
+	}
+
+	nowMs := time.Now().UnixMilli()
 	var results []SearchResult
-	for _, h := range hits {
+	for _, c := range candidates {
 		var content, sectionsJSON string
 		var createdAt int64
 		err := s.db.QueryRowContext(ctx,
-			`SELECT content, sections, created_at FROM entries WHERE id = ?`, h.entryID,
+			`SELECT content, sections, created_at FROM entries WHERE id = ?`, c.id,
 		).Scan(&content, &sectionsJSON, &createdAt)
 		if err != nil {
 			continue
@@ -120,9 +178,13 @@ func (s *Service) Search(ctx context.Context, query string, opts SearchOptions) 
 			continue
 		}
 
+		ageDays := float64(nowMs-createdAt) / (24 * 60 * 60 * 1000)
+		decay := math.Pow(0.5, ageDays/90.0)
+		score := c.score * (0.8 + 0.2*decay)
+
 		results = append(results, SearchResult{
-			ID:        h.entryID,
-			Score:     1.0 - h.distance,
+			ID:        c.id,
+			Score:     score,
 			Content:   content,
 			Sections:  sections,
 			CreatedAt: createdAt,
@@ -134,7 +196,33 @@ func (s *Service) Search(ctx context.Context, query string, opts SearchOptions) 
 		}
 	}
 
+	if len(results) > 0 {
+		maxScore := results[0].Score
+		for _, r := range results[1:] {
+			if r.Score > maxScore {
+				maxScore = r.Score
+			}
+		}
+		if maxScore > 0 {
+			for i := range results {
+				results[i].Score = results[i].Score / maxScore
+			}
+		}
+	}
+
 	return results, nil
+}
+
+func fts5Escape(query string) string {
+	words := strings.Fields(query)
+	escaped := make([]string, 0, len(words))
+	for _, w := range words {
+		w = strings.ReplaceAll(w, `"`, ``)
+		if w != "" {
+			escaped = append(escaped, `"`+w+`"`)
+		}
+	}
+	return strings.Join(escaped, " ")
 }
 
 func (s *Service) ListRecent(ctx context.Context, limit, days int) ([]SearchResult, error) {
@@ -328,46 +416,81 @@ func hasMatchingSection(entrySections, filterSections []string) bool {
 
 func generateExcerpt(text, query string, maxLength int) string {
 	if query == "" || strings.TrimSpace(query) == "" {
-		if len(text) <= maxLength {
-			return text
-		}
-		return text[:maxLength] + "..."
+		return truncateAtBoundary(text, maxLength)
+	}
+
+	paragraphs := splitParagraphs(text)
+	if len(paragraphs) == 0 {
+		return truncateAtBoundary(text, maxLength)
 	}
 
 	queryWords := strings.Fields(strings.ToLower(query))
-	textLower := strings.ToLower(text)
 
-	bestPos := 0
-	bestScore := 0
-
-	for i := 0; i <= len(text)-maxLength; i += 20 {
-		end := i + maxLength
-		if end > len(text) {
-			end = len(text)
-		}
-		window := textLower[i:end]
+	bestIdx := 0
+	bestScore := -1
+	for i, p := range paragraphs {
+		pLower := strings.ToLower(p)
 		score := 0
-		for _, word := range queryWords {
-			if strings.Contains(window, word) {
-				score++
-			}
+		for _, w := range queryWords {
+			score += strings.Count(pLower, w)
 		}
 		if score > bestScore {
 			bestScore = score
-			bestPos = i
+			bestIdx = i
 		}
 	}
 
-	end := bestPos + maxLength
-	if end > len(text) {
-		end = len(text)
+	header := findPrecedingHeader(paragraphs, bestIdx)
+	var excerpt string
+	if header != "" {
+		excerpt = header + "\n\n" + paragraphs[bestIdx]
+	} else {
+		excerpt = paragraphs[bestIdx]
 	}
-	excerpt := text[bestPos:end]
-	if bestPos > 0 {
-		excerpt = "..." + excerpt
+
+	if bestIdx+1 < len(paragraphs) && len(excerpt)+len(paragraphs[bestIdx+1])+2 <= maxLength {
+		excerpt += "\n\n" + paragraphs[bestIdx+1]
 	}
-	if end < len(text) {
-		excerpt += "..."
+
+	return truncateAtBoundary(excerpt, maxLength)
+}
+
+func splitParagraphs(text string) []string {
+	raw := strings.Split(text, "\n\n")
+	paragraphs := make([]string, 0, len(raw))
+	for _, p := range raw {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			paragraphs = append(paragraphs, p)
+		}
 	}
-	return excerpt
+	return paragraphs
+}
+
+func findPrecedingHeader(paragraphs []string, idx int) string {
+	for i := idx; i >= 0; i-- {
+		if strings.HasPrefix(paragraphs[i], "## ") {
+			if i == idx {
+				return ""
+			}
+			return paragraphs[i]
+		}
+	}
+	return ""
+}
+
+func truncateAtBoundary(text string, maxLen int) string {
+	if len(text) <= maxLen {
+		return text
+	}
+	cut := text[:maxLen]
+	for i := len(cut) - 1; i > maxLen/2; i-- {
+		if cut[i] == '.' || cut[i] == '?' || cut[i] == '!' {
+			return cut[:i+1] + "..."
+		}
+	}
+	if idx := strings.LastIndex(cut, " "); idx > maxLen/2 {
+		return cut[:idx] + "..."
+	}
+	return cut + "..."
 }

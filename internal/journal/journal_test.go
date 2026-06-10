@@ -129,6 +129,30 @@ func TestFormatMarkdown(t *testing.T) {
 	}
 }
 
+func TestWritePopulatesFTS(t *testing.T) {
+	db := testDB(t)
+	mgr := NewManager(db, nil)
+
+	id, err := mgr.WriteThoughts(context.Background(), ThoughtInput{
+		ProjectNotes: "Testing FTS5 population with UUIDv7 identifiers.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var ftsEntryID, ftsContent string
+	err = db.QueryRow(`SELECT entry_id, content FROM entries_fts WHERE content MATCH '"UUIDv7"'`).Scan(&ftsEntryID, &ftsContent)
+	if err != nil {
+		t.Fatalf("FTS query: %v", err)
+	}
+	if ftsEntryID != id {
+		t.Errorf("FTS entry_id = %q, want %q", ftsEntryID, id)
+	}
+	if !searchString(ftsContent, "UUIDv7") {
+		t.Errorf("FTS content missing UUIDv7: %s", ftsContent)
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr)
 }
