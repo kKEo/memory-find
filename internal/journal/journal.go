@@ -43,6 +43,21 @@ func InitDB(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("create vec table: %w", err)
 	}
+	_, err = db.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(entry_id UNINDEXED, content)`)
+	if err != nil {
+		return fmt.Errorf("create fts table: %w", err)
+	}
+
+	var ftsCount, entryCount int
+	db.QueryRow(`SELECT COUNT(*) FROM entries_fts`).Scan(&ftsCount)
+	db.QueryRow(`SELECT COUNT(*) FROM entries`).Scan(&entryCount)
+	if ftsCount == 0 && entryCount > 0 {
+		_, err = db.Exec(`INSERT INTO entries_fts(entry_id, content) SELECT id, content FROM entries`)
+		if err != nil {
+			return fmt.Errorf("backfill fts: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -106,6 +121,14 @@ func (m *Manager) WriteThoughts(ctx context.Context, input ThoughtInput) (string
 	)
 	if err != nil {
 		return "", fmt.Errorf("insert entry: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO entries_fts(entry_id, content) VALUES (?, ?)`,
+		id, content,
+	)
+	if err != nil {
+		return "", fmt.Errorf("insert fts: %w", err)
 	}
 
 	if m.embedder != nil {
