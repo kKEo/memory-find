@@ -1,1 +1,12 @@
-memo-mcp
+# Built binary. Anchored to the repo root — an unanchored "memo-mcp" would
+# also match cmd/memo-mcp/, silently ignoring any new file added there.
+/memo-mcp
+
+# Local databases and coverage output that shouldn't be checked in.
+*.db
+*.db-wal
+*.db-shm
+coverage.out
+
+# JetBrains project files.
+.idea/

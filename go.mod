@@ -3,9 +3,10 @@ module github.com/kmaziarz/memo-mcp
 go 1.26.0
 
 require (
+	github.com/gofrs/flock v0.13.0
+	github.com/google/uuid v1.6.0
 	github.com/knights-analytics/hugot v0.7.2
 	github.com/modelcontextprotocol/go-sdk v1.6.0
-	github.com/schollz/progressbar/v3 v3.19.0
 	modernc.org/sqlite v1.50.0
 )
 
@@ -14,21 +15,17 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
-	github.com/gofrs/flock v0.13.0 // indirect
 	github.com/gomlx/exceptions v0.0.3 // indirect
 	github.com/gomlx/go-huggingface v0.3.5 // indirect
 	github.com/gomlx/go-xla v0.2.2 // indirect
 	github.com/gomlx/gomlx v0.27.3 // indirect
 	github.com/gomlx/onnx-gomlx v0.4.2 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/knights-analytics/ortgenai v0.3.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/viant/afs v1.30.0 // indirect

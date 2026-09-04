@@ -3,8 +3,12 @@ package search
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
@@ -192,6 +196,165 @@ func TestSectionFilter(t *testing.T) {
 	}
 }
 
+// TestScoresMonotonicallyDecreasing is the direct regression test for the
+// bug where the recency multiplier was applied to each result's score
+// after the candidates had already been sorted and truncated, so the
+// displayed scores could be non-monotonic (e.g. result #1 lower than #3).
+func TestScoresMonotonicallyDecreasing(t *testing.T) {
+	db := testDB(t)
+	emb := &topicEmbedder{}
+	seedEntries(t, db, emb)
+
+	svc := NewService(db, emb)
+	results, err := svc.Search(context.Background(), "TypeScript frustration auth session testing", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	for i := 1; i < len(results); i++ {
+		if results[i].Score > results[i-1].Score {
+			t.Errorf("scores not monotonically decreasing: result[%d].Score=%.4f > result[%d].Score=%.4f",
+				i, results[i].Score, i-1, results[i-1].Score)
+		}
+	}
+}
+
+// TestRecencyAffectsOrdering is the regression test for the recency decay
+// being computed but never actually changing result order (it used to be
+// applied after the final sort and truncation).
+func TestRecencyAffectsOrdering(t *testing.T) {
+	db := testDB(t)
+	mgr := journal.NewManager(db, nil)
+
+	oldID, err := mgr.WriteThoughts(context.Background(), journal.ThoughtInput{
+		Observations: "shared marker term appears here",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newID, err := mgr.WriteThoughts(context.Background(), journal.ThoughtInput{
+		Observations: "shared marker term appears here too",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Backdate the first entry by a year so the only thing distinguishing
+	// the two candidates, once BM25 ranks them near-identically, is recency.
+	oldCreatedAt := time.Now().AddDate(-1, 0, 0).UnixMilli()
+	if _, err := db.Exec(`UPDATE entries SET created_at = ? WHERE id = ?`, oldCreatedAt, oldID); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := NewService(db, nil)
+	results, err := svc.Search(context.Background(), "shared marker term", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) < 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if results[0].ID != newID {
+		t.Errorf("expected the newer entry (%s) ranked first, got %s ranked first (old entry %s)", newID, results[0].ID, oldID)
+	}
+}
+
+// TestSectionFilterFindsEntryOutsideTopK is the regression test for
+// filters being applied only after the candidate list was already
+// truncated to a small top-K window: a section-filtered search used to be
+// able to return nothing even though many matching entries existed,
+// simply because none of them happened to survive that earlier truncation.
+func TestSectionFilterFindsEntryOutsideTopK(t *testing.T) {
+	db := testDB(t)
+	emb := &mockEmbedder{vec: fixedVec(384)}
+	mgr := journal.NewManager(db, emb)
+
+	// Enough decoys (all in a different section, and all equally "close"
+	// under the fixed mock vector) to fill up the default fetch window on
+	// their own.
+	for i := 0; i < 40; i++ {
+		if _, err := mgr.WriteThoughts(context.Background(), journal.ThoughtInput{
+			Reflections: fmt.Sprintf("decoy entry number %d about unrelated topics", i),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	targetID, err := mgr.WriteThoughts(context.Background(), journal.ThoughtInput{
+		WorldKnowledge: "a rare fact worth remembering",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	svc := NewService(db, emb)
+	results, err := svc.Search(context.Background(), "rare fact", SearchOptions{
+		Limit:    10,
+		Sections: []string{"world_knowledge"},
+	})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+
+	found := false
+	for _, r := range results {
+		if r.ID == targetID {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected the world_knowledge entry (%s) to be found despite 40 decoys in another section", targetID)
+	}
+}
+
+// TestEmbedderErrorFallsBackToKeyword is the regression test for D5: a
+// query-time embedding error used to fail the whole search rather than
+// degrading to keyword-only, unlike the write path which already
+// tolerated a missing/failing embedder.
+func TestEmbedderErrorFallsBackToKeyword(t *testing.T) {
+	db := testDB(t)
+	mgr := journal.NewManager(db, nil)
+
+	if _, err := mgr.WriteThoughts(context.Background(), journal.ThoughtInput{
+		ProjectNotes: "a distinctive keyword findable by BM25 alone",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	failingEmb := &erroringEmbedder{err: errors.New("model unavailable")}
+	svc := NewService(db, failingEmb)
+
+	results, err := svc.Search(context.Background(), "distinctive keyword", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("expected Search to degrade to keyword-only, got error: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected a keyword-only match despite the embedder failing")
+	}
+}
+
+// TestExcerptsAreValidUTF8 guards against byte-index truncation splitting
+// a multi-byte rune, which used to be able to produce an excerpt that is
+// not valid UTF-8.
+func TestExcerptsAreValidUTF8(t *testing.T) {
+	text := strings.Repeat("héllo wörld 日本語のテキスト émojis 🎉🎊 ", 20)
+	for _, n := range []int{1, 5, 10, 50, 100, 200} {
+		got := truncateAtBoundary(text, n)
+		if !utf8.ValidString(got) {
+			t.Errorf("truncateAtBoundary(text, %d) produced invalid UTF-8: %q", n, got)
+		}
+	}
+}
+
+type erroringEmbedder struct {
+	err error
+}
+
+func (e *erroringEmbedder) Embed(_ context.Context, _ string) ([]float32, error) {
+	return nil, e.err
+}
+
+var _ embedding.Embedder = (*erroringEmbedder)(nil)
+
 func TestGetStats(t *testing.T) {
 	db := testDB(t)
 	emb := &mockEmbedder{vec: fixedVec(384)}
@@ -276,21 +439,55 @@ func TestGetStatsEmptyJournal(t *testing.T) {
 	}
 }
 
-func TestFTS5Escape(t *testing.T) {
+func TestFTS5Query(t *testing.T) {
 	tests := []struct {
 		input, want string
 	}{
-		{"hello world", `"hello" "world"`},
-		{`say "hi" there`, `"say" "hi" "there"`},
+		{"hello world", `"hello" OR "world"`},
+		{`say "hi" there`, `"say" OR "hi" OR "there"`},
 		{"  spaced  ", `"spaced"`},
 		{"single", `"single"`},
 		{"", ""},
+		// Punctuation-only input has no usable terms and must not produce
+		// a "MATCH ''" (FTS5 syntax error) or a bare operator.
+		{"???", ""},
+		{"a b", ""}, // single-character words are dropped
+		// FTS5 query-syntax operators in the raw input must not leak
+		// through into the built query.
+		{"foo* -bar (baz)", `"foo" OR "bar" OR "baz"`},
 	}
 	for _, tc := range tests {
-		got := fts5Escape(tc.input)
+		got := fts5Query(tc.input)
 		if got != tc.want {
-			t.Errorf("fts5Escape(%q) = %q, want %q", tc.input, got, tc.want)
+			t.Errorf("fts5Query(%q) = %q, want %q", tc.input, got, tc.want)
 		}
+	}
+}
+
+// TestFTS5QueryIsDisjunctive is the direct regression test for the bug
+// where FTS5's implicit AND between quoted terms made a natural-language,
+// multi-word search_journal query require every word to appear in the same
+// entry — which is close to never true in practice.
+func TestFTS5QueryIsDisjunctive(t *testing.T) {
+	db := testDB(t)
+	mgr := journal.NewManager(db, nil)
+
+	if _, err := mgr.WriteThoughts(context.Background(), journal.ThoughtInput{
+		ProjectNotes: "TypeScript type errors are everywhere in this codebase.",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := NewService(db, nil)
+	// Neither word alone would be surprising to match, but the entry does
+	// not contain the word "frustration" at all — only a disjunctive
+	// (OR) query can find it via "TypeScript".
+	results, err := svc.Search(context.Background(), "TypeScript frustration", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected a match on \"TypeScript\" alone under OR semantics, got none")
 	}
 }
 
