@@ -9,29 +9,15 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"unicode/utf8"
 
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
+
+	"github.com/kmaziarz/memo-mcp/internal/embedding"
 )
-
-type mockEmbedder struct {
-	vec []float32
-	err error
-}
-
-func (m *mockEmbedder) Embed(_ context.Context, _ string) ([]float32, error) {
-	return m.vec, m.err
-}
-
-func fixedVec(dim int) []float32 {
-	v := make([]float32, dim)
-	for i := range v {
-		v[i] = float32(i) * 0.001
-	}
-	return v
-}
 
 func testDB(t *testing.T) *sql.DB {
 	t.Helper()
@@ -49,7 +35,7 @@ func testDB(t *testing.T) *sql.DB {
 
 func TestWriteAndReadBack(t *testing.T) {
 	db := testDB(t)
-	emb := &mockEmbedder{vec: fixedVec(384)}
+	emb := embedding.NewHashEmbedder(384)
 	mgr := NewManager(db, emb)
 
 	id, err := mgr.WriteThoughts(context.Background(), ThoughtInput{
@@ -154,7 +140,7 @@ func (e *lengthLimitedEmbedder) Embed(_ context.Context, text string) ([]float32
 	if len([]rune(text)) > e.maxRunes {
 		return nil, fmt.Errorf("simulated tokenizer overflow: input has %d runes, limit is %d", len([]rune(text)), e.maxRunes)
 	}
-	return fixedVec(384), nil
+	return embedding.HashEmbed(text, 384), nil
 }
 
 // TestLongEntryStillGetsEmbedded is the regression test for the headline
@@ -298,6 +284,67 @@ func TestOpenDBPermissions(t *testing.T) {
 	}
 	if perm := dbInfo.Mode().Perm(); perm != 0o600 {
 		t.Errorf("db file perm = %o, want 0600", perm)
+	}
+}
+
+// TestConcurrentWriters is the regression test for D11/D17: two separate
+// *sql.DB handles opened against the same on-disk file (standing in for
+// two processes, or two Claude sessions, sharing one JOURNAL_TOKEN) must
+// be able to interleave writes without hitting SQLITE_BUSY. This only
+// exercises anything meaningful because OpenDB configures WAL mode,
+// busy_timeout, and _txlock=immediate on the DSN — an in-memory database
+// or a single *sql.DB can't reproduce the cross-connection contention this
+// guards against.
+func TestConcurrentWriters(t *testing.T) {
+	base := t.TempDir()
+	const token = "concurrent"
+
+	db1, err := OpenDB(token, base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db1.Close()
+
+	db2, err := OpenDB(token, base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db2.Close()
+
+	mgr1 := NewManager(db1, nil)
+	mgr2 := NewManager(db2, nil)
+
+	const perWriter = 25
+	var wg sync.WaitGroup
+	errs := make(chan error, perWriter*2)
+
+	write := func(mgr *Manager, label string) {
+		defer wg.Done()
+		for i := 0; i < perWriter; i++ {
+			if _, err := mgr.WriteThoughts(context.Background(), ThoughtInput{
+				Observations: fmt.Sprintf("%s entry %d", label, i),
+			}); err != nil {
+				errs <- err
+			}
+		}
+	}
+
+	wg.Add(2)
+	go write(mgr1, "writer1")
+	go write(mgr2, "writer2")
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Errorf("concurrent write failed: %v", err)
+	}
+
+	var count int
+	if err := db1.QueryRow(`SELECT COUNT(*) FROM entries`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != perWriter*2 {
+		t.Errorf("expected %d entries across both writers, got %d", perWriter*2, count)
 	}
 }
 

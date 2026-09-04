@@ -31,7 +31,7 @@ func NewHugotEmbedder(ctx context.Context, modelDir string) (*HugotEmbedder, err
 		return nil, fmt.Errorf("create hugot session: %w", err)
 	}
 
-	pipe, err := loadPipelineWithRecovery(ctx, session, modelDir)
+	pipe, err := loadPipelineWithRecovery(ctx, session, modelDir, fetchFromHuggingFace)
 	if err != nil {
 		session.Destroy()
 		return nil, err
@@ -79,13 +79,13 @@ const modelName = "sentence-transformers/all-MiniLM-L6-v2"
 // feature-extraction pipeline. If the pipeline fails to load from what
 // looks like a ready model cache, the cache is treated as corrupt: it is
 // wiped and the download is retried exactly once before giving up.
-func loadPipelineWithRecovery(ctx context.Context, session *hugot.Session, modelDir string) (*pipelines.FeatureExtractionPipeline, error) {
+func loadPipelineWithRecovery(ctx context.Context, session *hugot.Session, modelDir string, fetch modelFetcher) (*pipelines.FeatureExtractionPipeline, error) {
 	const maxAttempts = 2
 
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		forceRedownload := attempt > 0
-		modelPath, err := downloadModelWithProgress(ctx, modelDir, forceRedownload)
+		modelPath, err := downloadModel(ctx, modelDir, forceRedownload, fetch)
 		if err != nil {
 			return nil, fmt.Errorf("download model: %w", err)
 		}
@@ -113,9 +113,22 @@ func sanitizedModelDirName(name string) string {
 	return strings.ReplaceAll(name, "/", "_")
 }
 
-// downloadModelWithProgress ensures the embedding model is present under
-// modelDir and returns the path to its directory, downloading it first if
-// necessary.
+// modelFetcher downloads modelName's files into destDir and returns the
+// path to the resulting model directory, mirroring hugot.DownloadModel's
+// contract. Production uses fetchFromHuggingFace; tests inject a fake that
+// writes a placeholder directory with no network access, so the
+// atomic-rename, sentinel, and corruption-recovery logic in downloadModel
+// can be exercised in isolation from the real ~90MB download.
+type modelFetcher func(ctx context.Context, modelName, destDir string) (string, error)
+
+func fetchFromHuggingFace(ctx context.Context, modelName, destDir string) (string, error) {
+	opts := hugot.NewDownloadOptions()
+	opts.OnnxFilePath = "onnx/model.onnx"
+	return hugot.DownloadModel(ctx, modelName, destDir, opts)
+}
+
+// downloadModel ensures the embedding model is present under modelDir and
+// returns the path to its directory, fetching it first if necessary.
 //
 // Readiness is tracked with a sentinel file, not directory existence: an
 // interrupted download used to leave a partial model directory behind that
@@ -124,10 +137,10 @@ func sanitizedModelDirName(name string) string {
 // download lands in a temporary directory and is atomically renamed into
 // place only once it's complete, and the sentinel is written only after
 // that rename succeeds. A file lock prevents two concurrent first-run
-// processes from downloading the same ~90MB model at once.
+// processes from downloading the same model at once.
 //
 // If force is true, any existing cached copy is discarded first.
-func downloadModelWithProgress(ctx context.Context, modelDir string, force bool) (string, error) {
+func downloadModel(ctx context.Context, modelDir string, force bool, fetch modelFetcher) (string, error) {
 	if err := os.MkdirAll(modelDir, 0o755); err != nil {
 		return "", fmt.Errorf("create model dir: %w", err)
 	}
@@ -172,9 +185,7 @@ func downloadModelWithProgress(ctx context.Context, modelDir string, force bool)
 
 	fmt.Fprintln(os.Stderr, "Downloading embedding model (first run only)...")
 
-	opts := hugot.NewDownloadOptions()
-	opts.OnnxFilePath = "onnx/model.onnx"
-	downloadedPath, err := hugot.DownloadModel(ctx, modelName, tmpDir, opts)
+	downloadedPath, err := fetch(ctx, modelName, tmpDir)
 	if err != nil {
 		return "", err
 	}
@@ -203,7 +214,7 @@ func isModelReady(modelDirPath, sentinelPath string) bool {
 // in loadPipelineWithRecovery doesn't catch (e.g. a model that loads but
 // produces bad output after a partial write).
 func RedownloadModel(ctx context.Context, modelDir string) (string, error) {
-	return downloadModelWithProgress(ctx, modelDir, true)
+	return downloadModel(ctx, modelDir, true, fetchFromHuggingFace)
 }
 
 func DefaultModelDir() string {

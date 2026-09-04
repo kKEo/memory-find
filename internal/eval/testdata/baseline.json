@@ -1,0 +1,301 @@
+{
+  "per_query": [
+    {
+      "query_id": "auth-jwt-expiry",
+      "recall_at_1": 0.5,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "irrelevant_mean_rank": 11,
+      "num_relevant": 2,
+      "num_irrelevant": 2
+    },
+    {
+      "query_id": "auth-session-bug",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "irrelevant_mean_rank": 2,
+      "num_relevant": 1,
+      "num_irrelevant": 1
+    },
+    {
+      "query_id": "postgres-index",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "irrelevant_mean_rank": 11,
+      "num_relevant": 1,
+      "num_irrelevant": 1
+    },
+    {
+      "query_id": "postgres-migration-lock",
+      "recall_at_1": 0.5,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 0.8772153153380494,
+      "irrelevant_mean_rank": 11,
+      "num_relevant": 2,
+      "num_irrelevant": 1
+    },
+    {
+      "query_id": "react-rerender",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "irrelevant_mean_rank": 11,
+      "num_relevant": 1,
+      "num_irrelevant": 1
+    },
+    {
+      "query_id": "grpc-interceptor",
+      "recall_at_1": 0.5,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "irrelevant_mean_rank": 3,
+      "num_relevant": 2,
+      "num_irrelevant": 1
+    },
+    {
+      "query_id": "docker-image-size",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "kubernetes-rollout",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "auth-random-logout",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "db-slow-backup",
+      "recall_at_1": 0,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 0.5,
+      "ndcg_10": 0.6309297535714574,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "frontend-slow-mobile",
+      "recall_at_1": 0.5,
+      "recall_at_5": 0.5,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 0.8315546295836226,
+      "num_relevant": 2
+    },
+    {
+      "query_id": "flaky-tests",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "onboarding-drop-off",
+      "recall_at_1": 0.5,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 2
+    },
+    {
+      "query_id": "mood-deadline-stress",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "irrelevant_mean_rank": 11,
+      "num_relevant": 1,
+      "num_irrelevant": 1
+    },
+    {
+      "query_id": "mood-burnout",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "mood-oncall-anxiety",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "user-context-deadline",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "wk-negative-control-auth",
+      "recall_at_1": 0.5,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "irrelevant_mean_rank": 11,
+      "num_relevant": 2,
+      "num_irrelevant": 3
+    },
+    {
+      "query_id": "wk-negative-control-db",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "irrelevant_mean_rank": 10.5,
+      "num_relevant": 1,
+      "num_irrelevant": 2
+    },
+    {
+      "query_id": "no-match-cooking",
+      "recall_at_1": 0,
+      "recall_at_5": 0,
+      "recall_at_10": 0,
+      "mrr": 0,
+      "ndcg_10": 0,
+      "irrelevant_mean_rank": 11,
+      "num_relevant": 0,
+      "num_irrelevant": 3
+    },
+    {
+      "query_id": "no-match-astronomy",
+      "recall_at_1": 0,
+      "recall_at_5": 0,
+      "recall_at_10": 0,
+      "mrr": 0,
+      "ndcg_10": 0,
+      "irrelevant_mean_rank": 7,
+      "num_relevant": 0,
+      "num_irrelevant": 2
+    },
+    {
+      "query_id": "stemming-gap-review",
+      "recall_at_1": 0,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 0.3333333333333333,
+      "ndcg_10": 0.5,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "section-filtered-standup",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "recency-rate-limit",
+      "recall_at_1": 0.5,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 0.8503449055347547,
+      "num_relevant": 2
+    },
+    {
+      "query_id": "long-entry-incident-code",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "long-entry-websocket-ticket",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "long-entry-billing-account",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 1
+    },
+    {
+      "query_id": "hybrid-frontend-performance",
+      "recall_at_1": 0.5,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "irrelevant_mean_rank": 11,
+      "num_relevant": 2,
+      "num_irrelevant": 1
+    },
+    {
+      "query_id": "hybrid-grpc-chain-order",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "irrelevant_mean_rank": 2,
+      "num_relevant": 1,
+      "num_irrelevant": 1
+    }
+  ],
+  "mean": {
+    "query_id": "MEAN",
+    "recall_at_1": 0.7241379310344828,
+    "recall_at_5": 0.9137931034482759,
+    "recall_at_10": 0.9310344827586207,
+    "mrr": 0.8908045977011494,
+    "ndcg_10": 0.8858636070354442,
+    "irrelevant_mean_rank": 8.653846153846153,
+    "num_relevant": 0
+  }
+}

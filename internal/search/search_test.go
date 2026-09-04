@@ -17,24 +17,6 @@ import (
 	"github.com/kmaziarz/memo-mcp/internal/journal"
 )
 
-type mockEmbedder struct {
-	vec []float32
-}
-
-func (m *mockEmbedder) Embed(_ context.Context, _ string) ([]float32, error) {
-	return m.vec, nil
-}
-
-var _ embedding.Embedder = (*mockEmbedder)(nil)
-
-func fixedVec(dim int) []float32 {
-	v := make([]float32, dim)
-	for i := range v {
-		v[i] = float32(i) * 0.001
-	}
-	return v
-}
-
 func testDB(t *testing.T) *sql.DB {
 	t.Helper()
 	db, err := sql.Open("sqlite", ":memory:")
@@ -68,7 +50,7 @@ func seedEntries(t *testing.T, db *sql.DB, emb embedding.Embedder) {
 
 func TestSearchReturnsResults(t *testing.T) {
 	db := testDB(t)
-	emb := &mockEmbedder{vec: fixedVec(384)}
+	emb := embedding.NewHashEmbedder(384)
 	seedEntries(t, db, emb)
 
 	svc := NewService(db, emb)
@@ -80,14 +62,23 @@ func TestSearchReturnsResults(t *testing.T) {
 	if len(results) == 0 {
 		t.Fatal("expected at least one result")
 	}
+	// The 3-entry seed corpus is smaller than the default fetch window, so
+	// every entry surfaces via the vector arm regardless of relevance —
+	// that part of the count is an artifact of the fixture being tiny, not
+	// a meaningful assertion on its own. What's meaningful, and what a
+	// degenerate constant-vector mock could never exercise, is that the
+	// one entry actually about "TypeScript" ranks first.
 	if len(results) != 3 {
 		t.Errorf("expected 3 results, got %d", len(results))
+	}
+	if !strings.Contains(results[0].Content, "TypeScript") {
+		t.Errorf("expected the TypeScript entry ranked first, got: %s", results[0].Excerpt)
 	}
 }
 
 func TestListRecent(t *testing.T) {
 	db := testDB(t)
-	emb := &mockEmbedder{vec: fixedVec(384)}
+	emb := embedding.NewHashEmbedder(384)
 	seedEntries(t, db, emb)
 
 	svc := NewService(db, emb)
@@ -135,7 +126,7 @@ func TestReadEntryNotFound(t *testing.T) {
 
 func TestReadRecentEntries(t *testing.T) {
 	db := testDB(t)
-	emb := &mockEmbedder{vec: fixedVec(384)}
+	emb := embedding.NewHashEmbedder(384)
 	seedEntries(t, db, emb)
 
 	svc := NewService(db, emb)
@@ -170,7 +161,7 @@ func TestGenerateExcerpt(t *testing.T) {
 
 func TestSectionFilter(t *testing.T) {
 	db := testDB(t)
-	emb := &mockEmbedder{vec: fixedVec(384)}
+	emb := embedding.NewHashEmbedder(384)
 	seedEntries(t, db, emb)
 
 	svc := NewService(db, emb)
@@ -265,12 +256,13 @@ func TestRecencyAffectsOrdering(t *testing.T) {
 // simply because none of them happened to survive that earlier truncation.
 func TestSectionFilterFindsEntryOutsideTopK(t *testing.T) {
 	db := testDB(t)
-	emb := &mockEmbedder{vec: fixedVec(384)}
+	emb := embedding.NewHashEmbedder(384)
 	mgr := journal.NewManager(db, emb)
 
-	// Enough decoys (all in a different section, and all equally "close"
-	// under the fixed mock vector) to fill up the default fetch window on
-	// their own.
+	// Enough decoys, in a different section from the target, to fill up
+	// the default fetch window on their own — filtering must find the
+	// target via SQL regardless of where it would have ranked in an
+	// unfiltered top-K.
 	for i := 0; i < 40; i++ {
 		if _, err := mgr.WriteThoughts(context.Background(), journal.ThoughtInput{
 			Reflections: fmt.Sprintf("decoy entry number %d about unrelated topics", i),
@@ -320,7 +312,7 @@ func TestEmbedderErrorFallsBackToKeyword(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	failingEmb := &erroringEmbedder{err: errors.New("model unavailable")}
+	failingEmb := embedding.NewFailingEmbedder(errors.New("model unavailable"))
 	svc := NewService(db, failingEmb)
 
 	results, err := svc.Search(context.Background(), "distinctive keyword", SearchOptions{Limit: 10})
@@ -345,19 +337,9 @@ func TestExcerptsAreValidUTF8(t *testing.T) {
 	}
 }
 
-type erroringEmbedder struct {
-	err error
-}
-
-func (e *erroringEmbedder) Embed(_ context.Context, _ string) ([]float32, error) {
-	return nil, e.err
-}
-
-var _ embedding.Embedder = (*erroringEmbedder)(nil)
-
 func TestGetStats(t *testing.T) {
 	db := testDB(t)
-	emb := &mockEmbedder{vec: fixedVec(384)}
+	emb := embedding.NewHashEmbedder(384)
 	seedEntries(t, db, emb)
 
 	svc := NewService(db, emb)
@@ -524,7 +506,7 @@ func TestBM25OnlySearch(t *testing.T) {
 
 func TestHybridSearchMerge(t *testing.T) {
 	db := testDB(t)
-	emb := &mockEmbedder{vec: fixedVec(384)}
+	emb := embedding.NewHashEmbedder(384)
 	mgr := journal.NewManager(db, emb)
 
 	inputs := []journal.ThoughtInput{
