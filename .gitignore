@@ -8,5 +8,9 @@
 *.db-shm
 coverage.out
 
+# ...except checked-in test fixture databases, which are deliberately
+# tracked (see internal/journal/migrate_test.go).
+!internal/**/testdata/*.db
+
 # JetBrains project files.
 .idea/
