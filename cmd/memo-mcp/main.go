@@ -19,15 +19,28 @@ import (
 
 func main() {
 	statsFlag := flag.Bool("stats", false, "Display journal statistics and exit")
+	redownloadModelFlag := flag.Bool("redownload-model", false, "Force a fresh download of the embedding model, discarding any cached copy, then exit")
 	flag.Parse()
 
-	if err := run(*statsFlag); err != nil {
+	if err := run(*statsFlag, *redownloadModelFlag); err != nil {
 		fmt.Fprintf(os.Stderr, "fatal: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(showStats bool) error {
+func run(showStats, redownloadModel bool) error {
+	ctx := context.Background()
+
+	if redownloadModel {
+		modelDir := embedding.DefaultModelDir()
+		fmt.Fprintf(os.Stderr, "Redownloading embedding model into %s...\n", modelDir)
+		if _, err := embedding.RedownloadModel(ctx, modelDir); err != nil {
+			return fmt.Errorf("redownload model: %w", err)
+		}
+		fmt.Fprintln(os.Stderr, "Done.")
+		return nil
+	}
+
 	token := os.Getenv("JOURNAL_TOKEN")
 	if token == "" {
 		return fmt.Errorf("JOURNAL_TOKEN environment variable is required")
@@ -41,28 +54,38 @@ func run(showStats bool) error {
 	}
 	defer db.Close()
 
-	ctx := context.Background()
-
 	// If --stats flag, display stats and exit
 	if showStats {
 		return displayStats(ctx, db)
 	}
 
 	// Normal server startup
-	modelDir := embedding.DefaultModelDir()
-	embedder, err := embedding.NewHugotEmbedder(ctx, modelDir)
+	embedder, cleanup, err := buildEmbedder(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: embedding unavailable, search will not work: %v\n", err)
+		fmt.Fprintf(os.Stderr, "warning: embedding unavailable, semantic search will fall back to keyword search: %v\n", err)
 	}
-	if embedder != nil {
-		defer embedder.Destroy()
-	}
+	defer cleanup()
 
 	journalMgr := journal.NewManager(db, embedder)
 	searchSvc := search.NewService(db, embedder)
 	srv := server.New(journalMgr, searchSvc)
 
 	return srv.Run(ctx)
+}
+
+// buildEmbedder constructs the embedding backend, returning a genuinely nil
+// embedding.Embedder interface value on failure — not a non-nil interface
+// wrapping a nil *embedding.HugotEmbedder. That distinction matters: every
+// caller of embedder.Embed(...) checks "if embedder != nil" first, and that
+// check only works if a failed build produces a true nil interface. Passing
+// a nil *HugotEmbedder through the interface directly makes that check
+// silently pass anyway, and the resulting Embed call panics.
+func buildEmbedder(ctx context.Context) (embedding.Embedder, func(), error) {
+	e, err := embedding.NewHugotEmbedder(ctx, embedding.DefaultModelDir())
+	if err != nil {
+		return nil, func() {}, err
+	}
+	return e, e.Destroy, nil
 }
 
 func displayStats(ctx context.Context, db *sql.DB) error {

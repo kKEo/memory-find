@@ -49,13 +49,18 @@ type processThoughtsArgs struct {
 }
 
 type searchArgs struct {
-	Query    string   `json:"query" jsonschema:"required,Natural language search query"`
+	// Requiredness for both fields below comes from the absence of
+	// "omitempty" in the json tag, not from the jsonschema tag — the
+	// jsonschema tag's value becomes the field's description verbatim, so
+	// it must never start with a "required," directive; that string
+	// leaked straight into what the model reads.
+	Query    string   `json:"query" jsonschema:"Natural language search query"`
 	Limit    int      `json:"limit,omitempty" jsonschema:"Maximum number of results to return (default: 10)"`
 	Sections []string `json:"sections,omitempty" jsonschema:"Filter by section types"`
 }
 
 type readEntryArgs struct {
-	ID string `json:"id" jsonschema:"required,Entry ID (from search results)"`
+	ID string `json:"id" jsonschema:"Entry ID (from search results)"`
 }
 
 type listRecentArgs struct {
@@ -108,7 +113,7 @@ func (s *Server) handleProcessThoughts(ctx context.Context, _ *mcp.CallToolReque
 		Reflections:       args.Reflections,
 		Observations:      args.Observations,
 		ProjectNotes:      args.ProjectNotes,
-		UserContext:        args.UserContext,
+		UserContext:       args.UserContext,
 		TechnicalInsights: args.TechnicalInsights,
 		WorldKnowledge:    args.WorldKnowledge,
 	}
@@ -130,13 +135,11 @@ func (s *Server) handleSearchJournal(ctx context.Context, _ *mcp.CallToolRequest
 		return nil, nil, fmt.Errorf("query is required")
 	}
 
-	limit := args.Limit
-	if limit <= 0 {
-		limit = 10
-	}
-
+	// args.Limit's default (when <= 0) and upper bound are enforced by
+	// search.Service.Search itself, so there's exactly one place that
+	// defines them.
 	opts := search.SearchOptions{
-		Limit:    limit,
+		Limit:    args.Limit,
 		Sections: args.Sections,
 	}
 
@@ -176,16 +179,14 @@ func (s *Server) handleReadEntry(ctx context.Context, _ *mcp.CallToolRequest, ar
 }
 
 func (s *Server) handleListRecent(ctx context.Context, _ *mcp.CallToolRequest, args listRecentArgs) (*mcp.CallToolResult, any, error) {
-	limit := args.Limit
-	if limit <= 0 {
-		limit = 10
-	}
 	days := args.Days
 	if days <= 0 {
 		days = 30
 	}
 
-	results, err := s.search.ListRecent(ctx, limit, days)
+	// args.Limit's default and upper bound are enforced by
+	// search.Service.ListRecent itself.
+	results, err := s.search.ListRecent(ctx, args.Limit, days)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -208,12 +209,9 @@ func (s *Server) handleListRecent(ctx context.Context, _ *mcp.CallToolRequest, a
 }
 
 func (s *Server) handleReadRecent(ctx context.Context, _ *mcp.CallToolRequest, args readRecentArgs) (*mcp.CallToolResult, any, error) {
-	limit := args.Limit
-	if limit <= 0 {
-		limit = 5
-	}
-
-	results, err := s.search.ReadRecentEntries(ctx, limit)
+	// args.Limit's default and upper bound are enforced by
+	// search.Service.ReadRecentEntries itself.
+	results, err := s.search.ReadRecentEntries(ctx, args.Limit)
 	if err != nil {
 		return nil, nil, err
 	}
