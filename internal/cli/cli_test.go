@@ -3,10 +3,14 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/kKEo/memory-find/internal/retrieve"
 )
 
 func env(m map[string]string) Getenv { return func(k string) string { return m[k] } }
@@ -16,7 +20,7 @@ func TestResolveConfigDefaultsToMemoKBUnderHome(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DBName != "default" || cfg.KBDir != filepath.Join("/tmp/home", "kb") || cfg.DBDir != "/tmp/home" {
+	if cfg.DBName != "default" || cfg.KBDir != filepath.Join("/tmp/home", "kb") || cfg.LogQueries {
 		t.Fatalf("got %+v", cfg)
 	}
 	if len(cfg.Deprecations) != 0 {
@@ -34,18 +38,24 @@ func TestResolveConfigMemoKBName(t *testing.T) {
 	}
 }
 
-// Legacy variables keep their exact old meaning (old directory, no kb/
-// subfolder) so existing journals stay reachable, and warn.
+// Legacy variables are accepted as aliases for one release (JOURNAL_TOKEN as
+// the name, JOURNAL_PATH as the home) with warnings; old journal files are
+// never opened, the knowledge base is a new file under <home>/kb.
 func TestResolveConfigLegacyJournalVariables(t *testing.T) {
-	cfg, err := ResolveConfig(env(map[string]string{"MEMO_HOME": "/tmp/home", "JOURNAL_TOKEN": "proj", "JOURNAL_PATH": "/data/journals", "MEMO_KB": "ignored"}))
+	cfg, err := ResolveConfig(env(map[string]string{"JOURNAL_TOKEN": "proj", "JOURNAL_PATH": "/data/journals", "MEMO_QUERY_LOG": "1"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DBName != "proj" || cfg.DBDir != "/data/journals" || cfg.KBDir != filepath.Join("/tmp/home", "kb") {
+	if cfg.DBName != "proj" || cfg.KBDir != filepath.Join("/data/journals", "kb") || !cfg.LogQueries {
 		t.Fatalf("got %+v", cfg)
 	}
 	if len(cfg.Deprecations) != 2 {
 		t.Fatalf("want 2 deprecation warnings, got %v", cfg.Deprecations)
+	}
+	// MEMO_KB wins over the legacy name when both are set.
+	cfg, _ = ResolveConfig(env(map[string]string{"JOURNAL_TOKEN": "proj", "MEMO_KB": "new"}))
+	if cfg.DBName != "new" {
+		t.Fatalf("got %+v", cfg)
 	}
 }
 
@@ -167,5 +177,62 @@ func TestFenceCode(t *testing.T) {
 	}
 	if fenceCode("notes.md", "# hi\n") != "# hi\n" {
 		t.Fatal("markdown must not be fenced")
+	}
+}
+
+// search and explain work from the terminal without a model (keyword-only,
+// flagged degraded), and the CLI's numbers are the retrieval service's own
+// numbers: the same Why struct, serialised, not a re-computation.
+func TestSearchAndExplainCommands(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("MEMO_HOME", home)
+	t.Setenv("MEMO_KB", "demo")
+	t.Setenv("JOURNAL_TOKEN", "")
+	t.Setenv("MEMO_QUERY_LOG", "1")
+	run := func(args ...string) (string, string, int) {
+		var out, errOut bytes.Buffer
+		code := Main(context.Background(), "dev", args, &out, &errOut)
+		return out.String(), errOut.String(), code
+	}
+	doc := filepath.Join(t.TempDir(), "i.md")
+	if err := os.WriteFile(doc, []byte("# gRPC Interceptors\n\nInterceptors run in registration order; put auth before logging.\n\n## Errors\n\nERR_CONN_RESET maps to codes.Unavailable.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, errOut, code := run("ingest", doc, "--ns", "grpc", "--embed=false"); code != 0 {
+		t.Fatalf("ingest: %s %s", out, errOut)
+	}
+	out, errOut, code := run("search", "auth interceptor order", "--no-model")
+	if code != 0 || !strings.Contains(out, "gRPC Interceptors") || !strings.Contains(out, "degraded") {
+		t.Fatalf("search: %d %s %s", code, out, errOut)
+	}
+	out, _, code = run("search", "ERR_CONN_RESET", "--no-model", "--format", "json")
+	if code != 0 {
+		t.Fatalf("search json: %s", out)
+	}
+	var resp retrieve.Response
+	if err := json.Unmarshal([]byte(out), &resp); err != nil || len(resp.Results) == 0 {
+		t.Fatalf("json output: %v %s", err, out)
+	}
+	// explain for one address prints its Why; the fused score must equal the
+	// service's own number for that result.
+	out, _, code = run("explain", "ERR_CONN_RESET", resp.Results[0].URI, "--no-model")
+	if code != 0 {
+		t.Fatalf("explain: %s", out)
+	}
+	var why retrieve.Why
+	if err := json.Unmarshal([]byte(out), &why); err != nil {
+		t.Fatalf("explain json: %v %s", err, out)
+	}
+	if why.URI != resp.Results[0].URI || math.Abs(why.Final-resp.Results[0].Score) > 1e-12 {
+		t.Fatalf("CLI explain disagrees with search: %+v vs %+v", why, resp.Results[0])
+	}
+	// The query log recorded the searches (opt-in via MEMO_QUERY_LOG=1).
+	out, _, code = run("log", "tail")
+	if code != 0 || !strings.Contains(out, "ERR_CONN_RESET") {
+		t.Fatalf("log tail: %s", out)
+	}
+	out, _, code = run("search", "quasar entanglement", "--no-model")
+	if code != 0 || !strings.Contains(out, "no results") {
+		t.Fatalf("abstention: %s", out)
 	}
 }

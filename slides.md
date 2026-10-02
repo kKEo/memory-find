@@ -1,9 +1,9 @@
 ---
 theme: default
-title: "memo-mcp: A Private Journal for Claude"
+title: "memo-mcp: A Measurable Local Knowledge Base for Agents"
 info: |
-  An introduction to memo-mcp — a local MCP server that gives Claude
-  a persistent, searchable private journal.
+  An introduction to memo-mcp — a local MCP server that gives agents
+  a measurable, explainable knowledge base.
 highlighter: shiki
 drawings:
   persist: false
@@ -12,9 +12,9 @@ transition: slide-left
 
 # memo-mcp
 
-## A Private Journal for Claude
+## A Measurable Local Knowledge Base for Agents
 
-Giving AI a memory it can search
+Knowledge an agent can fill, search, and explain
 
 <style>
 h1 {
@@ -151,43 +151,41 @@ Keep these handy; they'll show up again.
 
 # What memo-mcp Does
 
-A local MCP server with **6 tools**:
+A local MCP server with **4 tools** over one knowledge base:
 
 | Tool | Purpose |
 |------|---------|
-| `process_thoughts` | Write a new journal entry |
-| `search_journal` | Hybrid keyword + semantic search across all entries |
-| `read_journal_entry` | Read a specific entry by ID |
-| `list_recent_entries` | Browse recent entries |
-| `read_recent_entries` | Read full content of recent entries |
-| `journal_stats` | Entry count, coverage, storage size |
+| `ingest` | Store a document the agent fetched or wrote, split into passages |
+| `search` | Find passages by words, exact identifiers and meaning, fused into one list |
+| `read` | Dereference a `memo://` address: a passage, its section, or the document |
+| `status` | Namespaces, the embedding model, pending vectors, background jobs |
 
 <v-click>
 
-All data stays on **your machine**. No cloud. No API calls.
+Plus a terminal face: `memo-mcp ingest | search | explain | read | ls | export --md | verify`.
+
+All data stays on **your machine**. The only network call ever is the one-time model download.
 
 </v-click>
 
 ---
 
-# The 6 Thought Categories
+# Sources, Documents, Chunks
 
-When Claude writes a journal entry, it can use any combination of:
+Every piece of knowledge knows where it came from:
 
 <v-clicks>
 
-- **reflections** — integrated thinking, noticing, processing
-- **observations** — short, discrete one-liners
-- **project_notes** — technical insights about the current codebase
-- **user_context** — notes about working with you
-- **technical_insights** — broader software engineering learnings
-- **world_knowledge** — interesting facts and domain knowledge
+- **Source** — the URL or file, its library and version, when it was fetched, and how much we trust it
+- **Document** — the text as ingested; a changed page becomes a new *revision*, the old one is kept
+- **Chunk** — a passage of ~200 tokens; the unit search ranks, indexed three ways
+- **Namespace** — a labelled shelf inside one file (a library, a project, "personal"); searches span all shelves, writes go to one
 
 </v-clicks>
 
 <v-click>
 
-Each is a **private space** — Claude writes freely, honestly, without filters.
+**Trust is set by the channel, not by the caller.** Tool writes are `agent`; the command line writes `user`; `curated` has to be typed on purpose.
 
 </v-click>
 
@@ -197,29 +195,34 @@ Each is a **private space** — Claude writes freely, honestly, without filters.
 
 ```mermaid
 flowchart TB
-    Claude["Claude Desktop / Claude Code"]
+    Agent["Claude Desktop / Claude Code"]
+    Human["Terminal / Obsidian"]
     subgraph Server["memo-mcp binary"]
-        MCP["MCP Server<br/>(stdio transport)"]
-        J["Journal Manager"]
-        S["Search Service"]
-        E["Embedder<br/>(all-MiniLM-L6-v2)"]
+        MCP["MCP Server<br/>(4 typed tools, stdio)"]
+        CLI["CLI<br/>(ingest, search, explain, export)"]
+        KB["kb: store, chunks, jobs, audit"]
+        R["retrieve: 3 arms + fusion + explain"]
+        E["embedding<br/>(all-MiniLM-L6-v2, pure Go)"]
     end
-    DB[("SQLite<br/>+ sqlite-vec + FTS5")]
+    DB[("SQLite<br/>FTS5 ×2 + vectors")]
 
-    Claude <-->|stdio| MCP
-    MCP --> J
-    MCP --> S
-    J --> E
-    J --> DB
-    S --> E
-    S --> DB
+    Agent <-->|stdio| MCP
+    Human <--> CLI
+    MCP --> KB
+    MCP --> R
+    CLI --> KB
+    CLI --> R
+    KB --> E
+    R --> E
+    KB --> DB
+    R --> DB
 ```
 
 <v-click>
 
-**4 packages** — `embedding`, `journal`, `search`, `server`
+**7 packages** — `kb`, `chunk`, `embedding`, `retrieve`, `server`, `cli`, `eval`
 
-**Single binary**, zero system dependencies, ~31MB
+**Single binary**, zero system dependencies, pure Go (`CGO_ENABLED=0`)
 
 </v-click>
 
@@ -228,24 +231,23 @@ flowchart TB
 # How Writing Works
 
 ```mermaid
-sequenceDiagram
-    participant C as Claude
-    participant S as MCP Server
-    participant DB as SQLite
-
-    C->>S: process_thoughts(reflections: "...")
-    S->>S: Format as markdown
-    S->>S: Generate UUID v7
-    S->>DB: INSERT entry (content, sections, timestamp)
-    S->>S: Generate embedding (384-dim vector)
-    S->>DB: INSERT embedding
-    S->>C: "Thoughts recorded. ID: 019..."
+flowchart LR
+    A["ingest(content, source)"] --> N["normalise + hash"]
+    N -->|same hash| D0["no-op: already stored"]
+    N -->|changed| D["new document revision"]
+    D --> C["chunk<br/>(headings → paragraphs → sentences)"]
+    C --> F["keyword indexes<br/>(triggers keep them in step)"]
+    C --> V["embed in batches of 16<br/>(outside the transaction)"]
+    V -->|ok| S["vectors stored"]
+    V -->|model missing| Q["queued job<br/>status shows pending"]
+    D --> AU["audit row: who, channel, what"]
 ```
 
 <v-click>
 
-- Embedding failure is **non-blocking** — entry still saved
-- Single SQLite transaction — atomic writes
+- The write never blocks on the model: embedding runs outside the database transaction
+- A failed embedding is never silent: the passage is searchable by keyword and its vector is queued
+- Nothing is overwritten: a changed page is a new revision, the old one is marked superseded
 
 </v-click>
 
@@ -255,52 +257,46 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant C as Claude
-    participant S as MCP Server
-    participant E as Embedder
+    participant C as Agent
+    participant S as memo-mcp
     participant DB as SQLite
 
-    C->>S: search_journal(query: "frustrating bugs")
-    S->>E: Embed query → 384-dim vector
-    par
-        S->>DB: Vector KNN (sqlite-vec)
-    and
-        S->>DB: Keyword search (FTS5 / BM25)
-    end
-    DB-->>S: Two ranked lists
-    S->>S: Fuse (reciprocal rank fusion) + recency tie-break
-    S->>S: Generate excerpts
-    S->>C: One ranked list with scores
+    C->>S: search(query, scope, response_format)
+    S->>S: route: identifier in the query? add the exact arm
+    S->>DB: keyword arm (FTS5 stemmed, BM25)
+    S->>DB: exact arm (FTS5 identifiers)
+    S->>DB: semantic arm (vector distance)
+    DB-->>S: three ranked lists, scope applied before top-k
+    S->>S: reciprocal rank fusion (equal weights) → recency → gap cut → budget
+    S->>C: results with provenance, relevance band, and on request: why
 ```
 
 <v-click>
 
-- Section/date filters run **in the same query**, not as a post-filter over a
-  truncated list — a filtered search sees every matching entry
-- Fusion, not fallback: both signals contribute to every query where they're available
-- Excerpt generation highlights the matching passage
+- **Equal arm weights**: a keyword-only hit at rank 1 ties a vector hit at rank 1, so the keyword arm can *add* results, not only reorder them
+- **Abstention**: a semantic-only match below the weak band is dropped; nothing left means zero results with a reason and a hint
+- **Explain**: `response_format: explain` shows every arm's rank and contribution, the recency factor, and where the list was cut
 
 </v-click>
 
 ---
 
-# Token-Based Storage
+# One File, Many Shelves
 
-Each journal lives in its own SQLite file:
+Each knowledge base is one SQLite file; namespaces are shelves inside it:
 
 ```
-~/.memo-mcp/
-├── my-project.db      ← JOURNAL_TOKEN=my-project
-├── personal.db        ← JOURNAL_TOKEN=personal
-└── work-notes.db      ← JOURNAL_TOKEN=work-notes
+~/.memo-mcp/kb/
+├── default.db      ← MEMO_KB=default   (namespaces: grpc-go, personal, …)
+└── work.db         ← MEMO_KB=work
 ```
 
 <v-clicks>
 
-- **`JOURNAL_TOKEN`** env var = namespace (required)
-- One file = all entries + all embeddings + all indexes
-- Different projects → different tokens
-- Back up your journal: just copy the `.db` file
+- **`MEMO_KB`** picks the file; **`namespace`** on each write picks the shelf
+- A search spans every shelf by default; `scope.namespaces` narrows it
+- Separate files are the privacy boundary; shelves are a search scope
+- Back up or share a knowledge base: copy the `.db` file, or `memo-mcp export --md`
 
 </v-clicks>
 

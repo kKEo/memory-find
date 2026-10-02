@@ -1,0 +1,116 @@
+// Package retrieve is the search engine of the knowledge base: several
+// retrieval arms (keyword, exact identifier, semantic; later fact, entity
+// and graph) run over the same pre-filtered set of live chunks, their ranked
+// lists are fused with reciprocal rank fusion, chunks are aggregated to
+// documents, a bounded recency factor is applied, the list is cut at the
+// first large score gap, and every result can explain itself.
+//
+// Numeric knobs live in a Profile, never in the tool schema (roadmap D-K).
+package retrieve
+
+// Profile is a named bundle of tuning constants. The defaults below carry the
+// journal's measured values forward; P3 tunes them in the eval lab and adds
+// named alternatives (precise, recency, code).
+type Profile struct {
+	Name string
+	// RRFK is the k in weight/(k+rank). 60 is the value from the original RRF
+	// paper and what the journal shipped with.
+	RRFK int
+	// Weights per arm. Absent arm = 0. The journal shipped 0.6 vector / 0.4
+	// keyword; the exact arm gets a modest weight so identifier hits reach
+	// the first page without dominating prose queries.
+	Weights map[string]float64
+	// FetchDepth is how many candidates each arm returns before fusion. Deep
+	// enough that a keyword-only hit can reach the first page (the journal's
+	// 30 was not).
+	FetchDepth int
+	// Recency: final = fused * (RecencyFloor + (1-RecencyFloor) * 0.5^(age/HalfLifeDays)),
+	// applied only to documents whose source kind is in RecencyKinds.
+	HalfLifeDays float64
+	RecencyFloor float64
+	RecencyKinds []string
+	// CutoffGap: the list is cut before the first result whose final score is
+	// below (1-CutoffGap) of the previous one, once at least MinResults are
+	// kept. 0 disables the gap cut.
+	CutoffGap  float64
+	MinResults int
+	// Relevance bands on raw cosine similarity.
+	BandStrong, BandModerate, BandWeak float64
+	// SemanticFloor drops a candidate whose ONLY evidence is a semantic
+	// similarity below this value. Nearest-neighbour search always returns
+	// something, so without a floor a query about nothing in the corpus
+	// still gets a full page of noise and abstention never happens. A
+	// candidate that also matched a keyword is never dropped by the floor.
+	SemanticFloor float64
+	// DefaultLimit caps results when the caller gives none.
+	DefaultLimit int
+	MaxLimit     int
+}
+
+// Default is the profile queries use unless the caller names another.
+//
+// Derivations: RRFK=60 is the value from the RRF paper and what the journal
+// shipped. Weights are EQUAL (0.5/0.5), not the journal's 0.6/0.4: with
+// unequal weights a keyword-only hit at rank 1 (0.4/61 ≈ 0.0066) scores below
+// a vector-only hit down to rank 31 (0.6/91 ≈ 0.0066), so on a corpus with
+// thirty semantically similar decoys the one document that contains the
+// query's rare term could never reach the first page — the audit's H2
+// finding. With equal weights a rank-1 hit in either arm ties a rank-1 hit in
+// the other, and the arm that is confident wins ties through the exact arm.
+// exact=0.3 is below keyword so an identifier match alone ranks like a strong
+// keyword match without dominating prose queries (P3 measures all three).
+// FetchDepth=100 keeps keyword-only hits in the fused list instead of cutting
+// them before fusion as the journal did.
+// Recency floor 0.8 with a 90-day half-life is the shipped factor, now limited
+// to notes and conversations because versioned docs do not age (OD-4).
+// CutoffGap 0.5 cuts at a halving of the fused score, a large drop in RRF
+// terms; MinResults 3 keeps weak-but-plausible neighbours visible.
+// SemanticFloor equals the weak band (0.30): below it a semantic-only hit is
+// "very weak", and returning it would turn every no-match query into a page
+// of noise; P3 calibrates the bands and the floor per model.
+var Default = Profile{
+	Name:          "default",
+	RRFK:          60,
+	Weights:       map[string]float64{ArmSemantic: 0.5, ArmKeyword: 0.5, ArmExact: 0.3},
+	FetchDepth:    100,
+	HalfLifeDays:  90,
+	RecencyFloor:  0.8,
+	RecencyKinds:  []string{"note", "conversation"},
+	CutoffGap:     0.5,
+	MinResults:    3,
+	BandStrong:    0.60,
+	BandModerate:  0.45,
+	BandWeak:      0.30,
+	SemanticFloor: 0.30,
+	DefaultLimit:  10,
+	MaxLimit:      100,
+}
+
+// Arm names.
+const (
+	ArmSemantic = "semantic"
+	ArmKeyword  = "keyword"
+	ArmExact    = "exact"
+)
+
+// Modes.
+const (
+	ModeAuto     = "auto"
+	ModeHybrid   = "hybrid"
+	ModeKeyword  = "keyword"
+	ModeExact    = "exact"
+	ModeSemantic = "semantic"
+)
+
+// Granularities.
+const (
+	GranularityChunk    = "chunk"
+	GranularityDocument = "document"
+)
+
+// Response formats.
+const (
+	FormatConcise  = "concise"
+	FormatDetailed = "detailed"
+	FormatExplain  = "explain"
+)

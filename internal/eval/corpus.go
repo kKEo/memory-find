@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kKEo/memory-find/internal/journal"
-	"github.com/kKEo/memory-find/internal/search"
+	"github.com/kKEo/memory-find/internal/retrieve"
 )
 
 // longFiller generates repeated, topic-flavored filler text long enough
@@ -31,53 +30,53 @@ func longFiller(topic string, repeats int) string {
 func Corpus() []FixtureEntry {
 	entries := []FixtureEntry{
 		// --- Auth / session cluster ---
-		{Key: "auth-1", Input: journal.ThoughtInput{ProjectNotes: "The authentication service issues JWT tokens with a 24 hour expiry. Session refresh happens automatically in the middleware layer before the token expires."}},
-		{Key: "auth-2", Input: journal.ThoughtInput{ProjectNotes: "Session tokens were leaking across requests because the middleware cached the auth context per connection instead of per request. Fixed by scoping the session lookup to the request context."}},
-		{Key: "auth-3", Input: journal.ThoughtInput{TechnicalInsights: "Learned that JWT refresh tokens should be rotated on every use to limit the blast radius of a stolen refresh token. Implemented rotation in the auth service this week."}},
-		{Key: "auth-4", Input: journal.ThoughtInput{Reflections: "Spent the afternoon debugging why users were getting logged out randomly. Turned out the session expiry check compared UTC and local time inconsistently."}},
-		{Key: "auth-5", Input: journal.ThoughtInput{Observations: "Auth service p99 latency spiked after adding the session refresh check on every request."}},
+		{Key: "auth-1", Input: ThoughtInput{ProjectNotes: "The authentication service issues JWT tokens with a 24 hour expiry. Session refresh happens automatically in the middleware layer before the token expires."}},
+		{Key: "auth-2", Input: ThoughtInput{ProjectNotes: "Session tokens were leaking across requests because the middleware cached the auth context per connection instead of per request. Fixed by scoping the session lookup to the request context."}},
+		{Key: "auth-3", Input: ThoughtInput{TechnicalInsights: "Learned that JWT refresh tokens should be rotated on every use to limit the blast radius of a stolen refresh token. Implemented rotation in the auth service this week."}},
+		{Key: "auth-4", Input: ThoughtInput{Reflections: "Spent the afternoon debugging why users were getting logged out randomly. Turned out the session expiry check compared UTC and local time inconsistently."}},
+		{Key: "auth-5", Input: ThoughtInput{Observations: "Auth service p99 latency spiked after adding the session refresh check on every request."}},
 
 		// --- Database / Postgres cluster ---
-		{Key: "db-1", Input: journal.ThoughtInput{ProjectNotes: "PostgreSQL query planner picked a sequential scan on the orders table instead of using the index on customer_id. Added an explicit index hint and it now uses the index."}},
-		{Key: "db-2", Input: journal.ThoughtInput{ProjectNotes: "Database migration to add a NOT NULL column locked the users table for twenty minutes in staging because Postgres rewrites the whole table for that kind of migration."}},
-		{Key: "db-3", Input: journal.ThoughtInput{TechnicalInsights: "Learned that adding a column with a non-constant DEFAULT in Postgres before version 11 rewrites the entire table; a constant default doesn't."}},
-		{Key: "db-4", Input: journal.ThoughtInput{Reflections: "Frustrated with how long the nightly database backup takes now that the orders table has grown past ten million rows."}},
-		{Key: "db-5", Input: journal.ThoughtInput{Observations: "Postgres connection pool exhausted under load; increased max_connections and added pgbouncer in front."}},
+		{Key: "db-1", Input: ThoughtInput{ProjectNotes: "PostgreSQL query planner picked a sequential scan on the orders table instead of using the index on customer_id. Added an explicit index hint and it now uses the index."}},
+		{Key: "db-2", Input: ThoughtInput{ProjectNotes: "Database migration to add a NOT NULL column locked the users table for twenty minutes in staging because Postgres rewrites the whole table for that kind of migration."}},
+		{Key: "db-3", Input: ThoughtInput{TechnicalInsights: "Learned that adding a column with a non-constant DEFAULT in Postgres before version 11 rewrites the entire table; a constant default doesn't."}},
+		{Key: "db-4", Input: ThoughtInput{Reflections: "Frustrated with how long the nightly database backup takes now that the orders table has grown past ten million rows."}},
+		{Key: "db-5", Input: ThoughtInput{Observations: "Postgres connection pool exhausted under load; increased max_connections and added pgbouncer in front."}},
 
 		// --- Frontend / React cluster ---
-		{Key: "fe-1", Input: journal.ThoughtInput{ProjectNotes: "React component was re-rendering on every keystroke because the parent passed a new callback function on each render. Wrapped it in useCallback."}},
-		{Key: "fe-2", Input: journal.ThoughtInput{ProjectNotes: "Frontend bundle size ballooned after adding the charting library. Investigating tree-shaking and code-splitting to bring it back down."}},
-		{Key: "fe-3", Input: journal.ThoughtInput{TechnicalInsights: "Virtual DOM diffing gets expensive with large lists; switched to windowing so only visible rows are rendered."}},
-		{Key: "fe-4", Input: journal.ThoughtInput{Observations: "React rendering is noticeably slow on older mobile devices when the product list has more than a few hundred items."}},
+		{Key: "fe-1", Input: ThoughtInput{ProjectNotes: "React component was re-rendering on every keystroke because the parent passed a new callback function on each render. Wrapped it in useCallback."}},
+		{Key: "fe-2", Input: ThoughtInput{ProjectNotes: "Frontend bundle size ballooned after adding the charting library. Investigating tree-shaking and code-splitting to bring it back down."}},
+		{Key: "fe-3", Input: ThoughtInput{TechnicalInsights: "Virtual DOM diffing gets expensive with large lists; switched to windowing so only visible rows are rendered."}},
+		{Key: "fe-4", Input: ThoughtInput{Observations: "React rendering is noticeably slow on older mobile devices when the product list has more than a few hundred items."}},
 
 		// --- gRPC / RPC cluster ---
-		{Key: "rpc-1", Input: journal.ThoughtInput{TechnicalInsights: "Implemented a gRPC unary interceptor for authentication so every service method gets the auth check for free instead of duplicating it."}},
-		{Key: "rpc-2", Input: journal.ThoughtInput{ProjectNotes: "gRPC interceptor chain order matters: the logging interceptor needs to run before the auth interceptor rejects a request, or failed auth attempts never get logged."}},
-		{Key: "rpc-3", Input: journal.ThoughtInput{Observations: "Considered switching an internal REST endpoint to a binary RPC protocol for lower latency between services."}},
+		{Key: "rpc-1", Input: ThoughtInput{TechnicalInsights: "Implemented a gRPC unary interceptor for authentication so every service method gets the auth check for free instead of duplicating it."}},
+		{Key: "rpc-2", Input: ThoughtInput{ProjectNotes: "gRPC interceptor chain order matters: the logging interceptor needs to run before the auth interceptor rejects a request, or failed auth attempts never get logged."}},
+		{Key: "rpc-3", Input: ThoughtInput{Observations: "Considered switching an internal REST endpoint to a binary RPC protocol for lower latency between services."}},
 
 		// --- Testing cluster ---
-		{Key: "test-1", Input: journal.ThoughtInput{TechnicalInsights: "Dependency injection makes mocking the embedder trivial in tests; the real embedding backend never needs to load in CI."}},
-		{Key: "test-2", Input: journal.ThoughtInput{ProjectNotes: "The integration test suite was flaky because it shared one SQLite connection across parallel tests. Fixed by giving each test its own temp file database."}},
-		{Key: "test-3", Input: journal.ThoughtInput{Reflections: "Looking at the test coverage report, most of the uncovered lines are error paths nobody has ever hit in production."}},
+		{Key: "test-1", Input: ThoughtInput{TechnicalInsights: "Dependency injection makes mocking the embedder trivial in tests; the real embedding backend never needs to load in CI."}},
+		{Key: "test-2", Input: ThoughtInput{ProjectNotes: "The integration test suite was flaky because it shared one SQLite connection across parallel tests. Fixed by giving each test its own temp file database."}},
+		{Key: "test-3", Input: ThoughtInput{Reflections: "Looking at the test coverage report, most of the uncovered lines are error paths nobody has ever hit in production."}},
 
 		// --- Deployment / infra cluster ---
-		{Key: "infra-1", Input: journal.ThoughtInput{ProjectNotes: "Kubernetes rolled out the new deployment before the database migration finished, so a handful of requests hit the old schema. Added a migration-complete health check gate."}},
-		{Key: "infra-2", Input: journal.ThoughtInput{TechnicalInsights: "Docker image size dropped from 900MB to 40MB after switching the base image to a distroless one and removing the build toolchain from the final stage."}},
-		{Key: "infra-3", Input: journal.ThoughtInput{Observations: "Rolled back the Friday deploy after error rates spiked; turned out to be an unrelated DNS issue, not the deploy itself."}},
+		{Key: "infra-1", Input: ThoughtInput{ProjectNotes: "Kubernetes rolled out the new deployment before the database migration finished, so a handful of requests hit the old schema. Added a migration-complete health check gate."}},
+		{Key: "infra-2", Input: ThoughtInput{TechnicalInsights: "Docker image size dropped from 900MB to 40MB after switching the base image to a distroless one and removing the build toolchain from the final stage."}},
+		{Key: "infra-3", Input: ThoughtInput{Observations: "Rolled back the Friday deploy after error rates spiked; turned out to be an unrelated DNS issue, not the deploy itself."}},
 
 		// --- Personal / emotional cluster ---
-		{Key: "mood-1", Input: journal.ThoughtInput{Reflections: "Feeling overwhelmed by the sprint deadline, there are too many pull requests to review this week."}},
-		{Key: "mood-2", Input: journal.ThoughtInput{Reflections: "Burned out from context switching between three different projects all week."}},
-		{Key: "mood-3", Input: journal.ThoughtInput{Reflections: "Anxious about the on-call rotation starting Monday; the runbooks feel out of date."}},
-		{Key: "mood-4", Input: journal.ThoughtInput{UserContext: "The user mentioned they've been stressed about a tight launch deadline and prefers concise status updates over long explanations right now."}},
-		{Key: "mood-5", Input: journal.ThoughtInput{Observations: "Took a long walk at lunch today, felt calmer afterward."}},
+		{Key: "mood-1", Input: ThoughtInput{Reflections: "Feeling overwhelmed by the sprint deadline, there are too many pull requests to review this week."}},
+		{Key: "mood-2", Input: ThoughtInput{Reflections: "Burned out from context switching between three different projects all week."}},
+		{Key: "mood-3", Input: ThoughtInput{Reflections: "Anxious about the on-call rotation starting Monday; the runbooks feel out of date."}},
+		{Key: "mood-4", Input: ThoughtInput{UserContext: "The user mentioned they've been stressed about a tight launch deadline and prefers concise status updates over long explanations right now."}},
+		{Key: "mood-5", Input: ThoughtInput{Observations: "Took a long walk at lunch today, felt calmer afterward."}},
 
 		// --- World knowledge cluster: pure noise, negative controls ---
-		{Key: "wk-1", Input: journal.ThoughtInput{WorldKnowledge: "The Great Barrier Reef is the largest living structure on Earth, visible even from space."}},
-		{Key: "wk-2", Input: journal.ThoughtInput{WorldKnowledge: "Octopuses have three hearts and blue blood, and two of the hearts stop beating when they swim."}},
-		{Key: "wk-3", Input: journal.ThoughtInput{WorldKnowledge: "The Eiffel Tower grows about 15 centimeters taller in summer due to thermal expansion of the iron."}},
-		{Key: "wk-4", Input: journal.ThoughtInput{WorldKnowledge: "Honey never spoils; archaeologists have found pots of honey in ancient Egyptian tombs that are still edible."}},
-		{Key: "wk-5", Input: journal.ThoughtInput{WorldKnowledge: "A single bolt of lightning contains enough energy to toast about one hundred thousand slices of bread."}},
+		{Key: "wk-1", Input: ThoughtInput{WorldKnowledge: "The Great Barrier Reef is the largest living structure on Earth, visible even from space."}},
+		{Key: "wk-2", Input: ThoughtInput{WorldKnowledge: "Octopuses have three hearts and blue blood, and two of the hearts stop beating when they swim."}},
+		{Key: "wk-3", Input: ThoughtInput{WorldKnowledge: "The Eiffel Tower grows about 15 centimeters taller in summer due to thermal expansion of the iron."}},
+		{Key: "wk-4", Input: ThoughtInput{WorldKnowledge: "Honey never spoils; archaeologists have found pots of honey in ancient Egyptian tombs that are still edible."}},
+		{Key: "wk-5", Input: ThoughtInput{WorldKnowledge: "A single bolt of lightning contains enough energy to toast about one hundred thousand slices of bread."}},
 
 		// --- Stem-variant cluster: same root word, different surface
 		// form. Neither FTS5 (no porter tokenizer yet) nor
@@ -86,22 +85,22 @@ func Corpus() []FixtureEntry {
 		// to each other. This is a known, currently-accepted gap that
 		// Phase 2's porter-stemmed FTS index should close — see the
 		// corresponding query's comment below.
-		{Key: "stem-1", Input: journal.ThoughtInput{ProjectNotes: "Finished reviewing the pull request for the payment service refactor."}},
-		{Key: "stem-2", Input: journal.ThoughtInput{Observations: "The code review took longer than expected because of merge conflicts."}},
-		{Key: "stem-3", Input: journal.ThoughtInput{TechnicalInsights: "Reviewers should focus on correctness first, style nits second."}},
+		{Key: "stem-1", Input: ThoughtInput{ProjectNotes: "Finished reviewing the pull request for the payment service refactor."}},
+		{Key: "stem-2", Input: ThoughtInput{Observations: "The code review took longer than expected because of merge conflicts."}},
+		{Key: "stem-3", Input: ThoughtInput{TechnicalInsights: "Reviewers should focus on correctness first, style nits second."}},
 
 		// --- Near-duplicate / paraphrase pair: same fact, different
 		// wording, both should be retrievable for the same query.
-		{Key: "dup-1", Input: journal.ThoughtInput{ProjectNotes: "The onboarding flow drops about 40% of new users at the email verification step."}},
-		{Key: "dup-2", Input: journal.ThoughtInput{ProjectNotes: "Roughly four in ten new signups abandon onboarding right at email verification."}},
+		{Key: "dup-1", Input: ThoughtInput{ProjectNotes: "The onboarding flow drops about 40% of new users at the email verification step."}},
+		{Key: "dup-2", Input: ThoughtInput{ProjectNotes: "Roughly four in ten new signups abandon onboarding right at email verification."}},
 
 		// --- Knowledge-update pair: same fact, superseded by a later
 		// entry. There is no supersede mechanism yet (Phase 3 of the
 		// project roadmap), so for now these are just two ordinary
 		// entries with a recency gap between them; the query below checks
 		// that recency alone gives some preference to the newer one.
-		{Key: "kb-old", AgeDays: 180, Input: journal.ThoughtInput{ProjectNotes: "The public API rate limit is 100 requests per minute per API key."}},
-		{Key: "kb-new", AgeDays: 1, Input: journal.ThoughtInput{ProjectNotes: "Updated the public API rate limit to 500 requests per minute per API key after the partner integration needed higher throughput."}},
+		{Key: "kb-old", AgeDays: 180, Input: ThoughtInput{ProjectNotes: "The public API rate limit is 100 requests per minute per API key."}},
+		{Key: "kb-new", AgeDays: 1, Input: ThoughtInput{ProjectNotes: "Updated the public API rate limit to 500 requests per minute per API key after the partner integration needed higher throughput."}},
 
 		// --- Long entries (>6000 chars) with a distinctive marker in the
 		// LAST formatted section (world_knowledge — see
@@ -110,19 +109,19 @@ func Corpus() []FixtureEntry {
 		// embedding cap, so it should be findable via keyword search but
 		// not via vector similarity — that split is exactly what these
 		// fixtures are for measuring.
-		{Key: "long-1", Input: journal.ThoughtInput{
+		{Key: "long-1", Input: ThoughtInput{
 			Reflections:       longFiller("the July deployment incident", 20),
 			ProjectNotes:      longFiller("the rollback procedure", 20),
 			TechnicalInsights: longFiller("the on-call response timeline", 20),
 			WorldKnowledge:    "The rare deployment incident tracking code for this event is INCIDENT-7734-ZEBRA, filed for follow-up during the July migration window.",
 		}},
-		{Key: "long-2", Input: journal.ThoughtInput{
+		{Key: "long-2", Input: ThoughtInput{
 			Reflections:       longFiller("the websocket disconnect investigation", 20),
 			ProjectNotes:      longFiller("the load balancer configuration", 20),
 			TechnicalInsights: longFiller("the client reconnect logic", 20),
 			WorldKnowledge:    "The support ticket about intermittent websocket disconnects was tracked under ticket WEBSOCK-4521-FALCON for engineering follow-up.",
 		}},
-		{Key: "long-3", Input: journal.ThoughtInput{
+		{Key: "long-3", Input: ThoughtInput{
 			Reflections:       longFiller("the billing reconciliation process", 20),
 			ProjectNotes:      longFiller("the invoice generation pipeline", 20),
 			TechnicalInsights: longFiller("the payment provider webhook handling", 20),
@@ -139,14 +138,14 @@ func Corpus() []FixtureEntry {
 	for i := 1; i <= 35; i++ {
 		entries = append(entries, FixtureEntry{
 			Key: fmt.Sprintf("standup-decoy-%d", i),
-			Input: journal.ThoughtInput{
+			Input: ThoughtInput{
 				Reflections: fmt.Sprintf("Day %d: attended the daily standup meeting, nothing major to report.", i),
 			},
 		})
 	}
 	entries = append(entries, FixtureEntry{
 		Key:   "standup-target",
-		Input: journal.ThoughtInput{WorldKnowledge: "The daily standup meeting format was originally borrowed from Scrum, where it's called the daily scrum."},
+		Input: ThoughtInput{WorldKnowledge: "The daily standup meeting format was originally borrowed from Scrum, where it's called the daily scrum."},
 	})
 
 	return entries
@@ -195,8 +194,8 @@ func Queries() []Query {
 		// this can't assert "zero results" — instead it declares no
 		// Relevant entries and tracks whether specific unrelated entries
 		// get pulled to the top regardless (they shouldn't dominate).
-		{ID: "no-match-cooking", Query: "sourdough starter fermentation baking technique", Irrelevant: []string{"auth-1", "db-1", "fe-1"}},
-		{ID: "no-match-astronomy", Query: "exoplanet atmospheric spectroscopy telescope", Irrelevant: []string{"rpc-1", "infra-1"}},
+		{ID: "no-match-cooking", Query: "sourdough starter fermentation baking technique", Category: "abstention", Irrelevant: []string{"auth-1", "db-1", "fe-1"}},
+		{ID: "no-match-astronomy", Query: "exoplanet atmospheric spectroscopy telescope", Category: "abstention", Irrelevant: []string{"rpc-1", "infra-1"}},
 
 		// --- Stem-variant: documents the current gap. stem-1 and stem-3
 		// are NOT listed as Relevant even though a human would consider
@@ -205,28 +204,28 @@ func Queries() []Query {
 		// "review" to "reviewing"/"reviewers". Once Phase 2 adds a porter
 		// FTS tokenizer, this query's Relevant set should be expanded to
 		// all three and the baseline updated to expect the improvement.
-		{ID: "stemming-gap-review", Query: "review pull request", Relevant: []string{"stem-2"}},
+		{ID: "stemming-gap-review", Query: "review pull request", Category: "stemming", Relevant: []string{"stem-1", "stem-2", "stem-3"}},
 
 		// --- Section-filtered: many same-section decoys elsewhere, one
 		// true target in world_knowledge.
-		{ID: "section-filtered-standup", Query: "standup meeting scrum origin", Opts: search.SearchOptions{Sections: []string{"world_knowledge"}}, Relevant: []string{"standup-target"}},
+		{ID: "section-filtered-standup", Query: "standup meeting scrum origin", Scope: retrieve.Scope{Tags: []string{"world_knowledge"}}, Category: "scoped", Relevant: []string{"standup-target"}},
 
 		// --- Date-filtered / recency: two versions of the same fact,
 		// only recency (no supersede mechanism yet) distinguishes them.
-		{ID: "recency-rate-limit", Query: "public API rate limit requests per minute", Relevant: []string{"kb-new", "kb-old"}},
+		{ID: "recency-rate-limit", Category: "recency", Query: "public API rate limit requests per minute", Relevant: []string{"kb-new", "kb-old"}},
 
 		// --- Long-entry marker queries: the marker text lives in the
 		// LAST formatted section of a >6000-char entry, past the interim
 		// embedding truncation cap. Expected (and worth watching in the
 		// report): found via keyword match, not via vector similarity.
-		{ID: "long-entry-incident-code", Query: "INCIDENT-7734-ZEBRA deployment incident", Relevant: []string{"long-1"}},
-		{ID: "long-entry-websocket-ticket", Query: "WEBSOCK-4521-FALCON websocket disconnect ticket", Relevant: []string{"long-2"}},
-		{ID: "long-entry-billing-account", Query: "ACCOUNT-9910-COMET billing discrepancy", Relevant: []string{"long-3"}},
+		{ID: "long-entry-incident-code", Category: "long-document", Query: "INCIDENT-7734-ZEBRA deployment incident", Relevant: []string{"long-1"}},
+		{ID: "long-entry-websocket-ticket", Category: "long-document", Query: "WEBSOCK-4521-FALCON websocket disconnect ticket", Relevant: []string{"long-2"}},
+		{ID: "long-entry-billing-account", Category: "long-document", Query: "ACCOUNT-9910-COMET billing discrepancy", Relevant: []string{"long-3"}},
 
 		// --- Multi-signal hybrid: shares both an exact keyword and
 		// topic-level vocabulary with more than one entry, requiring
 		// both arms to cooperate to rank the double-signal entry first.
-		{ID: "hybrid-frontend-performance", Query: "slow rendering performance bundle size", Relevant: []string{"fe-2", "fe-4"}, Irrelevant: []string{"fe-1"}},
-		{ID: "hybrid-grpc-chain-order", Query: "interceptor chain order logging before auth", Relevant: []string{"rpc-2"}, Irrelevant: []string{"rpc-1"}},
+		{ID: "hybrid-frontend-performance", Category: "hybrid", Query: "slow rendering performance bundle size", Relevant: []string{"fe-2", "fe-4"}, Irrelevant: []string{"fe-1"}},
+		{ID: "hybrid-grpc-chain-order", Category: "hybrid", Query: "interceptor chain order logging before auth", Relevant: []string{"rpc-2"}, Irrelevant: []string{"rpc-1"}},
 	}
 }

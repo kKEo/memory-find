@@ -3,6 +3,7 @@ package kb
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -481,4 +482,94 @@ func (s *Store) Verify(ctx context.Context, repair bool) (*VerifyReport, error) 
 		}
 	}
 	return r, nil
+}
+
+// ReadSection returns the chunk's text together with its neighbours in the
+// same section of the same document, in order ("small-to-big").
+func (s *Store) ReadSection(ctx context.Context, c *ChunkRead) (string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT text FROM chunks WHERE document_id = ? AND section_path = ? ORDER BY ord`, c.DocumentID, c.SectionPath)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	var parts []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return "", err
+		}
+		parts = append(parts, t)
+	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+	head := c.SectionPath
+	if head != "" {
+		head = "## " + head + "\n\n"
+	}
+	return head + strings.Join(parts, "\n\n"), nil
+}
+
+// QueryLogEntry is one row of the opt-in query log.
+type QueryLogEntry struct {
+	ID        int64           `json:"id"`
+	At        time.Time       `json:"at"`
+	Args      string          `json:"args"`
+	Mode      string          `json:"mode"`
+	Profile   string          `json:"profile"`
+	ModelID   string          `json:"model_id"`
+	NResults  int             `json:"n_results"`
+	TopURIs   json.RawMessage `json:"top_uris"`
+	LatencyMs int64           `json:"latency_ms"`
+	Trace     json.RawMessage `json:"trace"`
+}
+
+// QueryLogTail returns the newest n log rows.
+func (s *Store) QueryLogTail(ctx context.Context, n int) ([]QueryLogEntry, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, ts, args_json, mode, profile, model_id, n_results, top_uris_json, latency_ms, trace_json FROM query_log ORDER BY id DESC LIMIT ?`, n)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []QueryLogEntry
+	for rows.Next() {
+		var e QueryLogEntry
+		var ts int64
+		var top, trace string
+		if err := rows.Scan(&e.ID, &ts, &e.Args, &e.Mode, &e.Profile, &e.ModelID, &e.NResults, &top, &e.LatencyMs, &trace); err != nil {
+			return nil, err
+		}
+		e.At = time.UnixMilli(ts).UTC()
+		e.TopURIs, e.Trace = json.RawMessage(top), json.RawMessage(trace)
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// QueryLogEntry returns one log row.
+func (s *Store) QueryLogEntry(ctx context.Context, id int64) (*QueryLogEntry, error) {
+	var e QueryLogEntry
+	var ts int64
+	var top, trace string
+	err := s.db.QueryRowContext(ctx, `SELECT id, ts, args_json, mode, profile, model_id, n_results, top_uris_json, latency_ms, trace_json FROM query_log WHERE id = ?`, id).
+		Scan(&e.ID, &ts, &e.Args, &e.Mode, &e.Profile, &e.ModelID, &e.NResults, &top, &e.LatencyMs, &trace)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("query log entry %d: %w", id, ErrNotFound)
+	}
+	if err != nil {
+		return nil, err
+	}
+	e.At = time.UnixMilli(ts).UTC()
+	e.TopURIs, e.Trace = json.RawMessage(top), json.RawMessage(trace)
+	return &e, nil
+}
+
+// QueryLogPrune keeps at most maxRows rows and nothing older than maxAge.
+func (s *Store) QueryLogPrune(ctx context.Context, maxRows int, maxAge time.Duration) (int64, error) {
+	cutoff := s.now().Add(-maxAge).UnixMilli()
+	res, err := s.db.ExecContext(ctx, `DELETE FROM query_log WHERE ts < ? OR id NOT IN (SELECT id FROM query_log ORDER BY id DESC LIMIT ?)`, cutoff, maxRows)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }

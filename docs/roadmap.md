@@ -500,6 +500,18 @@ less and shipped two phases in a month, so treat these as ranges, not promises.
 
 ### P2 — Search that explains itself · 5–6 days · `v0.6.0`
 
+> **Status (2026-10-02): built.** `internal/retrieve` (semantic, keyword and exact arms over
+> the scoped live set, weighted RRF with **equal** arm weights after the H2 derivation, chunk→
+> document aggregation by max, per-kind recency clamped at zero, gap cutoff, a semantic-only
+> similarity floor so no-match queries abstain, token-budget packing, `exclude_ids`, the `Why`/
+> `Trace` explain contract, opt-in query log); the MCP server rewritten to four typed tools
+> (`ingest`, `search`, `read`, `status`) with annotations, output schemas, text mirrors and
+> honest descriptions; CLI `search | explain | log`; the eval harness ported to the store with the
+> H3a/H3b metric fixes, categories, first-hit arms and an abstention rate; the journal and
+> search packages deleted. New baseline: recall@10 1.00, MRR 1.00, abstention 1.00
+> (`docs/eval/v0.6.0.md`). Remaining before the tag: commit, CI green, `git tag -a v0.6.0`.
+
+
 - **Story.** (a) search, read and explain; (c) the CLI.
 - **Goal.** Find chunks three ways (by words, by exact identifier, by meaning), fuse the lists,
   and be able to say exactly why each result ranked where it did, over MCP with typed results

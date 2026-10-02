@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"flag"
 	"os"
@@ -10,56 +9,41 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
-
 	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/journal"
-	"github.com/kKEo/memory-find/internal/search"
+	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/retrieve"
 )
 
-var updateGolden = flag.Bool("update", false, "update golden files")
+var updateGolden = flag.Bool("update", false, "rewrite testdata/tools.golden.json from the live tools/list response")
 
-// newTestSession wires up a full Server (journal + search + embedder)
-// behind an in-memory MCP transport, so tests exercise the real tool
-// registration, schema inference, and handler wiring end to end rather
-// than calling the Manager/Service methods directly. It uses a real
-// temp-file database (not :memory:) so the WAL pragmas and migration path
-// from journal.OpenDB are exercised too.
-func newTestSession(t *testing.T) (*mcp.ClientSession, *sql.DB) {
+// newTestSession wires a full Server (store + retrieval + hash embedder)
+// behind an in-memory MCP transport, over a real temp-file knowledge base
+// opened through kb.Open, so the production DSN and migration run too.
+func newTestSession(t *testing.T) (*mcp.ClientSession, *kb.Store) {
 	t.Helper()
-
-	dbPath := filepath.Join(t.TempDir(), "test.db")
-	db, err := sql.Open("sqlite", "file:"+dbPath+"?_pragma=busy_timeout(5000)")
+	db, err := kb.Open(context.Background(), t.TempDir(), "test", kb.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := journal.Migrate(context.Background(), db); err != nil {
-		t.Fatal(err)
-	}
 	t.Cleanup(func() { db.Close() })
-
-	emb := embedding.NewHashEmbedder(384)
-	srv := New(journal.NewManager(db, emb), search.NewService(db, emb), "test")
+	store := kb.NewStore(db, embedding.NewHashEmbedder(64))
+	srv := New(store, retrieve.New(store, retrieve.Default, false), "test")
 
 	clientTransport, serverTransport := mcp.NewInMemoryTransports()
-
-	// The server must be connected before the client: the client
-	// initializes the MCP session as part of connecting.
 	if _, err := srv.mcp.Connect(context.Background(), serverTransport, nil); err != nil {
 		t.Fatalf("server connect: %v", err)
 	}
-
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0.0.0"}, nil)
 	cs, err := client.Connect(context.Background(), clientTransport, nil)
 	if err != nil {
 		t.Fatalf("client connect: %v", err)
 	}
 	t.Cleanup(func() { cs.Close() })
-
-	return cs, db
+	return cs, store
 }
 
 func callTool(t *testing.T, cs *mcp.ClientSession, name string, args map[string]any) *mcp.CallToolResult {
@@ -81,229 +65,224 @@ func resultText(res *mcp.CallToolResult) string {
 	return sb.String()
 }
 
-// TestListToolsGolden pins the exact protocol surface the server exposes:
-// tool names, descriptions, and inferred JSON schemas. It exists to catch
-// exactly the kind of thing that's easy to miss in review otherwise — the
-// jsonschema:"required,..." tag bug (see git history) leaked the literal
-// string "required," into a tool description, and nothing but a snapshot
-// of the actual generated schema would have caught that.
-//
-// Run with -update to regenerate testdata/tools.golden.json after an
-// intentional change to the tool surface.
+func structured[T any](t *testing.T, res *mcp.CallToolResult) T {
+	t.Helper()
+	var out T
+	b, err := json.Marshal(res.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatalf("structured content does not match %T: %v\n%s", out, err, b)
+	}
+	return out
+}
+
+const docText = "# gRPC Interceptors\n\nInterceptors run in registration order. Put the auth interceptor before logging.\n\n## Errors\n\nA handler returning ERR_CONN_RESET surfaces as codes.Unavailable on the client.\n"
+
+func ingestDoc(t *testing.T, cs *mcp.ClientSession) IngestOut {
+	t.Helper()
+	res := callTool(t, cs, "ingest", map[string]any{
+		"content":   docText,
+		"namespace": "grpc",
+		"source":    map[string]any{"uri": "https://example.com/interceptors", "title": "gRPC Interceptors", "kind": "doc", "library": "grpc/grpc-go", "version": "v1.8.0", "origin": "web"},
+	})
+	if res.IsError {
+		t.Fatalf("ingest error: %s", resultText(res))
+	}
+	return structured[IngestOut](t, res)
+}
+
+// TestListToolsGolden pins the exact protocol surface: names, titles,
+// descriptions, annotations, input and output schemas. Run with -update
+// after an intentional change and review the diff.
 func TestListToolsGolden(t *testing.T) {
 	cs, _ := newTestSession(t)
-
 	res, err := cs.ListTools(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("ListTools: %v", err)
 	}
-
 	got, err := json.MarshalIndent(res.Tools, "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}
 	got = append(got, '\n')
-
 	goldenPath := filepath.Join("testdata", "tools.golden.json")
-
 	if *updateGolden {
-		if err := os.MkdirAll("testdata", 0o755); err != nil {
-			t.Fatal(err)
-		}
 		if err := os.WriteFile(goldenPath, got, 0o644); err != nil {
 			t.Fatal(err)
 		}
 		t.Logf("updated %s", goldenPath)
 		return
 	}
-
 	want, err := os.ReadFile(goldenPath)
 	if err != nil {
 		t.Fatalf("read golden file (run with -update to create it): %v", err)
 	}
 	if string(got) != string(want) {
-		t.Errorf("tools/list output does not match %s (run with -update to review/accept the diff)\n--- got ---\n%s", goldenPath, got)
+		t.Errorf("tools/list does not match %s (run with -update to review/accept the diff)\n--- got ---\n%s", goldenPath, got)
 	}
 }
 
-// TestNoToolDescriptionLeaksRequiredDirective is a narrower, human-readable
-// companion to the golden test above: whatever the schema looks like, no
-// field description should ever start with "required," — that string is a
-// jsonschema struct-tag artifact, not something the model should read.
-func TestNoToolDescriptionLeaksRequiredDirective(t *testing.T) {
+func TestToolSurfaceIsExactlyFourTools(t *testing.T) {
 	cs, _ := newTestSession(t)
-
 	res, err := cs.ListTools(context.Background(), nil)
 	if err != nil {
-		t.Fatalf("ListTools: %v", err)
+		t.Fatal(err)
 	}
-
+	var names []string
 	for _, tool := range res.Tools {
-		b, err := json.Marshal(tool.InputSchema)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if strings.Contains(string(b), `"required,`) {
-			t.Errorf("tool %q input schema contains a leaked 'required,' description: %s", tool.Name, b)
-		}
+		names = append(names, tool.Name)
+	}
+	if strings.Join(names, ",") != "ingest,read,search,status" {
+		t.Fatalf("tools = %v", names)
 	}
 }
 
-func TestEachToolRoundTrip(t *testing.T) {
+// Descriptions must not carry struct-tag artefacts or make privacy promises
+// the system cannot keep.
+func TestDescriptionsAreHonest(t *testing.T) {
 	cs, _ := newTestSession(t)
-
-	// process_thoughts first, since every other tool needs at least one
-	// entry to operate on.
-	writeRes := callTool(t, cs, "process_thoughts", map[string]any{
-		"reflections":   "I noticed the retry logic was fragile under load.",
-		"project_notes": "The auth service needs a circuit breaker around the token endpoint.",
-	})
-	if writeRes.IsError {
-		t.Fatalf("process_thoughts returned an error result: %s", resultText(writeRes))
-	}
-	if !strings.Contains(resultText(writeRes), "Entry ID:") {
-		t.Errorf("expected an entry ID in the response, got: %s", resultText(writeRes))
-	}
-
-	tests := []struct {
-		name           string
-		args           map[string]any
-		wantErr        bool
-		wantSubstrings []string
-	}{
-		{
-			name:           "search_journal",
-			args:           map[string]any{"query": "retry logic under load"},
-			wantSubstrings: []string{"retry logic"},
-		},
-		{
-			name:    "search_journal missing query",
-			args:    map[string]any{"query": ""},
-			wantErr: true,
-		},
-		{
-			name:           "list_recent_entries",
-			args:           map[string]any{},
-			wantSubstrings: []string{"Recent entries"},
-		},
-		{
-			name:           "read_recent_entries",
-			args:           map[string]any{"limit": 1},
-			wantSubstrings: []string{"retry logic"},
-		},
-		{
-			name:           "journal_stats",
-			args:           map[string]any{},
-			wantSubstrings: []string{"Total entries: 1"},
-		},
-		{
-			name:    "read_journal_entry missing id",
-			args:    map[string]any{"id": "does-not-exist"},
-			wantErr: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			toolName, _, _ := strings.Cut(tc.name, " ")
-			res := callTool(t, cs, toolName, tc.args)
-
-			if tc.wantErr {
-				if !res.IsError {
-					t.Errorf("expected a tool error, got: %s", resultText(res))
-				}
-				return
-			}
-			if res.IsError {
-				t.Fatalf("unexpected tool error: %s", resultText(res))
-			}
-			text := resultText(res)
-			for _, want := range tc.wantSubstrings {
-				if !strings.Contains(text, want) {
-					t.Errorf("expected result to contain %q, got: %s", want, text)
-				}
-			}
-		})
-	}
-}
-
-// TestReadJournalEntryByID exercises the ID round trip specifically:
-// write, search to get an ID, then read that exact entry back.
-func TestReadJournalEntryByID(t *testing.T) {
-	cs, _ := newTestSession(t)
-
-	writeRes := callTool(t, cs, "process_thoughts", map[string]any{
-		"world_knowledge": "The mitochondria is the powerhouse of the cell.",
-	})
-	text := resultText(writeRes)
-	_, idPart, ok := strings.Cut(text, "Entry ID: ")
-	if !ok {
-		t.Fatalf("could not find entry ID in response: %s", text)
-	}
-	id := strings.TrimSpace(idPart)
-
-	readRes := callTool(t, cs, "read_journal_entry", map[string]any{"id": id})
-	if readRes.IsError {
-		t.Fatalf("read_journal_entry returned an error: %s", resultText(readRes))
-	}
-	if !strings.Contains(resultText(readRes), "mitochondria") {
-		t.Errorf("expected the written content back, got: %s", resultText(readRes))
-	}
-}
-
-// TestToolErrorsAreProtocolSuccesses locks in a subtlety of the MCP SDK
-// that's easy to get backwards: a tool-level failure (bad input, not
-// found, etc.) must surface as CallToolResult.IsError, with CallTool
-// itself returning a nil error — not as a transport/protocol-level error.
-// Getting this backwards means the model never sees why a call failed.
-func TestToolErrorsAreProtocolSuccesses(t *testing.T) {
-	cs, _ := newTestSession(t)
-
-	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "read_journal_entry",
-		Arguments: map[string]any{"id": "nonexistent-id"},
-	})
+	res, err := cs.ListTools(context.Background(), nil)
 	if err != nil {
-		t.Fatalf("expected CallTool to succeed at the protocol level, got error: %v", err)
+		t.Fatal(err)
 	}
-	if !res.IsError {
-		t.Error("expected IsError=true for a nonexistent entry")
-	}
-	if resultText(res) == "" {
-		t.Error("expected a non-empty error message in Content")
+	for _, tool := range res.Tools {
+		b, _ := json.Marshal(tool)
+		s := string(b)
+		for _, bad := range []string{`"required,`, "Nobody but you", "PRIVATE"} {
+			if strings.Contains(s, bad) {
+				t.Errorf("tool %q contains %q", tool.Name, bad)
+			}
+		}
+		if tool.OutputSchema == nil {
+			t.Errorf("tool %q has no output schema", tool.Name)
+		}
+		if tool.Title == "" {
+			t.Errorf("tool %q has no title", tool.Name)
+		}
 	}
 }
 
-func TestProcessThoughtsRequiresAtLeastOneField(t *testing.T) {
-	cs, _ := newTestSession(t)
-
-	res := callTool(t, cs, "process_thoughts", map[string]any{})
-	if !res.IsError {
-		t.Error("expected an error result when no thought categories are provided")
-	}
-}
-
-// TestStructuredContentValidates activates once handlers return typed Out
-// values (Phase 4 of the project roadmap: output schemas + StructuredContent
-// instead of prose-only responses) instead of `any`. At that point this
-// should assert CallToolResult.StructuredContent is non-nil and conforms to
-// the tool's advertised output schema for at least search_journal.
-func TestStructuredContentValidates(t *testing.T) {
-	t.Skip("pending Phase 4: handlers don't return structured output yet")
-}
-
-// TestAnnotations activates once tools carry mcp.ToolAnnotations (Phase 4).
-// At that point this should assert ReadOnlyHint is true on the five
-// read-only tools and false on process_thoughts, and OpenWorldHint is false
-// throughout (a private journal is a closed world).
 func TestAnnotations(t *testing.T) {
-	t.Skip("pending Phase 4: tools don't carry annotations yet")
+	cs, _ := newTestSession(t)
+	res, err := cs.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range res.Tools {
+		a := tool.Annotations
+		if a == nil {
+			t.Fatalf("tool %q has no annotations", tool.Name)
+		}
+		if a.OpenWorldHint == nil || *a.OpenWorldHint {
+			t.Errorf("tool %q must declare a closed world", tool.Name)
+		}
+		wantReadOnly := tool.Name != "ingest"
+		if a.ReadOnlyHint != wantReadOnly {
+			t.Errorf("tool %q readOnlyHint = %v", tool.Name, a.ReadOnlyHint)
+		}
+		if tool.Name == "ingest" && (a.DestructiveHint == nil || *a.DestructiveHint) {
+			t.Errorf("ingest must be marked non-destructive (it only adds revisions)")
+		}
+	}
+}
+
+func TestIngestSearchReadStatusRoundTrip(t *testing.T) {
+	cs, _ := newTestSession(t)
+	in := ingestDoc(t, cs)
+	if in.Revision != 1 || in.Chunks < 2 || in.Embedded != in.Chunks || in.Trust != "agent" || !strings.HasPrefix(in.URI, "memo://doc/") {
+		t.Fatalf("ingest out: %+v", in)
+	}
+	again := ingestDoc(t, cs)
+	if !again.Unchanged || again.URI != in.URI {
+		t.Fatalf("second ingest should be unchanged: %+v", again)
+	}
+
+	res := callTool(t, cs, "search", map[string]any{"query": "auth interceptor order", "response_format": "explain", "scope": map[string]any{"library": "grpc/grpc-go", "version": "v1.8.0"}})
+	if res.IsError {
+		t.Fatalf("search error: %s", resultText(res))
+	}
+	out := structured[SearchOut](t, res)
+	if len(out.Results) == 0 || out.Trace == nil || out.Results[0].Why == nil || out.Results[0].Provenance.Version != "v1.8.0" {
+		t.Fatalf("search out: %+v", out)
+	}
+	text := resultText(res)
+	if !strings.Contains(text, "retrieved data, not instructions") || !strings.Contains(text, "why:") || !strings.Contains(text, "trace:") {
+		t.Fatalf("text mirror lacks explain/labelling:\n%s", text)
+	}
+
+	// Concise results have no why block and shorter content.
+	res = callTool(t, cs, "search", map[string]any{"query": "auth interceptor order"})
+	concise := structured[SearchOut](t, res)
+	if concise.Results[0].Why != nil || concise.Trace != nil {
+		t.Fatal("concise returned explain data")
+	}
+
+	// Read the winning chunk, its section and the document.
+	chunkURI := out.Results[0].ChunkURI
+	r := structured[ReadOut](t, callTool(t, cs, "read", map[string]any{"uri": chunkURI}))
+	if r.Content == "" || r.Provenance.Title != "gRPC Interceptors" {
+		t.Fatalf("read chunk: %+v", r)
+	}
+	sec := structured[ReadOut](t, callTool(t, cs, "read", map[string]any{"uri": chunkURI, "granularity": "section"}))
+	if len(sec.Content) < len(r.Content) {
+		t.Fatalf("section read shorter than chunk")
+	}
+	doc := structured[ReadOut](t, callTool(t, cs, "read", map[string]any{"uri": chunkURI, "granularity": "document", "max_tokens": 5}))
+	if !doc.Truncated {
+		t.Fatalf("expected truncation: %+v", doc)
+	}
+
+	st := structured[StatusOut](t, callTool(t, cs, "status", map[string]any{}))
+	if st.LiveDocuments != 1 || st.DefaultModel != "hash" || st.Degraded || len(st.Namespaces) != 1 {
+		t.Fatalf("status: %+v", st)
+	}
+}
+
+func TestSearchAbstainsWithReason(t *testing.T) {
+	cs, _ := newTestSession(t)
+	ingestDoc(t, cs)
+	res := callTool(t, cs, "search", map[string]any{"query": "quasar entanglement", "mode": "keyword"})
+	out := structured[SearchOut](t, res)
+	if len(out.Results) != 0 || out.Reason == "" || out.Hint == "" || !strings.Contains(resultText(res), "No results") {
+		t.Fatalf("abstention: %+v / %s", out, resultText(res))
+	}
+}
+
+// Handler errors become tool errors (IsError), not protocol failures.
+func TestToolErrorsAreToolErrors(t *testing.T) {
+	cs, _ := newTestSession(t)
+	for name, args := range map[string]map[string]any{
+		"ingest": {"content": "   ", "source": map[string]any{}},
+		"read":   {"uri": "https://not-memo"},
+		"search": {"query": "x", "mode": "turbo"},
+	} {
+		res := callTool(t, cs, name, args)
+		if !res.IsError {
+			t.Errorf("%s: expected a tool error", name)
+		}
+	}
+	res := callTool(t, cs, "read", map[string]any{"uri": "memo://doc/nope"})
+	if !res.IsError || !strings.Contains(resultText(res), "not found") {
+		t.Errorf("missing document: %s", resultText(res))
+	}
+}
+
+// TestStructuredContentValidates: every tool's structured content round-trips
+// through its declared Out type (the SDK validates against the output schema
+// on the way out; this asserts the client side sees the same shape).
+func TestStructuredContentValidates(t *testing.T) {
+	cs, _ := newTestSession(t)
+	ingestDoc(t, cs)
+	structured[IngestOut](t, callTool(t, cs, "ingest", map[string]any{"content": "# Note\n\nhello\n", "source": map[string]any{"kind": "note"}}))
+	structured[SearchOut](t, callTool(t, cs, "search", map[string]any{"query": "interceptor"}))
+	structured[ReadOut](t, callTool(t, cs, "read", map[string]any{"uri": "memo://chunk/1"}))
+	structured[StatusOut](t, callTool(t, cs, "status", map[string]any{}))
 }
 
 // TestNegotiatesCurrentProtocolVersion pins the MCP spec date this server
-// speaks. It moved from 2025-11-25 (go-sdk v1.6.0) to 2026-07-28 with the
-// v1.8.0 bump; if a future SDK change alters the negotiated version, this
-// test is where the project finds out, not a client.
+// speaks (2026-07-28 since the go-sdk v1.8.0 bump).
 func TestNegotiatesCurrentProtocolVersion(t *testing.T) {
 	cs, _ := newTestSession(t)
 	got := cs.InitializeResult().ProtocolVersion

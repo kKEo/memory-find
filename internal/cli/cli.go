@@ -6,7 +6,6 @@ package cli
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"flag"
 	"fmt"
@@ -21,9 +20,8 @@ import (
 	_ "modernc.org/sqlite/vec"
 
 	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/journal"
 	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/search"
+	"github.com/kKEo/memory-find/internal/retrieve"
 	"github.com/kKEo/memory-find/internal/server"
 )
 
@@ -32,11 +30,10 @@ type Config struct {
 	// DBName is the knowledge-base name; it selects the database file.
 	// Comes from MEMO_KB (default "default"), or JOURNAL_TOKEN (deprecated).
 	DBName string
-	// DBDir is the directory holding the LEGACY journal file the MCP server
-	// still serves until roadmap P2 (<MEMO_HOME> or <JOURNAL_PATH>).
-	DBDir string
 	// KBDir is the directory holding knowledge-base files (<MEMO_HOME>/kb).
 	KBDir string
+	// LogQueries is MEMO_QUERY_LOG=1: keep an opt-in log of searches.
+	LogQueries bool
 	// Deprecations lists warnings about legacy variables that were honoured.
 	Deprecations []string
 }
@@ -47,10 +44,10 @@ type Getenv func(string) string
 // ResolveConfig maps the environment onto a Config.
 //
 // MEMO_KB (default "default") names the knowledge base; its file is
-// <MEMO_HOME or ~/.memo-mcp>/kb/<name>.db. The legacy JOURNAL_TOKEN /
-// JOURNAL_PATH pair keeps its exact old meaning for the journal the MCP
-// server still serves (<JOURNAL_PATH or ~/.memo-mcp>/<token>.db), with a
-// deprecation warning.
+// <MEMO_HOME or ~/.memo-mcp>/kb/<name>.db. The legacy JOURNAL_TOKEN is
+// accepted as the name for one release with a deprecation warning
+// (JOURNAL_PATH as MEMO_HOME); the old journal files themselves are not
+// opened (owner decision 5: nothing is migrated).
 func ResolveConfig(getenv Getenv) (Config, error) {
 	var cfg Config
 	home := getenv("MEMO_HOME")
@@ -62,27 +59,21 @@ func ResolveConfig(getenv Getenv) (Config, error) {
 		home = filepath.Join(h, ".memo-mcp")
 	}
 
-	cfg.KBDir = filepath.Join(home, "kb")
-	if token := getenv("JOURNAL_TOKEN"); token != "" {
-		cfg.DBName = token
-		cfg.DBDir = getenv("JOURNAL_PATH")
-		if cfg.DBDir == "" {
-			cfg.DBDir = home
-		}
-		cfg.Deprecations = append(cfg.Deprecations,
-			"JOURNAL_TOKEN is deprecated; set MEMO_KB=<name> instead (JOURNAL_TOKEN keeps working for one release)")
-		if getenv("JOURNAL_PATH") != "" {
-			cfg.Deprecations = append(cfg.Deprecations,
-				"JOURNAL_PATH is deprecated; set MEMO_HOME=<dir> instead")
-		}
-		return cfg, nil
+	if jp := getenv("JOURNAL_PATH"); jp != "" && getenv("MEMO_HOME") == "" {
+		home = jp
+		cfg.Deprecations = append(cfg.Deprecations, "JOURNAL_PATH is deprecated; set MEMO_HOME=<dir> instead")
 	}
-
+	cfg.KBDir = filepath.Join(home, "kb")
+	cfg.LogQueries = getenv("MEMO_QUERY_LOG") == "1"
 	cfg.DBName = getenv("MEMO_KB")
+	if token := getenv("JOURNAL_TOKEN"); token != "" && cfg.DBName == "" {
+		cfg.DBName = token
+		cfg.Deprecations = append(cfg.Deprecations,
+			"JOURNAL_TOKEN is deprecated; set MEMO_KB=<name> instead. Old journal files are not opened; the knowledge base is a new file under "+cfg.KBDir)
+	}
 	if cfg.DBName == "" {
 		cfg.DBName = "default"
 	}
-	cfg.DBDir = home
 	return cfg, nil
 }
 
@@ -134,6 +125,12 @@ func Main(ctx context.Context, version string, args []string, stdout, stderr io.
 		err = runExport(ctx, rest, stdout, stderr)
 	case "backfill":
 		err = runBackfill(ctx, stdout, stderr)
+	case "search":
+		err = runSearch(ctx, rest, stdout, stderr, false)
+	case "explain":
+		err = runSearch(ctx, rest, stdout, stderr, true)
+	case "log":
+		err = runLog(ctx, rest, stdout, stderr)
 	case "model":
 		err = runModel(ctx, rest, stderr)
 	case "help", "-h", "--help":
@@ -158,6 +155,9 @@ Usage:
   memo-mcp ingest <file|dir|->     add documents to the knowledge base
       --ns <name> --kind doc|note|code|conversation --uri <u> --title <t>
       --library <l> --version <v> --trust user|curated --context <text> --embed=false
+  memo-mcp search "<q>" [--mode --ns --library --version --kind --limit --format table|json|md --explain]
+  memo-mcp explain "<q>" [<memo://...>]   ranking table for every hit, or the full why for one
+  memo-mcp log tail|show <id>|prune       inspect the opt-in query log
   memo-mcp read <memo://...>       print a document, chunk or source with its provenance
   memo-mcp ls [--ns --kind --since 2026-01-01 --json]   list live documents, newest first
   memo-mcp export --md <dir> [--ns <name>]              write markdown files with front matter
@@ -171,7 +171,7 @@ Environment:
   MEMO_KB        knowledge-base name (default "default"); file is $MEMO_HOME/kb/<name>.db
   MEMO_HOME      base directory (default ~/.memo-mcp)
   MEMO_QUERY_LOG=1               keep an opt-in log of searches in the same file
-  JOURNAL_TOKEN, JOURNAL_PATH    deprecated; select the legacy journal the server still serves
+  JOURNAL_TOKEN, JOURNAL_PATH    deprecated aliases of MEMO_KB / MEMO_HOME (old journal files are not opened)
 `)
 }
 
@@ -196,31 +196,39 @@ func runModel(ctx context.Context, args []string, stderr io.Writer) error {
 	return nil
 }
 
-func openDB(stderr io.Writer) (*sql.DB, error) {
+func runServe(ctx context.Context, stderr io.Writer) error {
 	cfg, err := ResolveConfig(os.Getenv)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, d := range cfg.Deprecations {
 		fmt.Fprintln(stderr, "warning:", d)
 	}
-	return journal.OpenDB(cfg.DBName, cfg.DBDir)
-}
+	embedder, cleanup, err := buildEmbedder(ctx)
+	if err != nil {
+		fmt.Fprintf(stderr, "warning: embedding unavailable, search will be keyword-only and new vectors are queued: %v\n", err)
+	}
+	defer cleanup()
 
-func runServe(ctx context.Context, stderr io.Writer) error {
-	db, err := openDB(stderr)
+	db, err := kb.Open(ctx, cfg.KBDir, cfg.DBName, kb.Options{})
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+	store := kb.NewStore(db, embedder)
 
-	embedder, cleanup, err := buildEmbedder(ctx)
-	if err != nil {
-		fmt.Fprintf(stderr, "warning: embedding unavailable, semantic search will fall back to keyword search: %v\n", err)
+	// Drain queued vectors in the background; the server answers meanwhile.
+	if embedder != nil {
+		go func() {
+			if n, err := store.Backfill(ctx); err != nil {
+				fmt.Fprintf(stderr, "warning: backfill: %v\n", err)
+			} else if n > 0 {
+				fmt.Fprintf(stderr, "backfilled %d chunk vector(s)\n", n)
+			}
+		}()
 	}
-	defer cleanup()
 
-	srv := server.New(journal.NewManager(db, embedder), search.NewService(db, embedder), serverVersion)
+	srv := server.New(store, retrieve.New(store, retrieve.Default, cfg.LogQueries), serverVersion)
 	return srv.Run(ctx)
 }
 

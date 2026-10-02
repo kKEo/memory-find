@@ -15,6 +15,7 @@ import (
 
 	"github.com/kKEo/memory-find/internal/embedding"
 	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/retrieve"
 )
 
 // openStore resolves the configuration and opens the knowledge base. embedder
@@ -418,4 +419,242 @@ func fenceCode(name, body string) string {
 		return body
 	}
 	return "```" + ext + "\n" + strings.TrimRight(body, "\n") + "\n```\n"
+}
+
+func runSearch(ctx context.Context, args []string, stdout, stderr io.Writer, explainCmd bool) error {
+	name := "search"
+	if explainCmd {
+		name = "explain"
+	}
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	mode := fs.String("mode", retrieve.ModeAuto, "auto|hybrid|keyword|exact|semantic")
+	ns := fs.String("ns", "", "namespace filter (comma-separated)")
+	library := fs.String("library", "", "library filter")
+	version := fs.String("version", "", "version filter")
+	kind := fs.String("kind", "", "kind filter (comma-separated)")
+	minTrust := fs.String("min-trust", "", "agent|user|curated")
+	limit := fs.Int("limit", 10, "maximum results")
+	granularity := fs.String("granularity", retrieve.GranularityChunk, "chunk|document")
+	format := fs.String("format", "table", "table|json|md")
+	explain := fs.Bool("explain", explainCmd, "include why each result ranked and the per-query trace")
+	maxTokens := fs.Int("max-tokens", 8000, "response budget in estimated tokens")
+	noEmbed := fs.Bool("no-model", false, "do not load the embedding model (keyword-only)")
+	positional, err := parseInterspersed(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(positional) < 1 || len(positional) > 2 {
+		return fmt.Errorf("usage: memo-mcp %s \"<query>\" [memo://uri] [flags]", name)
+	}
+	query := positional[0]
+	var focus string
+	if len(positional) == 2 {
+		focus = positional[1]
+	}
+	cfg, err := ResolveConfig(os.Getenv)
+	if err != nil {
+		return err
+	}
+	embedder, cleanup := loadEmbedder(ctx, !*noEmbed, stderr)
+	defer cleanup()
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{NoCreate: true}, embedder)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	svc := retrieve.New(store, retrieve.Default, cfg.LogQueries)
+	rf := retrieve.FormatDetailed
+	if *explain || focus != "" {
+		rf = retrieve.FormatExplain
+	}
+	resp, err := svc.Search(ctx, retrieve.Request{Query: query, Mode: *mode, Granularity: *granularity, ResponseFormat: rf, MaxTokens: *maxTokens, Limit: *limit,
+		Scope: retrieve.Scope{Namespaces: splitCSV(*ns), Kinds: splitCSV(*kind), Library: *library, Version: *version, MinTrust: *minTrust}})
+	if err != nil {
+		return err
+	}
+	if focus != "" {
+		for _, r := range resp.Results {
+			if r.URI == focus || r.ChunkURI == focus || r.DocumentURI == focus {
+				enc := json.NewEncoder(stdout)
+				enc.SetIndent("", "  ")
+				return enc.Encode(r.Why)
+			}
+		}
+		return fmt.Errorf("%s is not among the %d result(s) for this query", focus, len(resp.Results))
+	}
+	switch *format {
+	case "json":
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(resp)
+	case "md":
+		fmt.Fprint(stdout, renderMarkdown(resp))
+		return nil
+	default:
+		fmt.Fprint(stdout, renderTable(resp, *explain))
+		return nil
+	}
+}
+
+func renderTable(resp *retrieve.Response, explain bool) string {
+	var sb strings.Builder
+	if len(resp.Results) == 0 {
+		fmt.Fprintf(&sb, "no results: %s\n", resp.Reason)
+		if resp.Hint != "" {
+			fmt.Fprintf(&sb, "hint: %s\n", resp.Hint)
+		}
+		if resp.Degraded {
+			sb.WriteString("(degraded: no embedding model)\n")
+		}
+		return sb.String()
+	}
+	if resp.Degraded {
+		sb.WriteString("(degraded: keyword-only, no embedding model)\n")
+	}
+	for _, r := range resp.Results {
+		rel := "  kw  "
+		if r.Relevance != nil {
+			rel = fmt.Sprintf("%.2f %-8s", *r.Relevance, r.Band)
+		}
+		title := r.Title
+		if r.SectionPath != "" {
+			title += " > " + r.SectionPath
+		}
+		fmt.Fprintf(&sb, "%2d  %s  %-10s %-5s %s\n", r.Rank, rel, r.Provenance.Namespace, r.Provenance.Trust, title)
+		fmt.Fprintf(&sb, "    %s", r.URI)
+		if r.Provenance.Version != "" {
+			fmt.Fprintf(&sb, "  @%s", r.Provenance.Version)
+		}
+		sb.WriteString("\n")
+		fmt.Fprintf(&sb, "    %s\n", oneLine(r.Content, 110))
+		if explain && r.Why != nil {
+			fmt.Fprintf(&sb, "    why: fused %.5f × recency %.2f = %.5f", r.Why.Fused, r.Why.RecencyFactor, r.Why.Final)
+			for _, a := range r.Why.Arms {
+				fmt.Fprintf(&sb, " | %s #%d +%.5f", a.Arm, *a.Rank, a.Contribution)
+				if len(a.MatchedTerms) > 0 {
+					fmt.Fprintf(&sb, " (%s)", strings.Join(a.MatchedTerms, ","))
+				}
+			}
+			sb.WriteString("\n")
+		}
+	}
+	if resp.Trace != nil {
+		t := resp.Trace
+		fmt.Fprintf(&sb, "trace: %s (%s); scope %s; %d live docs, %d superseded/forgotten excluded; cutoff %s", t.ModeResolved, t.RoutingReason, t.Filtered.ByScope, t.Filtered.LiveDocs, t.Filtered.ByRevocation, t.Cutoff.Kind)
+		for arm, ms := range t.LatencyMsPerArm {
+			fmt.Fprintf(&sb, "; %s %.0fms", arm, ms)
+		}
+		if t.Budget.TruncatedCount > 0 {
+			fmt.Fprintf(&sb, "; %d more left out by the budget", t.Budget.TruncatedCount)
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
+func renderMarkdown(resp *retrieve.Response) string {
+	var sb strings.Builder
+	if len(resp.Results) == 0 {
+		fmt.Fprintf(&sb, "_No results: %s._\n", resp.Reason)
+		return sb.String()
+	}
+	sb.WriteString("| # | relevance | where | title | address |\n|---|---|---|---|---|\n")
+	for _, r := range resp.Results {
+		rel := "keyword"
+		if r.Relevance != nil {
+			rel = fmt.Sprintf("%.2f %s", *r.Relevance, r.Band)
+		}
+		fmt.Fprintf(&sb, "| %d | %s | %s/%s | %s | `%s` |\n", r.Rank, rel, r.Provenance.Namespace, r.Provenance.Kind, strings.ReplaceAll(r.Title, "|", "\\|"), r.URI)
+	}
+	return sb.String()
+}
+
+func oneLine(s string, max int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if r := []rune(s); len(r) > max {
+		return string(r[:max]) + "…"
+	}
+	return s
+}
+
+func splitCSV(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func runLog(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return errors.New("usage: memo-mcp log tail [--n 20] | show <id> | prune")
+	}
+	sub, rest := args[0], args[1:]
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{NoCreate: true}, nil)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	switch sub {
+	case "tail":
+		fs := flag.NewFlagSet("log tail", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		n := fs.Int("n", 20, "rows")
+		if _, err := parseInterspersed(fs, rest); err != nil {
+			return err
+		}
+		entries, err := store.QueryLogTail(ctx, *n)
+		if err != nil {
+			return err
+		}
+		if len(entries) == 0 {
+			fmt.Fprintln(stdout, "(query log is empty; enable it with MEMO_QUERY_LOG=1)")
+			return nil
+		}
+		for _, e := range entries {
+			fmt.Fprintf(stdout, "%d  %s  %-22s %2d results %4dms  %s\n", e.ID, e.At.Format("2006-01-02 15:04:05"), e.Mode, e.NResults, e.LatencyMs, oneLine(loggedQueries(e.Args), 80))
+		}
+		return nil
+	case "show":
+		if len(rest) != 1 {
+			return errors.New("usage: memo-mcp log show <id>")
+		}
+		var id int64
+		if _, err := fmt.Sscanf(rest[0], "%d", &id); err != nil {
+			return fmt.Errorf("bad id %q", rest[0])
+		}
+		e, err := store.QueryLogEntry(ctx, id)
+		if err != nil {
+			return err
+		}
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(e)
+	case "prune":
+		n, err := store.QueryLogPrune(ctx, 10000, 30*24*time.Hour)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "pruned %d row(s)\n", n)
+		return nil
+	default:
+		return fmt.Errorf("unknown log subcommand %q", sub)
+	}
+}
+
+// loggedQueries pulls the query strings out of a logged args_json.
+func loggedQueries(args string) string {
+	var v struct {
+		Queries []string `json:"queries"`
+	}
+	if err := json.Unmarshal([]byte(args), &v); err != nil || len(v.Queries) == 0 {
+		return args
+	}
+	return strings.Join(v.Queries, " | ")
 }
