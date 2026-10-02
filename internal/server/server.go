@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kmaziarz/memo-mcp/internal/journal"
-	"github.com/kmaziarz/memo-mcp/internal/search"
+	"github.com/kKEo/memory-find/internal/journal"
+	"github.com/kKEo/memory-find/internal/search"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -18,7 +18,14 @@ type Server struct {
 	mcp     *mcp.Server
 }
 
-func New(j *journal.Manager, s *search.Service) *Server {
+// ProtocolVersion is the MCP specification date this server negotiates
+// with a current client (go-sdk v1.8.0). TestNegotiatesCurrentProtocolVersion
+// asserts the SDK actually negotiates it.
+const ProtocolVersion = "2026-07-28"
+
+// New builds the MCP server. version is the build's git tag (see
+// cmd/memo-mcp) and is what clients see in the Implementation block.
+func New(j *journal.Manager, s *search.Service, version string) *Server {
 	srv := &Server{
 		journal: j,
 		search:  s,
@@ -26,7 +33,7 @@ func New(j *journal.Manager, s *search.Service) *Server {
 
 	mcpSrv := mcp.NewServer(&mcp.Implementation{
 		Name:    "memo-mcp",
-		Version: "2.0.0",
+		Version: version,
 	}, nil)
 
 	srv.mcp = mcpSrv
@@ -153,13 +160,13 @@ func (s *Server) handleSearchJournal(ctx context.Context, _ *mcp.CallToolRequest
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Found %d relevant entries:\n\n", len(results)))
+	fmt.Fprintf(&sb, "Found %d relevant entries:\n\n", len(results))
 	for i, r := range results {
 		t := time.UnixMilli(r.CreatedAt)
-		sb.WriteString(fmt.Sprintf("%d. [Score: %.3f] %s\n", i+1, r.Score, t.Format("2006-01-02")))
-		sb.WriteString(fmt.Sprintf("   Sections: %s\n", strings.Join(r.Sections, ", ")))
-		sb.WriteString(fmt.Sprintf("   ID: %s\n", r.ID))
-		sb.WriteString(fmt.Sprintf("   Excerpt: %s\n\n", r.Excerpt))
+		fmt.Fprintf(&sb, "%d. [Score: %.3f] %s\n", i+1, r.Score, t.Format("2006-01-02"))
+		fmt.Fprintf(&sb, "   Sections: %s\n", strings.Join(r.Sections, ", "))
+		fmt.Fprintf(&sb, "   ID: %s\n", r.ID)
+		fmt.Fprintf(&sb, "   Excerpt: %s\n\n", r.Excerpt)
 	}
 
 	return textResult(sb.String()), nil, nil
@@ -196,13 +203,13 @@ func (s *Server) handleListRecent(ctx context.Context, _ *mcp.CallToolRequest, a
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Recent entries (last %d days):\n\n", days))
+	fmt.Fprintf(&sb, "Recent entries (last %d days):\n\n", days)
 	for i, r := range results {
 		t := time.UnixMilli(r.CreatedAt)
-		sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, t.Format("2006-01-02")))
-		sb.WriteString(fmt.Sprintf("   Sections: %s\n", strings.Join(r.Sections, ", ")))
-		sb.WriteString(fmt.Sprintf("   ID: %s\n", r.ID))
-		sb.WriteString(fmt.Sprintf("   Excerpt: %s\n\n", r.Excerpt))
+		fmt.Fprintf(&sb, "%d. %s\n", i+1, t.Format("2006-01-02"))
+		fmt.Fprintf(&sb, "   Sections: %s\n", strings.Join(r.Sections, ", "))
+		fmt.Fprintf(&sb, "   ID: %s\n", r.ID)
+		fmt.Fprintf(&sb, "   Excerpt: %s\n\n", r.Excerpt)
 	}
 
 	return textResult(sb.String()), nil, nil
@@ -223,8 +230,8 @@ func (s *Server) handleReadRecent(ctx context.Context, _ *mcp.CallToolRequest, a
 	var sb strings.Builder
 	for i, r := range results {
 		t := time.UnixMilli(r.CreatedAt)
-		sb.WriteString(fmt.Sprintf("--- Entry %d (%s) ---\n", i+1, t.Format("2006-01-02")))
-		sb.WriteString(fmt.Sprintf("ID: %s\n\n", r.ID))
+		fmt.Fprintf(&sb, "--- Entry %d (%s) ---\n", i+1, t.Format("2006-01-02"))
+		fmt.Fprintf(&sb, "ID: %s\n\n", r.ID)
 		sb.WriteString(r.Content)
 		sb.WriteString("\n\n")
 	}
@@ -240,7 +247,7 @@ func (s *Server) handleJournalStats(ctx context.Context, _ *mcp.CallToolRequest,
 
 	var sb strings.Builder
 	sb.WriteString("=== Journal Statistics ===\n\n")
-	sb.WriteString(fmt.Sprintf("Total entries: %d\n", stats.TotalEntries))
+	fmt.Fprintf(&sb, "Total entries: %d\n", stats.TotalEntries)
 
 	if stats.TotalEntries == 0 {
 		sb.WriteString("\nJournal is empty. Use process_thoughts to create your first entry.\n")
@@ -248,22 +255,22 @@ func (s *Server) handleJournalStats(ctx context.Context, _ *mcp.CallToolRequest,
 	}
 
 	// Date range
-	sb.WriteString(fmt.Sprintf("Date range: %s to %s\n",
+	fmt.Fprintf(&sb, "Date range: %s to %s\n",
 		stats.EarliestEntry.Format("2006-01-02"),
-		stats.LatestEntry.Format("2006-01-02")))
+		stats.LatestEntry.Format("2006-01-02"))
 
 	// Embedding coverage
 	coverage := 0.0
 	if stats.TotalEntries > 0 {
 		coverage = float64(stats.EntriesWithEmbeddings) / float64(stats.TotalEntries) * 100
 	}
-	sb.WriteString(fmt.Sprintf("Entries with embeddings: %d/%d (%.1f%%)\n",
-		stats.EntriesWithEmbeddings, stats.TotalEntries, coverage))
+	fmt.Fprintf(&sb, "Entries with embeddings: %d/%d (%.1f%%)\n",
+		stats.EntriesWithEmbeddings, stats.TotalEntries, coverage)
 
 	// Recent activity
 	sb.WriteString("\nRecent activity:\n")
-	sb.WriteString(fmt.Sprintf("  Last 7 days: %d entries\n", stats.RecentActivity["7d"]))
-	sb.WriteString(fmt.Sprintf("  Last 30 days: %d entries\n", stats.RecentActivity["30d"]))
+	fmt.Fprintf(&sb, "  Last 7 days: %d entries\n", stats.RecentActivity["7d"])
+	fmt.Fprintf(&sb, "  Last 30 days: %d entries\n", stats.RecentActivity["30d"])
 
 	// Section breakdown
 	if len(stats.SectionCounts) > 0 {
@@ -280,15 +287,15 @@ func (s *Server) handleJournalStats(ctx context.Context, _ *mcp.CallToolRequest,
 			return sections[i].count > sections[j].count
 		})
 		for _, sc := range sections {
-			sb.WriteString(fmt.Sprintf("  %s: %d\n", sc.name, sc.count))
+			fmt.Fprintf(&sb, "  %s: %d\n", sc.name, sc.count)
 		}
 	}
 
 	// Storage info
 	sb.WriteString("\nStorage:\n")
-	sb.WriteString(fmt.Sprintf("  Location: %s\n", stats.DatabasePath))
-	sb.WriteString(fmt.Sprintf("  Size: %.2f MB\n", stats.DatabaseSizeMB))
-	sb.WriteString(fmt.Sprintf("  Avg entry length: %d characters\n", stats.AvgEntryLength))
+	fmt.Fprintf(&sb, "  Location: %s\n", stats.DatabasePath)
+	fmt.Fprintf(&sb, "  Size: %.2f MB\n", stats.DatabaseSizeMB)
+	fmt.Fprintf(&sb, "  Avg entry length: %d characters\n", stats.AvgEntryLength)
 
 	return textResult(sb.String()), nil, nil
 }

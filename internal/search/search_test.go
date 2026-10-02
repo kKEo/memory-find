@@ -13,8 +13,8 @@ import (
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
 
-	"github.com/kmaziarz/memo-mcp/internal/embedding"
-	"github.com/kmaziarz/memo-mcp/internal/journal"
+	"github.com/kKEo/memory-find/internal/embedding"
+	"github.com/kKEo/memory-find/internal/journal"
 )
 
 func testDB(t *testing.T) *sql.DB {
@@ -714,4 +714,30 @@ func TestHybridSearchShowcase(t *testing.T) {
 			t.Error("expected React re-renders entry (#1) in top 3 via frontend semantic match")
 		}
 	})
+}
+
+// TestGetStatsFractionalAverageLength guards the stats crash where
+// AVG(LENGTH(content)) was scanned into an integer: SQLite returns a float,
+// and any journal whose mean length is not whole (here 68 and 99 → 83.5)
+// made journal_stats and --stats fail with a Scan error.
+func TestGetStatsFractionalAverageLength(t *testing.T) {
+	db := testDB(t)
+	emb := embedding.NewHashEmbedder(384)
+	mgr := journal.NewManager(db, emb)
+	for _, text := range []string{
+		"I feel frustrated with TypeScript type errors today.",                              // 51 chars
+		"The auth service needs a complete rewrite. Current implementation leaks sessions.", // 82 chars
+	} {
+		if _, err := mgr.WriteThoughts(context.Background(), journal.ThoughtInput{Reflections: text}); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+	}
+
+	stats, err := NewService(db, emb).GetStats(context.Background())
+	if err != nil {
+		t.Fatalf("get stats with fractional mean: %v", err)
+	}
+	if stats.AvgEntryLength <= 0 {
+		t.Fatalf("expected positive average length, got %d", stats.AvgEntryLength)
+	}
 }

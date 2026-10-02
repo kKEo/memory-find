@@ -14,9 +14,9 @@ import (
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
 
-	"github.com/kmaziarz/memo-mcp/internal/embedding"
-	"github.com/kmaziarz/memo-mcp/internal/journal"
-	"github.com/kmaziarz/memo-mcp/internal/search"
+	"github.com/kKEo/memory-find/internal/embedding"
+	"github.com/kKEo/memory-find/internal/journal"
+	"github.com/kKEo/memory-find/internal/search"
 )
 
 var updateBaseline = flag.Bool("update-baseline", false, "regenerate testdata/baseline.json from the current measured report")

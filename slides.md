@@ -330,7 +330,7 @@ The entire stack is pure Go. No C compiler, no shared libraries, no Docker neede
 
 ```bash
 # Clone and build
-git clone https://github.com/kmaziarz/memo-mcp.git
+git clone https://github.com/kKEo/memory-find.git
 cd memo-mcp
 make build
 
@@ -587,4 +587,4 @@ Built with Go, SQLite, and sentence-transformers
 
 <br>
 
-github.com/kmaziarz/memo-mcp
+github.com/kKEo/memory-find

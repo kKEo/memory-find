@@ -39,9 +39,9 @@ Section filters are resolved in SQL first and applied inside the keyword query. 
 
 ## Storage
 
-One SQLite file per `JOURNAL_TOKEN`, at `~/.memo-mcp/<token>.db` (or under `$JOURNAL_PATH` if set). Directories and files memo-mcp creates are restricted to the owner (`0700`/`0600`); a directory that already existed with wider permissions is not tightened. WAL mode is on, so two processes touching the same token (e.g. two concurrent Claude Code sessions) don't collide.
+One SQLite file per `MEMO_KB` name, at `~/.memo-mcp/kb/<name>.db` (or under `$MEMO_HOME/kb/` if set); the deprecated `JOURNAL_TOKEN` keeps opening `~/.memo-mcp/<token>.db`. Directories and files memo-mcp creates are restricted to the owner (`0700`/`0600`); a directory that already existed with wider permissions is not tightened. WAL mode is on, so two processes touching the same token (e.g. two concurrent Claude Code sessions) don't collide.
 
-The token is explicit rather than inferred from the working directory — set `JOURNAL_TOKEN` per project (in the MCP server config, not the shell) and each project gets its own isolated journal. There's no cross-project sharing by default.
+The name is explicit rather than inferred from the working directory — set `MEMO_KB` per project (in the MCP server config, not the shell) and each project gets its own isolated journal. There's no cross-project sharing by default.
 
 ## Setup
 
@@ -63,7 +63,7 @@ Add it to Claude Code or Claude Desktop's MCP config:
     "memo-journal": {
       "command": "/path/to/memo-mcp",
       "env": {
-        "JOURNAL_TOKEN": "my-project"
+        "MEMO_KB": "my-project"
       }
     }
   }
@@ -72,19 +72,24 @@ Add it to Claude Code or Claude Desktop's MCP config:
 
 On first start memo-mcp downloads the ~90MB embedding model before it begins answering MCP requests; it prints a single "Downloading embedding model (first run only)..." line to stderr and no progress bar. If your client times out on that first start, run `memo-mcp --redownload-model` once from a terminal. If a download is interrupted, memo-mcp detects the incomplete cache and retries on the next run — it doesn't need to be deleted by hand.
 
-### CLI flags
+### Commands
 
-Running the binary directly (rather than as an MCP server) supports:
+Running the binary with no arguments starts the MCP server on stdio. Other commands:
 
-- `--stats` — print journal statistics and exit (no model load, no network; note that it opens the database read-write, so a mistyped `JOURNAL_TOKEN` creates an empty journal)
-- `--redownload-model` — force a fresh model download, discarding any cached copy, and exit
+- `memo-mcp status` — print database statistics and exit (no model load, no network; note that it opens the database read-write, so a mistyped name creates an empty database)
+- `memo-mcp version` — print the build version, the MCP protocol version, the Go version and the model directory
+- `memo-mcp model redownload` — force a fresh model download, discarding any cached copy, and exit
+
+The old spellings `--stats` and `--redownload-model` still work for one release and print a deprecation warning.
 
 ### Environment variables
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `JOURNAL_TOKEN` | yes | Selects which journal database to open. Letters, digits, `.`, `_`, `-` only. |
-| `JOURNAL_PATH` | no | Overrides the storage directory (default `~/.memo-mcp`) |
+| `MEMO_KB` | no | Selects the database to open; the file is `$MEMO_HOME/kb/<name>.db`. Letters, digits, `.`, `_`, `-` only. Default `default`. |
+| `MEMO_HOME` | no | Base directory (default `~/.memo-mcp`) |
+| `JOURNAL_TOKEN` | deprecated | Old name selector: opens `<JOURNAL_PATH or ~/.memo-mcp>/<token>.db` exactly as before, with a warning. Honoured for one release. |
+| `JOURNAL_PATH` | deprecated | Old base directory override, only with `JOURNAL_TOKEN` |
 
 ## How this differs from Claude Code's built-in memory
 

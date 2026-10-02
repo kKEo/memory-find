@@ -1,4 +1,4 @@
-module github.com/kmaziarz/memo-mcp
+module github.com/kKEo/memory-find
 
 go 1.26.0
 
@@ -6,7 +6,7 @@ require (
 	github.com/gofrs/flock v0.13.0
 	github.com/google/uuid v1.6.0
 	github.com/knights-analytics/hugot v0.7.2
-	github.com/modelcontextprotocol/go-sdk v1.6.0
+	github.com/modelcontextprotocol/go-sdk v1.8.0
 	modernc.org/sqlite v1.50.0
 )
 
@@ -40,6 +40,7 @@ require (
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/term v0.42.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	modernc.org/libc v1.72.0 // indirect

@@ -122,7 +122,13 @@ stopgap, not chunking); there is no raw relevance score (the top hit always show
 update, forget or supersede; no stemming; no embedding backfill; the vector arm cannot push
 filters; no `realmodel` test tier; the server reports version `"2.0.0"` though no tag exists.
 
-### 4.2 What the binary is right now (verified 2026-10-02)
+### 4.2 What the binary is right now (verified 2026-10-02, HEAD `375f24c`, before P0)
+
+> P0 changed several rows below: go-sdk is now v1.8.0 (protocol 2026-07-28), the version comes
+> from the git tag, the binary has subcommands, `MEMO_KB`/`MEMO_HOME` replace the journal
+> variables, the module path is `github.com/kKEo/memory-find`, and the stats crash is fixed. The
+> schema, tools and search constants are unchanged until P1/P2.
+
 
 | Fact | Value |
 |---|---|
@@ -278,6 +284,15 @@ Total 42–48 focused dev-days with P9, 39–45 without. The 2026-09 review esti
 less and shipped two phases in a month, so treat these as ranges, not promises.
 
 ### P0 — Reset the map · 2–3 days · `v0.4.0`
+
+> **Status (2026-10-02): built.** Retro tag `v0.3.0` cut; module renamed; stats crash fixed with
+> a test proven to fail on the old code; go-sdk v1.8.0 with an unchanged golden and a protocol
+> conformance test; version from `-ldflags`; `internal/cli` with `serve | status | version |
+> model redownload` and `MEMO_KB`/`MEMO_HOME`; signal handling; `.golangci.yml` (lint clean);
+> minimal CI; Makefile targets; spikes S1–S3 decided (S2: plain table, OD-1 resolved; S3: option
+> A confirmed, OD-2 resolved); S4 harness written, see `docs/spikes/S4-embedding-models.md`.
+> Remaining before the tag: push so CI runs once, then `git tag -a v0.4.0`.
+
 
 - **Story.** All four: the repository must tell the truth before anything is built on it.
 - **Goal.** Anchor history with a tag, talk the current MCP protocol, report a true version, give
@@ -1066,7 +1081,7 @@ optional).
 Each has a plain-words question, the options, and a recommendation. The text above assumes the
 recommendation; if a different option is chosen, the affected phase is named.
 
-- **OD-1 Where do vectors live?** A vector is a list of numbers per chunk; search finds the
+- **OD-1 Where do vectors live?** *Resolved by spike S2 (2026-10-02): plain table; vec0 was only 1.5–1.8× faster.* A vector is a list of numbers per chunk; search finds the
   closest ones. *A:* sqlite-vec's `vec0` virtual table (today's choice): a purpose-built layout,
   but no foreign keys, awkward filters, one fixed dimension per table, and a sharp edge we already
   hit. *B:* an ordinary table compared with `vec_distance_cosine()` in plain SQL: it scans every
@@ -1074,7 +1089,7 @@ recommendation; if a different option is chosen, the affected phase is named.
   milliseconds at 10k chunks), but every SQL filter works and any model dimension fits.
   **Recommend B** unless spike S2 shows vec0 more than 3× faster at 50k chunks *and* pushdown
   works. The `Arm` interface leaves room for a vec0 adapter above about 100k chunks. (P1)
-- **OD-2 Which index for exact identifiers?** Stemming mangles symbols, so identifiers need their
+- **OD-2 Which index for exact identifiers?** *Resolved by spike S3 (2026-10-02): option A; trigram confirmed available as the fallback.* Stemming mangles symbols, so identifiers need their
   own index. *A:* `unicode61` with `tokenchars '_.:-/'` (keeps `net/http` and `useCallback`
   whole; small). *B:* `trigram` (also finds substrings such as `Callback` inside `useCallback`;
   about 3× the index size; queries need at least three characters). **Recommend A** in P1; adopt B

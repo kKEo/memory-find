@@ -159,18 +159,24 @@ func TestMigrateFromV0Shapes(t *testing.T) {
 			// Capture entries content before migration to assert it
 			// survives byte-identical.
 			beforeContent := map[string]string{}
-			rows, err := db.Query(`SELECT id, content FROM entries`)
-			if err != nil {
-				t.Fatal(err)
-			}
-			for rows.Next() {
-				var id, content string
-				if err := rows.Scan(&id, &content); err != nil {
+			readEntries := func() {
+				rows, err := db.Query(`SELECT id, content FROM entries`)
+				if err != nil {
 					t.Fatal(err)
 				}
-				beforeContent[id] = content
+				defer rows.Close()
+				for rows.Next() {
+					var id, content string
+					if err := rows.Scan(&id, &content); err != nil {
+						t.Fatal(err)
+					}
+					beforeContent[id] = content
+				}
+				if err := rows.Err(); err != nil {
+					t.Fatal(err)
+				}
 			}
-			rows.Close()
+			readEntries()
 			if len(beforeContent) != tc.wantEntries {
 				t.Fatalf("fixture %s: expected %d entries, got %d", tc.fixture, tc.wantEntries, len(beforeContent))
 			}
