@@ -1,4 +1,4 @@
-# S4 — Which embedding models load under the pure-Go runtime? (P0 quick pass)
+# S4 — Which embedding models load under the pure-Go runtime?
 
 **Question.** hugot's pure-Go backend (GoMLX via onnx-gomlx) only runs ONNX graphs whose
 operations it implements, so before the P3 bake-off we need to know which candidates load at all,
@@ -44,3 +44,33 @@ Two other observations from running the harness:
    can any candidate be dropped for op coverage.
 3. The `models` table (P1) records the exact `hf_repo`, the ONNX path inside it and the external
    data path, since all three turned out to be needed to load a model at all.
+
+---
+
+## Full pass (P3, 2026-10-02, `memo-mcp model smoke --all`)
+
+The harness gaps above are fixed: the registry records each repo's ONNX path and external
+weights file, static models are read directly from safetensors, and `model smoke` is a command.
+Same laptop (Apple Silicon), hugot v0.7.2 pure-Go backend, one process per model.
+
+| Model | Loads (ms) | Sane | Dim | p50, 1 × ~256 tokens | p50, batch 16 | Licence | Verdict |
+|---|---|---|---|---|---|---|---|
+| minilm (all-MiniLM-L6-v2) | 168 | yes (0.92 vs 0.04) | 384 | **593 ms** | 9.8 s | Apache-2.0 | incumbent; the latency floor for ONNX models |
+| potion (potion-retrieval-32M, static) | 21,036 (reads a 129 MB table) | yes (0.84 vs −0.07) | 512 | **0 ms** | 2 ms | MIT | the instant tier: no network pass at all |
+| granite-small-r2 (onnx-community, fp32) | 31,924 | yes (0.94 vs 0.63) | 384 | 1,956 ms | 36 s | Apache-2.0 | runs; 3.3× slower than MiniLM; quality decided by eval |
+| granite-r2 (onnx-community, fp32) | 117,572 | yes (0.95 vs 0.47) | 768 | 7,173 ms | 140 s | Apache-2.0 | runs; 12× slower than MiniLM; too slow for queries |
+| gemma-256 (embeddinggemma q8) | loads | **no** | – | – | – | Gemma | op coverage: `DequantizeLinear` with a per-tensor scale is not implemented by onnx-gomlx; the fp32 export (1.2 GB) was not tried |
+| arctic-m-v2 (fp32 `onnx/model.onnx`) | **no** | – | – | – | – | Apache-2.0 | the 1.2 GB graph does not parse ("invalid wire-format data"); not a GoMLX op issue but a file the pure-Go parser cannot read |
+
+**What the numbers mean for OD-6.** The OD-6 rule said "p50 ≤ 150 ms for 256 tokens"; no ONNX
+model meets it under the pure-Go backend, including the incumbent (593 ms). The rule has to be
+relative: *no slower than 2× MiniLM, and better on eval nDCG@10 by at least 0.02*. Two models
+survive the smoke as realistic candidates: granite-small-r2 (same 384-d, Apache-2.0, 3.3× slower,
+so it fails the latency half unless its quality gain is large) and potion (instant, MIT, a static
+model whose paraphrase quality the eval must show). The decision is made in
+`docs/eval/v0.7.0.md` from the measured eval, not here.
+
+**Harness notes.** The static loader reads safetensors F32/F16 and a WordPiece `tokenizer.json`
+(BERT pre-tokenisation, greedy longest match). The quantised onnx-community exports all share the
+`DequantizeLinear` gap, so quantisation is not a path to speed on this backend today. Load times
+are dominated by reading weights into GoMLX; a long-running server pays them once.

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kKEo/memory-find/internal/chunk"
 	"github.com/kKEo/memory-find/internal/kb"
 	"github.com/kKEo/memory-find/internal/retrieve"
 )
@@ -78,37 +79,72 @@ type Query struct {
 	Relevant []string
 	// Irrelevant lists tempting false positives whose rank is tracked.
 	Irrelevant []string
+	// RealModelOnly marks queries the deterministic hash embedder cannot
+	// answer (paraphrase); they run only when a real model is configured.
+	RealModelOnly bool
 }
 
-// Load ingests the corpus into store (kind=note, trust=user, one namespace),
-// returning a map from fixture key to document id. Section names become tags.
-func Load(ctx context.Context, store *kb.Store, entries []FixtureEntry) (map[string]string, error) {
-	keyToID := make(map[string]string, len(entries))
-	now := time.Now()
+// ToDocs converts journal-era fixtures (one text per section) into
+// knowledge-base fixtures: kind=note in the "eval" namespace, section names
+// as tags.
+func ToDocs(entries []FixtureEntry) []FixtureDoc {
+	out := make([]FixtureDoc, 0, len(entries))
 	for _, e := range entries {
 		content, sections := e.Input.Markdown()
-		if strings.TrimSpace(content) == "" {
-			return nil, fmt.Errorf("fixture %q has no content", e.Key)
+		out = append(out, FixtureDoc{Key: e.Key, Namespace: "eval", Kind: kb.KindNote, Title: e.Key, Tags: sections, Content: "# " + e.Key + "\n\n" + content, AgeDays: e.AgeDays})
+	}
+	return out
+}
+
+// LoadStats reports the cost of loading a corpus.
+type LoadStats struct {
+	Docs     int
+	Chunks   int
+	WriteMs  float64 // total wall time for ingest
+	PerDocMs float64
+}
+
+// Load ingests fixtures into store (trust=user, CLI channel), returning a map
+// from fixture key to document id plus the write cost. Versions of the same
+// URI become revisions in order of appearance.
+func Load(ctx context.Context, store *kb.Store, docs []FixtureDoc) (map[string]string, *LoadStats, error) {
+	keyToID := make(map[string]string, len(docs))
+	now := time.Now()
+	st := &LoadStats{}
+	t0 := time.Now()
+	for _, d := range docs {
+		if strings.TrimSpace(d.Content) == "" {
+			return nil, nil, fmt.Errorf("fixture %q has no content", d.Key)
+		}
+		origin := kb.OriginUserSaid
+		if d.URI != "" {
+			origin = kb.OriginWeb
 		}
 		res, err := store.Ingest(ctx, kb.IngestInput{
-			Namespace: "eval", Content: "# " + e.Key + "\n\n" + content, Trust: kb.TrustUser, Channel: kb.ChannelCLI, Actor: "eval",
-			Source: kb.SourceInput{Title: e.Key, Kind: kb.KindNote, Origin: kb.OriginUserSaid, Tags: sections},
+			Namespace: d.Namespace, Content: d.Content, Trust: kb.TrustUser, Channel: kb.ChannelCLI, Actor: "eval",
+			Source: kb.SourceInput{URI: d.URI, Title: d.Title, Kind: d.Kind, Library: d.Library, Version: d.Version, Origin: origin, Tags: d.Tags},
 		})
 		if err != nil {
-			return nil, fmt.Errorf("seed %q: %w", e.Key, err)
+			return nil, nil, fmt.Errorf("seed %q: %w", d.Key, err)
 		}
 		if res.Pending > 0 {
-			return nil, fmt.Errorf("seed %q: %d chunk vectors pending; the eval needs an embedder", e.Key, res.Pending)
+			return nil, nil, fmt.Errorf("seed %q: %d chunk vectors pending; the eval needs an embedder", d.Key, res.Pending)
 		}
-		keyToID[e.Key] = res.DocumentID
-		if e.AgeDays != 0 {
-			ts := now.AddDate(0, 0, -e.AgeDays).UnixMilli()
+		keyToID[d.Key] = res.DocumentID
+		st.Docs++
+		st.Chunks += res.Chunks
+		if d.AgeDays != 0 {
+			ts := now.AddDate(0, 0, -d.AgeDays).UnixMilli()
 			if _, err := store.DB().ExecContext(ctx, `UPDATE documents SET created_at = ?, updated_at = ? WHERE id = ?`, ts, ts, res.DocumentID); err != nil {
-				return nil, fmt.Errorf("backdate %q: %w", e.Key, err)
+				return nil, nil, fmt.Errorf("backdate %q: %w", d.Key, err)
 			}
 		}
 	}
-	return keyToID, nil
+	st.WriteMs = float64(time.Since(t0)) / 1e6
+	if st.Docs > 0 {
+		st.PerDocMs = st.WriteMs / float64(st.Docs)
+	}
+	return keyToID, st, nil
 }
 
 // QueryMetrics holds the metrics for one query.
@@ -129,30 +165,80 @@ type QueryMetrics struct {
 	Abstained *bool `json:"abstained,omitempty"`
 	// FirstHitArms names the arms that returned the first relevant result,
 	// so a report can say whether a hit came through keyword or meaning.
-	FirstHitArms []string `json:"first_hit_arms,omitempty"`
-	LatencyMs    float64  `json:"latency_ms"`
+	FirstHitArms   []string `json:"first_hit_arms,omitempty"`
+	LatencyMs      float64  `json:"latency_ms"`
+	TokensReturned int      `json:"tokens_returned"`
+	Skipped        bool     `json:"skipped,omitempty"` // RealModelOnly query under the hash embedder
 }
 
 // Report is the result of a run. Means exclude zero-relevant queries from
 // the ranking metrics (they have nothing to rank) and report their
 // abstention rate separately.
 type Report struct {
+	Strategy       string                  `json:"strategy,omitempty"` // profile name or "agent-proxy"
+	Model          string                  `json:"model,omitempty"`
 	PerQuery       []QueryMetrics          `json:"per_query"`
 	Mean           QueryMetrics            `json:"mean"`
 	PerCategory    map[string]QueryMetrics `json:"per_category"`
 	AbstentionRate float64                 `json:"abstention_rate"`
 	NumAbstention  int                     `json:"num_abstention_queries"`
+	Cost           Cost                    `json:"cost"`
+}
+
+// Cost is what quality costs: time and size, next to every quality number.
+type Cost struct {
+	QueryP50Ms    float64 `json:"query_p50_ms"`
+	QueryP95Ms    float64 `json:"query_p95_ms"`
+	TokensP50     float64 `json:"tokens_returned_p50"`
+	WritePerDocMs float64 `json:"write_per_doc_ms"`
+	DBSizeMB      float64 `json:"db_size_mb"`
+	Docs          int     `json:"docs"`
+	Chunks        int     `json:"chunks"`
+}
+
+// RunOptions tunes Run.
+type RunOptions struct {
+	// AgentProxy runs the deterministic two-round "search, then re-query with
+	// the top hit's section title appended" stand-in for an agent iterating
+	// (labelled a weak proxy in the report).
+	AgentProxy bool
+	// RealModel reports whether a real embedder is configured, enabling the
+	// RealModelOnly queries.
+	RealModel bool
 }
 
 // Run executes every query at document granularity and computes metrics.
-func Run(ctx context.Context, svc *retrieve.Service, keyToID map[string]string, queries []Query) (*Report, error) {
+func Run(ctx context.Context, svc *retrieve.Service, keyToID map[string]string, queries []Query, opts RunOptions) (*Report, error) {
 	report := &Report{PerQuery: make([]QueryMetrics, 0, len(queries)), PerCategory: map[string]QueryMetrics{}}
 	const k = 10
 	for _, q := range queries {
+		if q.RealModelOnly && !opts.RealModel {
+			report.PerQuery = append(report.PerQuery, QueryMetrics{QueryID: q.ID, Category: categoryOf(q), Skipped: true})
+			continue
+		}
 		t0 := time.Now()
-		resp, err := svc.Search(ctx, retrieve.Request{Query: q.Query, Scope: q.Scope, Granularity: retrieve.GranularityDocument, ResponseFormat: retrieve.FormatExplain, Limit: k, MaxTokens: 1 << 20})
+		req := retrieve.Request{Query: q.Query, Scope: q.Scope, Granularity: retrieve.GranularityDocument, ResponseFormat: retrieve.FormatExplain, Limit: k, MaxTokens: 1 << 20}
+		resp, err := svc.Search(ctx, req)
 		if err != nil {
 			return nil, fmt.Errorf("query %q: %w", q.ID, err)
+		}
+		if opts.AgentProxy && len(resp.Results) > 0 {
+			// Round two: an agent that reads the top hit and searches again
+			// with what it learned (its section title). Results are unioned,
+			// first round first.
+			req2 := req
+			req2.Query = q.Query + " " + resp.Results[0].Title + " " + resp.Results[0].SectionPath
+			if r2, err := svc.Search(ctx, req2); err == nil {
+				seen := map[string]bool{}
+				for _, r := range resp.Results {
+					seen[r.DocumentURI] = true
+				}
+				for _, r := range r2.Results {
+					if !seen[r.DocumentURI] && len(resp.Results) < k {
+						resp.Results = append(resp.Results, r)
+					}
+				}
+			}
 		}
 		resultIDs := make([]string, len(resp.Results))
 		for i, r := range resp.Results {
@@ -162,6 +248,9 @@ func Run(ctx context.Context, svc *retrieve.Service, keyToID map[string]string, 
 		relevantIDs := keysToIDs(keyToID, q.Relevant)
 		irrelevantIDs := keysToIDs(keyToID, q.Irrelevant)
 		m := QueryMetrics{QueryID: q.ID, Category: categoryOf(q), NumRelevant: len(relevantIDs), NumIrrelevant: len(irrelevantIDs), NumResults: len(resultIDs), LatencyMs: float64(time.Since(t0)) / 1e6}
+		for _, r := range resp.Results {
+			m.TokensReturned += chunk.EstimateTokens(r.Content) + 24
+		}
 		if len(relevantIDs) == 0 {
 			abst := len(resultIDs) == 0
 			m.Abstained = &abst
@@ -186,6 +275,7 @@ func Run(ctx context.Context, svc *retrieve.Service, keyToID map[string]string, 
 		report.PerQuery = append(report.PerQuery, m)
 	}
 	report.Mean, report.AbstentionRate, report.NumAbstention = meanOf(report.PerQuery)
+	report.Cost = costOf(report.PerQuery)
 	for _, cat := range categories(report.PerQuery) {
 		var subset []QueryMetrics
 		for _, m := range report.PerQuery {
@@ -198,6 +288,27 @@ func Run(ctx context.Context, svc *retrieve.Service, keyToID map[string]string, 
 		report.PerCategory[cat] = cm
 	}
 	return report, nil
+}
+
+func costOf(all []QueryMetrics) Cost {
+	var lat, tok []float64
+	for _, m := range all {
+		if m.Skipped {
+			continue
+		}
+		lat = append(lat, m.LatencyMs)
+		tok = append(tok, float64(m.TokensReturned))
+	}
+	sort.Float64s(lat)
+	sort.Float64s(tok)
+	pct := func(v []float64, p float64) float64 {
+		if len(v) == 0 {
+			return 0
+		}
+		i := int(p * float64(len(v)-1))
+		return v[i]
+	}
+	return Cost{QueryP50Ms: pct(lat, 0.5), QueryP95Ms: pct(lat, 0.95), TokensP50: pct(tok, 0.5)}
 }
 
 func categoryOf(q Query) string {
@@ -239,6 +350,9 @@ func meanOf(all []QueryMetrics) (QueryMetrics, float64, int) {
 	m := QueryMetrics{QueryID: "MEAN"}
 	var ranked, irrelevantCount, abstQueries, abstained int
 	for _, q := range all {
+		if q.Skipped {
+			continue
+		}
 		if q.Abstained != nil {
 			abstQueries++
 			if *q.Abstained {

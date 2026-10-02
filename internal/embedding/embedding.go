@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,22 +40,26 @@ type HugotEmbedder struct {
 }
 
 func NewHugotEmbedder(ctx context.Context, modelDir string) (*HugotEmbedder, error) {
+	return NewHugotEmbedderFor(ctx, MiniLM, modelDir)
+}
+
+// NewHugotEmbedderFor loads any ONNX model the registry describes: it is
+// downloaded (with its external weights file when the repo has one) into
+// modelDir on first use and run on hugot's pure-Go backend.
+func NewHugotEmbedderFor(ctx context.Context, info ModelInfo, modelDir string) (*HugotEmbedder, error) {
+	if info.HFRepo == "" || info.OnnxPath == "" {
+		return nil, fmt.Errorf("model %q is not an ONNX model", info.ID)
+	}
 	session, err := hugot.NewGoSession(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("create hugot session: %w", err)
 	}
-
-	pipe, err := loadPipelineWithRecovery(ctx, session, modelDir, fetchFromHuggingFace)
+	pipe, err := loadPipelineWithRecovery(ctx, session, info, modelDir, fetchFromHuggingFace)
 	if err != nil {
 		session.Destroy()
 		return nil, err
 	}
-
-	e := &HugotEmbedder{
-		session:  session,
-		pipeline: pipe,
-		info:     MiniLM,
-	}
+	e := &HugotEmbedder{session: session, pipeline: pipe, info: info}
 	e.run = e.runPipeline
 	return e, nil
 }
@@ -64,7 +69,34 @@ func (e *HugotEmbedder) runPipeline(ctx context.Context, texts []string) ([][]fl
 	if err != nil {
 		return nil, fmt.Errorf("run pipeline: %w", err)
 	}
-	return result.Embeddings, nil
+	out := result.Embeddings
+	if e.info.Truncate > 0 {
+		for i, v := range out {
+			out[i] = TruncateNormalize(v, e.info.Truncate)
+		}
+	}
+	return out, nil
+}
+
+// TruncateNormalize keeps the first n dimensions of a Matryoshka-trained
+// vector and rescales it to unit length.
+func TruncateNormalize(v []float32, n int) []float32 {
+	if n <= 0 || n >= len(v) {
+		return v
+	}
+	t := make([]float32, n)
+	copy(t, v[:n])
+	var norm float64
+	for _, x := range t {
+		norm += float64(x) * float64(x)
+	}
+	if norm > 0 {
+		inv := float32(1 / math.Sqrt(norm))
+		for i := range t {
+			t[i] *= inv
+		}
+	}
+	return t
 }
 
 // Info describes the loaded model.
@@ -123,22 +155,26 @@ const modelName = "sentence-transformers/all-MiniLM-L6-v2"
 // feature-extraction pipeline. If the pipeline fails to load from what
 // looks like a ready model cache, the cache is treated as corrupt: it is
 // wiped and the download is retried exactly once before giving up.
-func loadPipelineWithRecovery(ctx context.Context, session *hugot.Session, modelDir string, fetch modelFetcher) (*pipelines.FeatureExtractionPipeline, error) {
+func loadPipelineWithRecovery(ctx context.Context, session *hugot.Session, info ModelInfo, modelDir string, fetch modelFetcher) (*pipelines.FeatureExtractionPipeline, error) {
 	const maxAttempts = 2
 
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		forceRedownload := attempt > 0
-		modelPath, err := downloadModel(ctx, modelDir, forceRedownload, fetch)
+		modelPath, err := downloadModel(ctx, modelDir, info, forceRedownload, fetch)
 		if err != nil {
 			return nil, fmt.Errorf("download model: %w", err)
 		}
 
+		opts := []hugot.FeatureExtractionOption{}
+		if info.Normalize {
+			opts = append(opts, pipelines.WithNormalization())
+		}
 		pipe, err := hugot.NewPipeline(session, hugot.FeatureExtractionConfig{
 			ModelPath:    modelPath,
-			Name:         "memo-embeddings",
-			OnnxFilename: "model.onnx",
-			Options:      []hugot.FeatureExtractionOption{pipelines.WithNormalization()},
+			Name:         "memo-embeddings-" + info.ID,
+			OnnxFilename: filepath.Base(info.OnnxPath),
+			Options:      opts,
 		})
 		if err == nil {
 			return pipe, nil
@@ -163,12 +199,16 @@ func sanitizedModelDirName(name string) string {
 // writes a placeholder directory with no network access, so the
 // atomic-rename, sentinel, and corruption-recovery logic in downloadModel
 // can be exercised in isolation from the real ~90MB download.
-type modelFetcher func(ctx context.Context, modelName, destDir string) (string, error)
+type modelFetcher func(ctx context.Context, info ModelInfo, destDir string) (string, error)
 
-func fetchFromHuggingFace(ctx context.Context, modelName, destDir string) (string, error) {
+func fetchFromHuggingFace(ctx context.Context, info ModelInfo, destDir string) (string, error) {
 	opts := hugot.NewDownloadOptions()
-	opts.OnnxFilePath = "onnx/model.onnx"
-	return hugot.DownloadModel(ctx, modelName, destDir, opts)
+	opts.OnnxFilePath = info.OnnxPath
+	opts.ExternalDataPath = info.ExternalDataPath
+	if info.HFRevision != "" {
+		opts.Branch = info.HFRevision
+	}
+	return hugot.DownloadModel(ctx, info.HFRepo, destDir, opts)
 }
 
 // downloadModel ensures the embedding model is present under modelDir and
@@ -184,12 +224,12 @@ func fetchFromHuggingFace(ctx context.Context, modelName, destDir string) (strin
 // processes from downloading the same model at once.
 //
 // If force is true, any existing cached copy is discarded first.
-func downloadModel(ctx context.Context, modelDir string, force bool, fetch modelFetcher) (string, error) {
+func downloadModel(ctx context.Context, modelDir string, info ModelInfo, force bool, fetch modelFetcher) (string, error) {
 	if err := os.MkdirAll(modelDir, 0o755); err != nil {
 		return "", fmt.Errorf("create model dir: %w", err)
 	}
 
-	expectedPath := filepath.Join(modelDir, sanitizedModelDirName(modelName))
+	expectedPath := filepath.Join(modelDir, sanitizedModelDirName(info.HFRepo))
 	sentinelPath := expectedPath + ".ok"
 
 	if force {
@@ -231,9 +271,12 @@ func downloadModel(ctx context.Context, modelDir string, force bool, fetch model
 	}
 	defer os.RemoveAll(tmpDir)
 
-	fmt.Fprintln(os.Stderr, "Downloading embedding model (first run only)...")
+	fmt.Fprintf(os.Stderr, "Downloading embedding model %s (first run only)...\n", info.HFRepo)
+	if info.Licence != "" && info.Licence != "Apache-2.0" && info.Licence != "MIT" {
+		fmt.Fprintf(os.Stderr, "note: %s is distributed under the %s licence; check it fits your use.\n", info.Name, info.Licence)
+	}
 
-	downloadedPath, err := fetch(ctx, modelName, tmpDir)
+	downloadedPath, err := fetch(ctx, info, tmpDir)
 	if err != nil {
 		return "", err
 	}
@@ -285,7 +328,12 @@ func isModelReady(modelDirPath, sentinelPath string) bool {
 // in loadPipelineWithRecovery doesn't catch (e.g. a model that loads but
 // produces bad output after a partial write).
 func RedownloadModel(ctx context.Context, modelDir string) (string, error) {
-	return downloadModel(ctx, modelDir, true, fetchFromHuggingFace)
+	return downloadModel(ctx, modelDir, MiniLM, true, fetchFromHuggingFace)
+}
+
+// RedownloadModelFor forces a fresh download of any registry model.
+func RedownloadModelFor(ctx context.Context, info ModelInfo, modelDir string) (string, error) {
+	return downloadModel(ctx, modelDir, info, true, fetchFromHuggingFace)
 }
 
 func DefaultModelDir() string {
@@ -294,4 +342,11 @@ func DefaultModelDir() string {
 		home = os.TempDir()
 	}
 	return filepath.Join(home, ".cache", "memo-mcp", "models")
+}
+
+// EnsureModelFiles downloads a registry model's files once and returns the
+// local directory. Other packages (the reranker) build their own hugot
+// pipelines from it, reusing this package's sentinel, lock and recovery.
+func EnsureModelFiles(ctx context.Context, info ModelInfo, modelDir string) (string, error) {
+	return downloadModel(ctx, modelDir, info, false, fetchFromHuggingFace)
 }

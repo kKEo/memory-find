@@ -606,3 +606,93 @@ func (n *nullInt) Scan(v any) error {
 	}
 	return nil
 }
+
+// InstalledModel is a row of the models table with its vector count.
+type InstalledModel struct {
+	embedding.ModelInfo
+	IsDefault   bool
+	Vectors     int
+	InstalledAt time.Time
+}
+
+// InstalledModels lists the models that have rows in this knowledge base.
+func (s *Store) InstalledModels(ctx context.Context) ([]InstalledModel, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT m.id, m.name, m.hf_repo, m.dim, m.max_tokens, m.licence, m.is_default, m.installed_at,
+		(SELECT COUNT(*) FROM chunk_vecs v WHERE v.model_id = m.id) FROM models m ORDER BY m.is_default DESC, m.id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []InstalledModel
+	for rows.Next() {
+		var m InstalledModel
+		var def int
+		var at int64
+		if err := rows.Scan(&m.ID, &m.Name, &m.HFRepo, &m.Dim, &m.MaxTokens, &m.Licence, &def, &at, &m.Vectors); err != nil {
+			return nil, err
+		}
+		m.IsDefault = def == 1
+		m.InstalledAt = time.UnixMilli(at).UTC()
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// SetDefaultModel makes modelID the model queries use. The model's row must
+// exist (it is created the first time that embedder stores a vector, or by
+// Reindex). Vectors for other models are kept, so switching back is free.
+func (s *Store) SetDefaultModel(ctx context.Context, modelID, actor, channel string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var n int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM models WHERE id = ?`, modelID).Scan(&n); err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("model %q has no vectors here yet; run `memo-mcp reindex --model %s` first", modelID, modelID)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE models SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END`, modelID); err != nil {
+		return err
+	}
+	if err := writeAudit(ctx, tx, s.now().UnixMilli(), actor, channel, "model-use", "memo://model/"+modelID, map[string]any{"model": modelID}); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// Reindex embeds every live chunk that lacks a vector for the configured
+// embedder's model ("re-embed, don't re-chunk"), creating the model row if
+// needed. It returns how many vectors it wrote. Progress is resumable: a
+// second run only does what the first left undone.
+func (s *Store) Reindex(ctx context.Context, progress func(done, total int)) (int, error) {
+	if s.embedder == nil {
+		return 0, errors.New("reindex needs an embedding model")
+	}
+	modelID, err := s.ensureModel(ctx)
+	if err != nil {
+		return 0, err
+	}
+	missing, err := s.missingVectors(ctx, modelID)
+	if err != nil {
+		return 0, err
+	}
+	done := 0
+	for start := 0; start < len(missing); start += embedBatchSize {
+		end := start + embedBatchSize
+		if end > len(missing) {
+			end = len(missing)
+		}
+		n, err := s.embedPending(ctx, modelID, missing[start:end])
+		done += n
+		if progress != nil {
+			progress(done, len(missing))
+		}
+		if err != nil {
+			return done, err
+		}
+	}
+	return done, nil
+}

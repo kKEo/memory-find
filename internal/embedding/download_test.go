@@ -15,9 +15,9 @@ import (
 // many times it was invoked, so tests can assert exactly when a
 // (re)download actually happened versus when the sentinel let it skip.
 func fakeFetcher(calls *int) modelFetcher {
-	return func(_ context.Context, modelName, destDir string) (string, error) {
+	return func(_ context.Context, info ModelInfo, destDir string) (string, error) {
 		*calls++
-		modelPath := filepath.Join(destDir, sanitizedModelDirName(modelName))
+		modelPath := filepath.Join(destDir, sanitizedModelDirName(MiniLM.HFRepo))
 		if err := os.MkdirAll(modelPath, 0o755); err != nil {
 			return "", err
 		}
@@ -32,7 +32,7 @@ func TestDownloadModelFetchesOnce(t *testing.T) {
 	dir := t.TempDir()
 	var calls int
 
-	path, err := downloadModel(context.Background(), dir, false, fakeFetcher(&calls))
+	path, err := downloadModel(context.Background(), dir, MiniLM, false, fakeFetcher(&calls))
 	if err != nil {
 		t.Fatalf("downloadModel: %v", err)
 	}
@@ -52,10 +52,10 @@ func TestDownloadModelSkipsWhenAlreadyReady(t *testing.T) {
 	var calls int
 	fetch := fakeFetcher(&calls)
 
-	if _, err := downloadModel(context.Background(), dir, false, fetch); err != nil {
+	if _, err := downloadModel(context.Background(), dir, MiniLM, false, fetch); err != nil {
 		t.Fatalf("first downloadModel: %v", err)
 	}
-	if _, err := downloadModel(context.Background(), dir, false, fetch); err != nil {
+	if _, err := downloadModel(context.Background(), dir, MiniLM, false, fetch); err != nil {
 		t.Fatalf("second downloadModel: %v", err)
 	}
 
@@ -77,7 +77,7 @@ func TestDownloadModelRecoversFromPartialDownload(t *testing.T) {
 	// Simulate an interrupted prior download: the model directory exists
 	// (with junk inside, unlike a real partial download, but the point is
 	// it's present) and has no sentinel.
-	partial := filepath.Join(dir, sanitizedModelDirName(modelName))
+	partial := filepath.Join(dir, sanitizedModelDirName(MiniLM.HFRepo))
 	if err := os.MkdirAll(partial, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestDownloadModelRecoversFromPartialDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	path, err := downloadModel(context.Background(), dir, false, fakeFetcher(&calls))
+	path, err := downloadModel(context.Background(), dir, MiniLM, false, fakeFetcher(&calls))
 	if err != nil {
 		t.Fatalf("downloadModel: %v", err)
 	}
@@ -105,10 +105,10 @@ func TestDownloadModelForceRedownloads(t *testing.T) {
 	var calls int
 	fetch := fakeFetcher(&calls)
 
-	if _, err := downloadModel(context.Background(), dir, false, fetch); err != nil {
+	if _, err := downloadModel(context.Background(), dir, MiniLM, false, fetch); err != nil {
 		t.Fatalf("first downloadModel: %v", err)
 	}
-	if _, err := downloadModel(context.Background(), dir, true, fetch); err != nil {
+	if _, err := downloadModel(context.Background(), dir, MiniLM, true, fetch); err != nil {
 		t.Fatalf("forced downloadModel: %v", err)
 	}
 
@@ -119,15 +119,15 @@ func TestDownloadModelForceRedownloads(t *testing.T) {
 
 func TestDownloadModelFetchFailureLeavesNoSentinel(t *testing.T) {
 	dir := t.TempDir()
-	fetch := func(context.Context, string, string) (string, error) {
+	fetch := func(context.Context, ModelInfo, string) (string, error) {
 		return "", errors.New("simulated network failure")
 	}
 
-	if _, err := downloadModel(context.Background(), dir, false, fetch); err == nil {
+	if _, err := downloadModel(context.Background(), dir, MiniLM, false, fetch); err == nil {
 		t.Fatal("expected an error from a failing fetch")
 	}
 
-	expectedPath := filepath.Join(dir, sanitizedModelDirName(modelName))
+	expectedPath := filepath.Join(dir, sanitizedModelDirName(MiniLM.HFRepo))
 	if _, err := os.Stat(expectedPath + ".ok"); err == nil {
 		t.Error("expected no sentinel file after a failed fetch")
 	}
@@ -155,7 +155,7 @@ func TestLoadPipelineWithRecoveryRetriesDownloadOnPipelineFailure(t *testing.T) 
 	}
 	defer session.Destroy()
 
-	_, pipelineErr := loadPipelineWithRecovery(context.Background(), session, dir, fetch)
+	_, pipelineErr := loadPipelineWithRecovery(context.Background(), session, MiniLM, dir, fetch)
 	if pipelineErr == nil {
 		t.Fatal("expected pipeline construction to fail against placeholder (non-ONNX) files")
 	}

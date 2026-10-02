@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,75 +20,109 @@ import (
 
 var updateBaseline = flag.Bool("update-baseline", false, "regenerate testdata/baseline.json from the current measured report")
 
-// baselineTolerance absorbs floating-point noise on a 0..1 metric, not real
-// regressions. P3 replaces the mean-only gate with a paired per-query one.
+// baselineTolerance applies to means and category means; single queries are
+// gated by PairedGate's rank-band rule.
 const baselineTolerance = 0.02
 
-// TestRetrievalEval ingests the fixture corpus into a real knowledge base,
-// runs every labelled query through the real retrieval service (hybrid
-// keyword + exact + semantic, exactly as production uses it) with the
-// deterministic hash embedder, and compares the metrics with the recorded
-// baseline. Run with -update-baseline after a deliberate retrieval change
-// once the new numbers are understood.
-func TestRetrievalEval(t *testing.T) {
+// loadSuite ingests both corpora into one fresh knowledge base with the
+// hash embedder and returns the store and the key→id maps.
+func loadSuite(t *testing.T) (*kb.Store, map[string]string, map[string]string) {
+	t.Helper()
 	ctx := context.Background()
 	db, err := kb.Open(ctx, t.TempDir(), "eval", kb.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	store := kb.NewStore(db, embedding.NewHashEmbedder(384))
-	keyToID, err := Load(ctx, store, Corpus())
+	notes, _, err := Load(ctx, store, ToDocs(Corpus()))
 	if err != nil {
-		t.Fatalf("load corpus: %v", err)
+		t.Fatalf("load notes corpus: %v", err)
 	}
-	svc := retrieve.New(store, retrieve.Default, false)
-	report, err := Run(ctx, svc, keyToID, Queries())
+	kbIDs, _, err := Load(ctx, store, CorpusKB())
 	if err != nil {
-		t.Fatalf("run queries: %v", err)
+		t.Fatalf("load kb corpus: %v", err)
 	}
-	logReport(t, report)
+	return store, notes, kbIDs
+}
 
-	// The long-document fixtures exist to prove chunking: their markers sit
-	// in the last section, past where the journal's 1,500-rune cap ended.
-	// Each must now be found by the SEMANTIC arm, not only by keyword.
-	for _, q := range report.PerQuery {
-		if q.Category == "long-document" && !containsStr(q.FirstHitArms, retrieve.ArmSemantic) {
-			t.Errorf("%s: relevant hit did not come through the semantic arm (arms %v); chunking is not reaching the tail", q.QueryID, q.FirstHitArms)
+// TestRetrievalEval is the gate: both corpora, the default profile, the hash
+// embedder, compared query by query with the recorded baseline. Run with
+// -update-baseline after a deliberate retrieval change once the new numbers
+// are understood; the article for the phase must say what moved and why.
+func TestRetrievalEval(t *testing.T) {
+	ctx := context.Background()
+	store, notesIDs, kbIDs := loadSuite(t)
+	svc := retrieve.New(store, retrieve.Default, false)
+	notes, err := Run(ctx, svc, notesIDs, Queries(), RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kbRep, err := Run(ctx, svc, kbIDs, QueriesKB(), RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	notes.Strategy, kbRep.Strategy = "default", "default"
+	suite := Suite{Name: "hash/default", Notes: notes, KB: kbRep}
+	t.Log("\n" + notes.Markdown("notes corpus (79 docs, 29 queries)"))
+	t.Log("\n" + kbRep.Markdown("knowledge-base corpus (314 docs, 19 queries)"))
+
+	for _, q := range append(notes.PerQuery, kbRep.PerQuery...) {
+		if q.Category == "long-document" && !q.Skipped && !containsStr(q.FirstHitArms, retrieve.ArmSemantic) {
+			t.Errorf("%s: relevant hit did not come through the semantic arm (arms %v)", q.QueryID, q.FirstHitArms)
 		}
 	}
 
 	baselinePath := filepath.Join("testdata", "baseline.json")
 	if *updateBaseline {
-		b, err := json.MarshalIndent(report, "", "  ")
-		if err != nil {
-			t.Fatal(err)
-		}
+		b, _ := json.MarshalIndent(suite, "", "  ")
 		if err := os.WriteFile(baselinePath, append(b, '\n'), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		t.Logf("updated %s", baselinePath)
 		return
 	}
-	baselineBytes, err := os.ReadFile(baselinePath)
+	raw, err := os.ReadFile(baselinePath)
 	if err != nil {
 		t.Fatalf("read baseline (run with -update-baseline to create it): %v", err)
 	}
-	var baseline Report
-	if err := json.Unmarshal(baselineBytes, &baseline); err != nil {
+	var base Suite
+	if err := json.Unmarshal(raw, &base); err != nil {
 		t.Fatalf("parse baseline: %v", err)
 	}
-	checkNoRegression(t, "RecallAt1", report.Mean.RecallAt1, baseline.Mean.RecallAt1)
-	checkNoRegression(t, "RecallAt5", report.Mean.RecallAt5, baseline.Mean.RecallAt5)
-	checkNoRegression(t, "RecallAt10", report.Mean.RecallAt10, baseline.Mean.RecallAt10)
-	checkNoRegression(t, "MRR", report.Mean.MRR, baseline.Mean.MRR)
-	checkNoRegression(t, "NDCG10", report.Mean.NDCG10, baseline.Mean.NDCG10)
-	checkNoRegression(t, "AbstentionRate", report.AbstentionRate, baseline.AbstentionRate)
-	for cat, bm := range baseline.PerCategory {
-		if gm, ok := report.PerCategory[cat]; ok {
-			checkNoRegression(t, cat+"/NDCG10", gm.NDCG10, bm.NDCG10)
-		}
+	for _, r := range PairedGate(notes, base.Notes, baselineTolerance) {
+		t.Errorf("notes corpus regressed: %s", r)
 	}
+	for _, r := range PairedGate(kbRep, base.KB, baselineTolerance) {
+		t.Errorf("kb corpus regressed: %s", r)
+	}
+}
+
+// TestAblations prints the strategy comparison every run so the numbers are
+// always one `go test -v` away; it gates only that each strategy runs.
+func TestAblations(t *testing.T) {
+	ctx := context.Background()
+	store, _, kbIDs := loadSuite(t)
+	var reports []*Report
+	for _, name := range []string{"keyword-only", "semantic-only", "default", "minmax", "code"} {
+		p, err := retrieve.Lookup(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r, err := Run(ctx, retrieve.New(store, p, false), kbIDs, QueriesKB(), RunOptions{})
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		r.Strategy = name
+		reports = append(reports, r)
+	}
+	r, err := Run(ctx, retrieve.New(store, retrieve.Default, false), kbIDs, QueriesKB(), RunOptions{AgentProxy: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Strategy = "agent-proxy (2 rounds, weak proxy)"
+	reports = append(reports, r)
+	t.Log("\n" + CompareMarkdown("knowledge-base corpus, hash embedder", reports))
 }
 
 func containsStr(list []string, s string) bool {
@@ -101,66 +134,55 @@ func containsStr(list []string, s string) bool {
 	return false
 }
 
-func checkNoRegression(t *testing.T, name string, got, baseline float64) {
-	t.Helper()
-	if got < baseline-baselineTolerance {
-		t.Errorf("%s regressed: got %.4f, baseline %.4f (tolerance %.2f)", name, got, baseline, baselineTolerance)
-	}
-}
-
-func logReport(t *testing.T, r *Report) {
-	t.Helper()
-	t.Logf("%-32s %-14s %6s %6s %6s %6s %6s  %s", "query", "category", "R@1", "R@5", "R@10", "MRR", "NDCG10", "first hit via")
-	for _, q := range r.PerQuery {
-		extra := ""
-		if q.NumIrrelevant > 0 {
-			extra += fmt.Sprintf("  irrelevant_mean_rank=%.1f", q.IrrelevantMeanRank)
-		}
-		if q.Abstained != nil {
-			extra += fmt.Sprintf("  abstained=%v (%d results)", *q.Abstained, q.NumResults)
-		}
-		t.Logf("%-32s %-14s %6.2f %6.2f %6.2f %6.2f %6.2f  %s%s", q.QueryID, q.Category, q.RecallAt1, q.RecallAt5, q.RecallAt10, q.MRR, q.NDCG10, strings.Join(q.FirstHitArms, "+"), extra)
-	}
-	t.Logf("%-32s %-14s %6.2f %6.2f %6.2f %6.2f %6.2f  abstention_rate=%.2f over %d queries", "MEAN", "", r.Mean.RecallAt1, r.Mean.RecallAt5, r.Mean.RecallAt10, r.Mean.MRR, r.Mean.NDCG10, r.AbstentionRate, r.NumAbstention)
-	for cat, m := range r.PerCategory {
-		t.Logf("  %-30s %-14s %6.2f %6.2f %6.2f %6.2f %6.2f", "category", cat, m.RecallAt1, m.RecallAt5, m.RecallAt10, m.MRR, m.NDCG10)
-	}
-}
-
 func TestCorpusKeysAreUnique(t *testing.T) {
-	seen := make(map[string]bool)
-	for _, e := range Corpus() {
-		if seen[e.Key] {
-			t.Errorf("duplicate fixture key: %q", e.Key)
+	for _, docs := range [][]FixtureDoc{ToDocs(Corpus()), CorpusKB()} {
+		seen := map[string]bool{}
+		for _, d := range docs {
+			if seen[d.Key] {
+				t.Errorf("duplicate fixture key: %q", d.Key)
+			}
+			seen[d.Key] = true
 		}
-		seen[e.Key] = true
 	}
 }
 
 func TestQueriesReferenceRealKeys(t *testing.T) {
-	valid := make(map[string]bool)
-	for _, e := range Corpus() {
-		valid[e.Key] = true
-	}
-	for _, q := range Queries() {
-		for _, k := range append(append([]string{}, q.Relevant...), q.Irrelevant...) {
-			if !valid[k] {
-				t.Errorf("query %q references unknown fixture key %q", q.ID, k)
+	check := func(docs []FixtureDoc, queries []Query) {
+		valid := map[string]bool{}
+		for _, d := range docs {
+			valid[d.Key] = true
+		}
+		for _, q := range queries {
+			for _, k := range append(append([]string{}, q.Relevant...), q.Irrelevant...) {
+				if !valid[k] {
+					t.Errorf("query %q references unknown fixture key %q", q.ID, k)
+				}
 			}
+		}
+	}
+	check(ToDocs(Corpus()), Queries())
+	check(CorpusKB(), QueriesKB())
+}
+
+func TestLongFixturesNeedSeveralChunks(t *testing.T) {
+	for _, d := range append(ToDocs(Corpus()), CorpusKB()...) {
+		if !strings.HasPrefix(d.Key, "long-") {
+			continue
+		}
+		if n := len(chunk.Split(d.Content, chunk.Options{})); n < 3 {
+			t.Errorf("%s splits into only %d chunk(s)", d.Key, n)
 		}
 	}
 }
 
-// The long fixtures must be long enough to need several chunks, or the
-// long-document queries stop testing what they claim to test.
-func TestLongFixturesNeedSeveralChunks(t *testing.T) {
-	for _, e := range Corpus() {
-		if !strings.HasPrefix(e.Key, "long-") {
-			continue
-		}
-		md, _ := e.Input.Markdown()
-		if n := len(chunk.Split(md, chunk.Options{})); n < 3 {
-			t.Errorf("%s splits into only %d chunk(s)", e.Key, n)
-		}
+func TestPairedGateCatchesSingleQueryLoss(t *testing.T) {
+	base := &Report{PerQuery: []QueryMetrics{{QueryID: "a", MRR: 1, NDCG10: 1}, {QueryID: "b", MRR: 1, NDCG10: 1}}, Mean: QueryMetrics{MRR: 1, NDCG10: 1}, PerCategory: map[string]QueryMetrics{}}
+	got := &Report{PerQuery: []QueryMetrics{{QueryID: "a", MRR: 1, NDCG10: 1}, {QueryID: "b", MRR: 0, NDCG10: 0}}, Mean: QueryMetrics{MRR: 0.5, NDCG10: 0.5}, PerCategory: map[string]QueryMetrics{}}
+	regs := PairedGate(got, base, 0.02)
+	if len(regs) < 2 {
+		t.Fatalf("expected the single-query loss to be reported, got %v", regs)
+	}
+	if regs := PairedGate(base, base, 0.02); len(regs) != 0 {
+		t.Fatalf("identical reports regressed: %v", regs)
 	}
 }

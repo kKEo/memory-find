@@ -602,6 +602,29 @@
                       "number"
                     ]
                   },
+                  "rerank": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "before_rank": {
+                        "type": "integer"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "score": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "model",
+                      "score",
+                      "before_rank"
+                    ],
+                    "type": [
+                      "null",
+                      "object"
+                    ]
+                  },
                   "uri": {
                     "type": "string"
                   }
@@ -771,6 +794,29 @@
             },
             "profile": {
               "type": "string"
+            },
+            "rerank": {
+              "additionalProperties": false,
+              "properties": {
+                "latency_ms": {
+                  "type": "number"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "top_n": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "model",
+                "top_n",
+                "latency_ms"
+              ],
+              "type": [
+                "null",
+                "object"
+              ]
             },
             "routing_reason": {
               "type": "string"

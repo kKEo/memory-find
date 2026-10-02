@@ -45,6 +45,18 @@ type Profile struct {
 	// DefaultLimit caps results when the caller gives none.
 	DefaultLimit int
 	MaxLimit     int
+	// Fusion is rrf (default) or minmax; see profiles.go.
+	Fusion string
+	// Arms restricts which arms may run (nil = all the mode asks for); the
+	// ablation profiles use it.
+	Arms []string
+	// Rerank re-scores the top RerankTopN fused results with the attached
+	// cross-encoder (if one is attached); see rerank package and OD-7.
+	Rerank     bool
+	RerankTopN int
+	// Derivation explains in one paragraph why the constants are what they
+	// are; `memo-mcp profiles show` prints it.
+	Derivation string
 }
 
 // Default is the profile queries use unless the caller names another.
@@ -70,6 +82,7 @@ type Profile struct {
 // of noise; P3 calibrates the bands and the floor per model.
 var Default = Profile{
 	Name:          "default",
+	Derivation:    "RRF k=60 (the RRF paper's value). Equal semantic/keyword weights so a keyword-only rank-1 hit ties a vector rank-1 hit and can reach the first page (audit H2); exact=0.3 so an identifier match ranks like a strong keyword match without dominating prose queries. Fetch depth 100 keeps keyword-only hits in the fused list. Recency floor 0.8 with a 90-day half-life, notes and conversations only (OD-4). Gap cut at a halving, never below 3 results. Semantic-only floor 0.30 = the weak band, so no-match queries abstain. All of these are starting points for the P3 eval, not measurements.",
 	RRFK:          60,
 	Weights:       map[string]float64{ArmSemantic: 0.5, ArmKeyword: 0.5, ArmExact: 0.3},
 	FetchDepth:    100,
