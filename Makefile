@@ -2,10 +2,15 @@ BINARY = memo-mcp
 PKG = ./cmd/memo-mcp/
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: build test test-verbose test-race cover fmt vet lint check clean eval golden-update baseline-update spike
+.PHONY: build snapshot test test-verbose test-race cover fmt vet lint check clean eval golden-update baseline-update spike
 
 build:
 	CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(VERSION)" -o $(BINARY) $(PKG)
+
+# snapshot runs the release build locally (five archives under dist/) without
+# a tag or publishing. Uses the GoReleaser pinned in the CI workflow.
+snapshot:
+	go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean --skip=publish
 
 # eval runs the retrieval benchmark (internal/eval) against the recorded
 # baseline and prints the per-query report.

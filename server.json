@@ -1,0 +1,42 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.kKEo/memory-find",
+  "description": "Local, explainable knowledge base for agents: hybrid search with provenance, trust and time, in one Go binary over SQLite.",
+  "repository": {
+    "url": "https://github.com/kKEo/memory-find",
+    "source": "github"
+  },
+  "version": "__VERSION__",
+  "websiteUrl": "https://github.com/kKEo/memory-find",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "registryBaseUrl": "https://github.com",
+      "identifier": "https://github.com/kKEo/memory-find/releases/download/v__VERSION__/memo-mcp___VERSION___linux_amd64.tar.gz",
+      "version": "__VERSION__",
+      "fileSha256": "__SHA256_LINUX_AMD64__",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "MEMO_KB",
+          "description": "Name of the knowledge base to open; one SQLite file per name under $MEMO_HOME/kb/.",
+          "isRequired": false,
+          "format": "string",
+          "default": "default"
+        },
+        {
+          "name": "MEMO_HOME",
+          "description": "Base directory for knowledge bases and settings (default ~/.memo-mcp).",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "MEMO_MODEL",
+          "description": "Embedding model id from `memo-mcp model ls` (default granite-small-r2).",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

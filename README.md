@@ -2,14 +2,9 @@
 
 # memo-mcp
 
-A local [MCP](https://modelcontextprotocol.io) server that gives agents a measurable, explainable knowledge base. Single Go binary, no cloud, no CGo — one SQLite file per knowledge base, three retrieval arms fused into one ranked list, provenance and trust on every record, and a codebase small enough to read end to end.
+A local [MCP](https://modelcontextprotocol.io) server that gives agents a measurable, explainable knowledge base: one Go binary, no cloud, no CGo, one SQLite file per knowledge base. Documents and facts go in with provenance; searches come back as one ranked list from four retrieval arms, each result with its address, trust and a reason for its rank. A human reads the same knowledge base from the terminal or as exported markdown.
 
-It started as a Go rewrite of [obra/private-journal-mcp](https://github.com/obra/private-journal-mcp) (TypeScript) and has since been rebuilt as a knowledge base: documents with provenance instead of journal entries, three retrieval arms instead of one vector, and an evaluation harness that measures every change.
-
-> **Where this is going.** The plan is [`docs/roadmap.md`](docs/roadmap.md) (phases P0–P2 are
-> built; P3 adds the measurement lab and the embedding-model bake-off); the research behind it is
-> [`docs/knowledge-base-sota.md`](docs/knowledge-base-sota.md). Everything below describes the
-> binary as it is today.
+It began as a Go rewrite of [obra/private-journal-mcp](https://github.com/obra/private-journal-mcp) and was rebuilt from scratch as a knowledge base in 2026-10. Version 1.0 fixes the contract: tool names and parameters, the `memo://` addresses, the explain fields and the export format. How search decides is written down in [`docs/architecture.md`](docs/architecture.md); the plan for the research layers (graph, compaction, web UI) is [`docs/roadmap.md`](docs/roadmap.md); the research behind it is [`docs/knowledge-base-sota.md`](docs/knowledge-base-sota.md).
 
 ## What it does
 
@@ -27,7 +22,7 @@ Claude (or any MCP client) gets seven tools over one knowledge base:
 
 The same addresses are readable as MCP resources (`memo://doc/{id}`, `memo://chunk/{id}`, `memo://source/{id}`, `memo://fact/{id}`), and `memo://index` or `memo://ns/{namespace}/index` give a one-line-per-document view under 8 KB for the start of a session. [`SKILL.md`](SKILL.md) tells an agent how to use the tools well; `memo-mcp export --index` prints the same index for an `AGENTS.md` or `CLAUDE.md` file.
 
-Everything is stored locally. There is exactly one outbound network call in the whole system: downloading the ~90MB embedding model from Hugging Face on first start. After that, nothing leaves the machine. The server never fetches URLs; the agent fetches and passes the text.
+Everything is stored locally. There is exactly one outbound network call in the whole system: downloading the embedding model from Hugging Face on first start. After that, nothing leaves the machine. The server never fetches URLs; the agent fetches and passes the text.
 
 ## How search works
 
@@ -35,7 +30,7 @@ Everything is stored locally. There is exactly one outbound network call in the 
 
 - **Keyword arm** — SQLite FTS5 with the Porter stemmer and BM25 scoring, over the passage and its section header. "review" finds "reviewing".
 - **Exact arm** — a second FTS5 index that keeps identifiers whole (`useCallback`, `net/http`, `ERR_CONN_RESET`). Added automatically when the query looks like code.
-- **Semantic arm** — the query and every passage are embedded with `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions, run locally via [hugot](https://github.com/knights-analytics/hugot)'s pure-Go ONNX backend) and compared by cosine distance in a plain SQLite table.
+- **Semantic arm** — the query and every passage are embedded with the configured model (default `granite-small-r2`, IBM granite-embedding-small-english-r2, 384 dimensions, run locally via [hugot](https://github.com/knights-analytics/hugot)'s pure-Go ONNX backend) and compared by cosine similarity in a plain SQLite table. `memo-mcp model ls` lists the alternatives, including the instant static model `potion`.
 
 The three ranked lists are combined with reciprocal rank fusion at equal weights (a keyword-only hit at rank 1 ties a vector hit at rank 1, so the keyword arm can add results rather than only reorder them), passages are aggregated to documents by their best passage, notes and conversations get a bounded recency boost (×0.8 to ×1.0, halving every 90 days; versioned docs do not age), the list is cut at the first large score gap, and results are packed to the requested token budget. A passage whose only evidence is a semantic similarity below the weak band (0.30) is dropped, so a question about nothing in the corpus returns zero results with a reason and a hint instead of a page of noise.
 
@@ -49,7 +44,9 @@ The name is explicit rather than inferred from the working directory — set `ME
 
 ## Setup
 
-Requires Go 1.26+.
+**From a release.** Download the archive for your platform from [releases](https://github.com/kKEo/memory-find/releases), unpack `memo-mcp` somewhere on your `PATH`, and run `memo-mcp version`. Archives exist for macOS and Linux (amd64, arm64) and Windows (amd64). The server is also listed in the MCP registry as `io.github.kKEo/memory-find`.
+
+**From source.** Requires Go 1.26+.
 
 ```bash
 git clone https://github.com/kKEo/memory-find
@@ -58,6 +55,12 @@ make build
 ```
 
 This produces a single `memo-mcp` binary (`CGO_ENABLED=0`, ~30MB, no runtime dependencies).
+
+With Claude Code:
+
+```bash
+claude mcp add memo --env MEMO_KB=my-project -- /path/to/memo-mcp
+```
 
 Add it to Claude Code or Claude Desktop's MCP config:
 
@@ -74,7 +77,7 @@ Add it to Claude Code or Claude Desktop's MCP config:
 }
 ```
 
-On first start memo-mcp downloads the ~90MB embedding model before it begins answering MCP requests; it prints a single "Downloading embedding model (first run only)..." line to stderr and no progress bar. If your client times out on that first start, run `memo-mcp --redownload-model` once from a terminal. If a download is interrupted, memo-mcp detects the incomplete cache and retries on the next run — it doesn't need to be deleted by hand.
+On first start memo-mcp downloads the default embedding model (granite-embedding-small-english-r2, Apache-2.0, about 140MB) into `~/.cache/memo-mcp/models` and prints one line to stderr. Until the model is ready, search runs keyword-only and says so (`degraded`); documents written meanwhile get their vectors when the model arrives. To download ahead of time run `memo-mcp model pull granite-small-r2`. An interrupted download is detected and retried on the next run.
 
 ### Commands
 
@@ -124,7 +127,15 @@ The old spellings `--stats` and `--redownload-model` still work for one release 
 
 Claude Code ships with its own memory (Auto Memory, and the API-level file-based memory tool for custom agents). Those are good defaults and, for most people, probably the right choice.
 
-memo-mcp exists as something different: a small, fully local, fully readable retrieval system you can inspect and measure, not a black box. The scoring constants are named at the top of `internal/search/search.go` (the recency floor and weight, `0.8` and `0.2`, are still inline literals in `recencyFactor`), the whole write path is one file, and there's nothing hidden behind a managed service. The eval harness in `internal/eval/` records a retrieval baseline that every change is checked against. If you want to understand *why* a memory system returns what it returns, or experiment with retrieval strategies on your own data, that's what this is for.
+memo-mcp exists as something different: a small, fully local, fully readable retrieval system you can inspect and measure, not a black box. Every ranking constant is a named profile field with a written derivation (`memo-mcp profiles show`), every result can explain its rank (`response_format: explain`, `memo-mcp explain`), every record carries where it came from and who vouched for it, and the eval harness in `internal/eval/` records a baseline that every change is checked against query by query. If you want to understand *why* a memory system returns what it returns, or experiment with retrieval strategies on your own data, that's what this is for.
+
+## Reading further
+
+- [`docs/architecture.md`](docs/architecture.md): layers, the write and read paths, the formulas, profiles, the explain contract, the address scheme.
+- [`docs/schema.md`](docs/schema.md): every table and column in plain words; trust transitions; what `as_of` can see.
+- [`docs/eval/`](docs/eval/): one measured report per tag.
+- [`articles/`](articles/): one article per phase, written for beginners: [why rebuild instead of migrate](articles/why-rebuild-instead-of-migrate.md), [designing the knowledge schema](articles/designing-the-knowledge-schema.md), [search that explains itself](articles/search-that-explains-itself.md), [the embedder is the biggest lever](articles/the-embedder-is-the-biggest-lever.md), [provenance, trust and time](articles/provenance-trust-and-time.md), [designing tools for agents](articles/designing-tools-for-agents.md), [shipping a pure-Go MCP server](articles/shipping-a-pure-go-mcp-server.md).
+- [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Privacy
 
@@ -137,7 +148,7 @@ memo-mcp exists as something different: a small, fully local, fully readable ret
 
 ## Project status
 
-This is currently a working, tested MCP server undergoing active hardening. The plan for where it goes next is [`docs/roadmap.md`](docs/roadmap.md); the research behind it is [`docs/knowledge-base-sota.md`](docs/knowledge-base-sota.md). Contributions and issues welcome.
+1.0: the core knowledge base is complete and measured. What is stable, and what 1.x adds (graph as an index, compaction and pages, an optional read-only web UI), is in [`docs/roadmap.md`](docs/roadmap.md). Not planned: HTTP transport, a server-side LLM, importing the v0 journal files. Contributions and issues welcome.
 
 ## License
 

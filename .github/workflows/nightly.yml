@@ -1,0 +1,33 @@
+# Nightly real-model eval (roadmap P3/P6). Downloads the default embedding
+# model once into a cached directory and runs the labelled corpora with it,
+# so the paraphrase slice (which the hash embedder skips) is measured daily.
+# Informational: the report is an artifact; the hash-embedder gate in ci.yml
+# is what blocks merges.
+name: nightly-realmodel
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: model cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/memo-mcp/models
+          key: models-granite-small-r2-${{ hashFiles('internal/embedding/registry.go') }}
+      - name: eval with the real model
+        run: |
+          mkdir -p out
+          go run ./cmd/memo-mcp eval --models hash,granite-small-r2 --corpus all --format md > out/eval.md
+          tail -n +1 out/eval.md | head -60
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: out/eval.md

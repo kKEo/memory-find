@@ -1,6 +1,7 @@
-# Minimal CI (roadmap P0). The full three-OS matrix, lint-as-gate and the
-# release pipeline arrive in P6. PR CI never downloads an embedding model:
-# every test runs against the deterministic HashEmbedder.
+# PR and push CI (roadmap P6). Three operating systems, one Go version
+# (from go.mod). No job downloads an embedding model: every test runs against
+# the deterministic HashEmbedder, so the gate is fast and offline-safe. The
+# real-model eval runs nightly in nightly.yml.
 name: ci
 on:
   push:
@@ -8,6 +9,33 @@ on:
   pull_request:
 jobs:
   test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git describe needs tags
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: gofmt
+        if: runner.os != 'Windows'
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - name: vet
+        run: go vet ./...
+      - name: test (race)
+        run: go test ./... -race -count=1
+      - name: build (pure Go)
+        shell: bash
+        run: CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(git describe --tags --always)" -o memo-mcp${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/memo-mcp
+      - name: smoke
+        shell: bash
+        run: ./memo-mcp${{ runner.os == 'Windows' && '.exe' || '' }} version
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,17 +43,23 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: gofmt
-        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
-      - name: vet
-        run: go vet ./...
-      - name: lint
-        uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v8
         with:
           version: latest
-      - name: test (race)
-        run: go test ./... -race -count=1
-      - name: build (pure Go)
-        run: CGO_ENABLED=0 go build -ldflags "-X main.version=$(git describe --tags --always)" -o memo-mcp ./cmd/memo-mcp
-      - name: smoke
-        run: ./memo-mcp version
+  release-config:
+    # Proves the release pipeline still builds without cutting a release.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --snapshot --clean --skip=publish
+      - name: five archives
+        run: test "$(ls dist/*.tar.gz dist/*.zip | wc -l)" -eq 5 && ls dist

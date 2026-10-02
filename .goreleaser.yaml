@@ -1,0 +1,52 @@
+# GoReleaser v2 (roadmap P6). Five archives: darwin/linux × amd64/arm64 and
+# windows/amd64. Pure Go, stripped, version from the tag. `make snapshot`
+# runs the same build locally without publishing.
+version: 2
+project_name: memo-mcp
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - id: memo-mcp
+    main: ./cmd/memo-mcp
+    binary: memo-mcp
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+      - SKILL.md
+checksum:
+  name_template: checksums.txt
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+changelog:
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+release:
+  draft: false
+  footer: |
+    Pure-Go binary, no runtime dependencies. On first start it downloads the
+    default embedding model (granite-embedding-small-english-r2, Apache-2.0).
+    Eval numbers for this tag: `docs/eval/v{{ .Version }}.md`.
