@@ -95,3 +95,26 @@ func TestMinMaxFusionExplainsTruthfully(t *testing.T) {
 		t.Error("bad uri")
 	}
 }
+
+// A model with its own similarity scale overrides the profile's bands and
+// floor (granite scores unrelated text around 0.6; MiniLM's floor of 0.30
+// would never abstain).
+func TestModelBandsOverrideProfile(t *testing.T) {
+	s := newStore(t, &bandedEmbedder{HashEmbedder: embedding.NewHashEmbedder(32)})
+	svc := New(s, Default, false)
+	if svc.profile.BandWeak != 0.72 || svc.profile.SemanticFloor != 0.72 || svc.profile.BandStrong != 0.88 {
+		t.Fatalf("bands not applied: %+v", svc.profile)
+	}
+	plain := New(newStore(t, embedding.NewHashEmbedder(32)), Default, false)
+	if plain.profile.BandWeak != 0.30 {
+		t.Fatal("default bands changed")
+	}
+}
+
+type bandedEmbedder struct{ *embedding.HashEmbedder }
+
+func (b *bandedEmbedder) Info() embedding.ModelInfo {
+	i := b.HashEmbedder.Info()
+	i.ID, i.Bands = "banded", [3]float64{0.88, 0.80, 0.72}
+	return i
+}
