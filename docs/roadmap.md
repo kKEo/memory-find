@@ -893,6 +893,21 @@ less and shipped two phases in a month, so treat these as ranges, not promises.
 
 ### P6 — Ship 1.0 · 2–3 days · `v1.0.0`
 
+> **Status (2026-10-02): built, pending the first tagged run.** CI matrix (ubuntu, macos,
+> windows; lint as a separate gate; a snapshot-release job proving the pipeline); nightly
+> real-model eval with a cached model directory; `.goreleaser.yaml` (five archives, verified
+> locally: `make snapshot` produced darwin/linux × amd64/arm64 and windows/amd64 plus
+> `checksums.txt`); `release.yml` publishes on `v*` tags and fills `server.json` with the tag
+> and the linux/amd64 checksum before `mcp-publisher login github-oidc && publish`;
+> `docs/architecture.md` (the 1.0 contract), `CHANGELOG.md`, README rewrite (install from
+> releases, `claude mcp add`, reading list), `ls --json` field names made snake_case. The
+> clean-machine scenario ran end to end (`docs/eval/v1.0.0.md`). Not verifiable on this
+> machine: the three-OS CI run, `mcp-publisher publish --dry-run` (tool not installed; the
+> schema URL and the publisher release URL resolve), the registry's acceptance of the `mcpb`
+> package shape. Remaining: commit, push, `git tag -a v1.0.0`, watch the release job, fix
+> whatever the registry rejects.
+
+
 - **Story.** All; a stranger can install it.
 - **Goal.** Make the core knowledge base installable on a clean machine, discoverable in the MCP
   registry, and documented so that anyone can read exactly how search decides.

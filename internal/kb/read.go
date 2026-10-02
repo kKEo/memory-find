@@ -210,17 +210,17 @@ type ListOptions struct {
 
 // ListEntry is one row of List: the live revision of a source.
 type ListEntry struct {
-	DocumentID string
-	URI        string
-	Title      string
-	Kind       string
-	Namespace  string
-	Library    string
-	Version    string
-	Revision   int
-	Chunks     int
-	UpdatedAt  time.Time
-	Trust      string
+	DocumentID string    `json:"document_id"`
+	URI        string    `json:"uri"`
+	Title      string    `json:"title"`
+	Kind       string    `json:"kind"`
+	Namespace  string    `json:"namespace"`
+	Library    string    `json:"library,omitempty"`
+	Version    string    `json:"version,omitempty"`
+	Revision   int       `json:"revision"`
+	Chunks     int       `json:"chunks"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	Trust      string    `json:"trust"`
 }
 
 // List returns live documents, newest first.

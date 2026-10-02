@@ -1,0 +1,43 @@
+# Release on tag (roadmap P6): GoReleaser builds the five archives with the
+# version from the tag, then the server.json gets the archive checksum and is
+# published to the MCP registry with GitHub OIDC (no stored secret; the
+# `mcp-name` marker in README.md proves ownership of io.github.kKEo/*).
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+  id-token: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: tests (hash embedder)
+        run: go test ./... -count=1
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: fill server.json with the tag and checksum
+        run: |
+          set -eu
+          TAG="${GITHUB_REF_NAME#v}"
+          SUM=$(grep "memo-mcp_${TAG}_linux_amd64.tar.gz" dist/checksums.txt | cut -d' ' -f1)
+          sed -e "s/__VERSION__/${TAG}/g" -e "s/__SHA256_LINUX_AMD64__/${SUM}/g" server.json > dist/server.json
+          cat dist/server.json
+      - name: install mcp-publisher
+        run: curl -fsSL https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz | tar xz -C /usr/local/bin mcp-publisher
+      - name: publish to the MCP registry
+        run: |
+          mcp-publisher login github-oidc
+          mcp-publisher publish dist/server.json

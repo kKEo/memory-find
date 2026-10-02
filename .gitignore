@@ -19,3 +19,6 @@ coverage.out
 *.swo
 *~
 .DS_Store
+
+# Release artefacts (GoReleaser).
+/dist/
