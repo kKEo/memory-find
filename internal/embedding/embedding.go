@@ -15,14 +15,27 @@ import (
 	"github.com/knights-analytics/hugot/pipelines"
 )
 
-type Embedder interface {
-	Embed(ctx context.Context, text string) ([]float32, error)
+// MiniLM is the incumbent model: small, Apache-2.0, and the only one so far
+// proven to load under the pure-Go backend (spike S4).
+var MiniLM = ModelInfo{
+	ID:        "minilm",
+	Name:      "all-MiniLM-L6-v2",
+	HFRepo:    modelName,
+	OnnxPath:  "onnx/model.onnx",
+	Dim:       384,
+	MaxTokens: 512, // the graph's position limit; the model was tuned on 256
+	Normalize: true,
+	Licence:   "Apache-2.0",
 }
 
 type HugotEmbedder struct {
 	session  *hugot.Session
 	pipeline *pipelines.FeatureExtractionPipeline
-	mu       sync.Mutex
+	info     ModelInfo
+	// run executes one batch; tests replace it to exercise the backstop
+	// without a model.
+	run func(ctx context.Context, texts []string) ([][]float32, error)
+	mu  sync.Mutex
 }
 
 func NewHugotEmbedder(ctx context.Context, modelDir string) (*HugotEmbedder, error) {
@@ -37,10 +50,48 @@ func NewHugotEmbedder(ctx context.Context, modelDir string) (*HugotEmbedder, err
 		return nil, err
 	}
 
-	return &HugotEmbedder{
+	e := &HugotEmbedder{
 		session:  session,
 		pipeline: pipe,
-	}, nil
+		info:     MiniLM,
+	}
+	e.run = e.runPipeline
+	return e, nil
+}
+
+func (e *HugotEmbedder) runPipeline(ctx context.Context, texts []string) ([][]float32, error) {
+	result, err := e.pipeline.RunPipeline(ctx, texts)
+	if err != nil {
+		return nil, fmt.Errorf("run pipeline: %w", err)
+	}
+	return result.Embeddings, nil
+}
+
+// Info describes the loaded model.
+func (e *HugotEmbedder) Info() ModelInfo {
+	if e == nil {
+		return MiniLM
+	}
+	return e.info
+}
+
+// EmbedBatch embeds texts in one model pass, with the over-long-input
+// backstop. The mutex serialises model access; the database connection is
+// never held while this runs.
+func (e *HugotEmbedder) EmbedBatch(ctx context.Context, texts []string, role Role) ([][]float32, error) {
+	if e == nil || e.run == nil {
+		return nil, errEmbedderUnavailable
+	}
+	if len(texts) == 0 {
+		return nil, nil
+	}
+	prefixed := make([]string, len(texts))
+	for i, t := range texts {
+		prefixed[i] = applyPrefix(e.info, role, t)
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return batchWithBackstop(ctx, e.run, prefixed)
 }
 
 var errEmbedderUnavailable = errors.New("embedder unavailable")
@@ -50,21 +101,14 @@ func (e *HugotEmbedder) Embed(ctx context.Context, text string) ([]float32, erro
 	// Embedder interface (callers should pass a true nil interface on
 	// construction failure instead), but if one does, fail cleanly rather
 	// than panicking on e.mu.Lock() below.
-	if e == nil || e.pipeline == nil {
+	if e == nil || e.run == nil {
 		return nil, errEmbedderUnavailable
 	}
-
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	result, err := e.pipeline.RunPipeline(ctx, []string{text})
+	out, err := e.EmbedBatch(ctx, []string{text}, RoleDocument)
 	if err != nil {
-		return nil, fmt.Errorf("run pipeline: %w", err)
+		return nil, err
 	}
-	if len(result.Embeddings) == 0 {
-		return nil, fmt.Errorf("no embeddings returned")
-	}
-	return result.Embeddings[0], nil
+	return out[0], nil
 }
 
 func (e *HugotEmbedder) Destroy() {
@@ -92,7 +136,7 @@ func loadPipelineWithRecovery(ctx context.Context, session *hugot.Session, model
 
 		pipe, err := hugot.NewPipeline(session, hugot.FeatureExtractionConfig{
 			ModelPath:    modelPath,
-			Name:         "journal-embeddings",
+			Name:         "memo-embeddings",
 			OnnxFilename: "model.onnx",
 			Options:      []hugot.FeatureExtractionOption{pipelines.WithNormalization()},
 		})
@@ -157,15 +201,19 @@ func downloadModel(ctx context.Context, modelDir string, force bool, fetch model
 		return expectedPath, nil
 	}
 
+	// Another process may be downloading right now; wait for it, but not
+	// forever (flock's TryLockContext only returns on success or when the
+	// context ends, so the bound has to come from the context).
+	lockCtx, cancel := context.WithTimeout(ctx, downloadLockTimeout)
+	defer cancel()
 	lock := flock.New(filepath.Join(modelDir, ".download.lock"))
-	locked, err := lock.TryLockContext(ctx, 500*time.Millisecond)
-	if err != nil {
-		return "", fmt.Errorf("acquire model download lock: %w", err)
-	}
-	if !locked {
-		return "", fmt.Errorf("timed out waiting for another process to finish downloading the model")
+	locked, err := lock.TryLockContext(lockCtx, 500*time.Millisecond)
+	if err != nil || !locked {
+		return "", fmt.Errorf("timed out after %s waiting for another process to finish downloading the model (%v)", downloadLockTimeout, err)
 	}
 	defer lock.Unlock()
+
+	sweepStaleDownloads(modelDir)
 
 	// Another process may have finished downloading while we waited for
 	// the lock.
@@ -198,6 +246,29 @@ func downloadModel(ctx context.Context, modelDir string, force bool, fetch model
 	}
 
 	return expectedPath, nil
+}
+
+// downloadLockTimeout bounds how long a second process waits for a first
+// one to finish downloading.
+const downloadLockTimeout = 15 * time.Minute
+
+// sweepStaleDownloads removes temporary download directories left behind by
+// a process that was killed mid-download. Only the lock holder calls it, so
+// a live download's directory is never touched; the age check is extra
+// caution against a lock that was somehow bypassed.
+func sweepStaleDownloads(modelDir string) {
+	entries, err := os.ReadDir(modelDir)
+	if err != nil {
+		return
+	}
+	for _, ent := range entries {
+		if !ent.IsDir() || !strings.HasPrefix(ent.Name(), ".download-") {
+			continue
+		}
+		if info, err := ent.Info(); err == nil && time.Since(info.ModTime()) > time.Hour {
+			_ = os.RemoveAll(filepath.Join(modelDir, ent.Name()))
+		}
+	}
 }
 
 func isModelReady(modelDirPath, sentinelPath string) bool {

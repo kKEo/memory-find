@@ -368,6 +368,17 @@ less and shipped two phases in a month, so treat these as ranges, not promises.
 
 ### P1 — The store · 5–6 days · `v0.5.0`
 
+> **Status (2026-10-02): built.** `docs/schema.md` signed off (versions are revisions; stemmed
+> index covers text and header; no default TTL). `internal/kb` (open with ownership probe and
+> read-only/no-create modes, migration runner reading the version inside the transaction,
+> migration 1 with triggers), `internal/chunk`, Embedder v2 (batch, roles, model info, halving
+> backstop, download lock timeout and stale-dir sweep), `kb.Ingest` with dedup/revisions/jobs/
+> audit, `Backfill`, `Read`/`List`/`Status`/`Verify`, markdown export with round-trip import;
+> CLI `ingest | read | ls | export --md | verify | backfill | status`. Legacy journal packages
+> remain until P2. Spike S5 deferred with a written decision. Remaining before the tag: commit,
+> CI green, `git tag -a v0.5.0`.
+
+
 - **Story.** (a) the ingest half; (c) export.
 - **Goal.** Design the new database layout once and carefully, then build the way knowledge gets
   in: whole documents are kept, split into chunks, indexed for keywords, exact identifiers and

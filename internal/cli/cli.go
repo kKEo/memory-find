@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 
 	// The CLI is what opens databases, so it registers the SQLite driver
 	// (with the sqlite-vec extension) itself.
@@ -23,17 +22,21 @@ import (
 
 	"github.com/kKEo/memory-find/internal/embedding"
 	"github.com/kKEo/memory-find/internal/journal"
+	"github.com/kKEo/memory-find/internal/kb"
 	"github.com/kKEo/memory-find/internal/search"
 	"github.com/kKEo/memory-find/internal/server"
 )
 
 // Config is everything the commands need from the environment.
 type Config struct {
-	// DBName is the knowledge-base (today: journal) name; it selects the
-	// database file. Comes from MEMO_KB, or JOURNAL_TOKEN (deprecated).
+	// DBName is the knowledge-base name; it selects the database file.
+	// Comes from MEMO_KB (default "default"), or JOURNAL_TOKEN (deprecated).
 	DBName string
-	// DBDir is the directory holding the database file.
+	// DBDir is the directory holding the LEGACY journal file the MCP server
+	// still serves until roadmap P2 (<MEMO_HOME> or <JOURNAL_PATH>).
 	DBDir string
+	// KBDir is the directory holding knowledge-base files (<MEMO_HOME>/kb).
+	KBDir string
 	// Deprecations lists warnings about legacy variables that were honoured.
 	Deprecations []string
 }
@@ -43,11 +46,11 @@ type Getenv func(string) string
 
 // ResolveConfig maps the environment onto a Config.
 //
-// Precedence: the legacy JOURNAL_TOKEN / JOURNAL_PATH pair keeps its exact
-// old meaning (<JOURNAL_PATH or ~/.memo-mcp>/<token>.db) so existing
-// installs keep working, with a deprecation warning. Otherwise MEMO_KB
-// (default "default") selects <MEMO_HOME or ~/.memo-mcp>/kb/<name>.db, the
-// layout the knowledge-base format will use (roadmap P1).
+// MEMO_KB (default "default") names the knowledge base; its file is
+// <MEMO_HOME or ~/.memo-mcp>/kb/<name>.db. The legacy JOURNAL_TOKEN /
+// JOURNAL_PATH pair keeps its exact old meaning for the journal the MCP
+// server still serves (<JOURNAL_PATH or ~/.memo-mcp>/<token>.db), with a
+// deprecation warning.
 func ResolveConfig(getenv Getenv) (Config, error) {
 	var cfg Config
 	home := getenv("MEMO_HOME")
@@ -59,6 +62,7 @@ func ResolveConfig(getenv Getenv) (Config, error) {
 		home = filepath.Join(h, ".memo-mcp")
 	}
 
+	cfg.KBDir = filepath.Join(home, "kb")
 	if token := getenv("JOURNAL_TOKEN"); token != "" {
 		cfg.DBName = token
 		cfg.DBDir = getenv("JOURNAL_PATH")
@@ -78,7 +82,7 @@ func ResolveConfig(getenv Getenv) (Config, error) {
 	if cfg.DBName == "" {
 		cfg.DBName = "default"
 	}
-	cfg.DBDir = filepath.Join(home, "kb")
+	cfg.DBDir = home
 	return cfg, nil
 }
 
@@ -118,6 +122,18 @@ func Main(ctx context.Context, version string, args []string, stdout, stderr io.
 		err = runVersion(version, stdout)
 	case "status":
 		err = runStatus(ctx, stdout, stderr)
+	case "ingest":
+		err = runIngest(ctx, rest, stdout, stderr)
+	case "read":
+		err = runRead(ctx, rest, stdout, stderr)
+	case "ls":
+		err = runLs(ctx, rest, stdout, stderr)
+	case "verify":
+		err = runVerify(ctx, rest, stdout, stderr)
+	case "export":
+		err = runExport(ctx, rest, stdout, stderr)
+	case "backfill":
+		err = runBackfill(ctx, stdout, stderr)
 	case "model":
 		err = runModel(ctx, rest, stderr)
 	case "help", "-h", "--help":
@@ -138,15 +154,24 @@ func usage(w io.Writer) {
 	fmt.Fprint(w, `memo-mcp — a local, measurable knowledge base for agents (MCP server + CLI)
 
 Usage:
-  memo-mcp [serve]            start the MCP server on stdio (default)
-  memo-mcp status             print database statistics
-  memo-mcp version            print version, protocol version, Go version, model dir
-  memo-mcp model redownload   fetch a fresh copy of the embedding model
+  memo-mcp [serve]                 start the MCP server on stdio (default)
+  memo-mcp ingest <file|dir|->     add documents to the knowledge base
+      --ns <name> --kind doc|note|code|conversation --uri <u> --title <t>
+      --library <l> --version <v> --trust user|curated --context <text> --embed=false
+  memo-mcp read <memo://...>       print a document, chunk or source with its provenance
+  memo-mcp ls [--ns --kind --since 2026-01-01 --json]   list live documents, newest first
+  memo-mcp export --md <dir> [--ns <name>]              write markdown files with front matter
+  memo-mcp verify [--repair]       check integrity (chunks, vectors, indexes)
+  memo-mcp backfill                embed chunks whose vectors are pending
+  memo-mcp status                  print knowledge-base statistics
+  memo-mcp version                 print version, protocol version, Go version, model dir
+  memo-mcp model redownload        fetch a fresh copy of the embedding model
 
 Environment:
-  MEMO_KB        database name (default "default"); file is $MEMO_HOME/kb/<name>.db
+  MEMO_KB        knowledge-base name (default "default"); file is $MEMO_HOME/kb/<name>.db
   MEMO_HOME      base directory (default ~/.memo-mcp)
-  JOURNAL_TOKEN, JOURNAL_PATH   deprecated; still honoured with a warning
+  MEMO_QUERY_LOG=1               keep an opt-in log of searches in the same file
+  JOURNAL_TOKEN, JOURNAL_PATH    deprecated; select the legacy journal the server still serves
 `)
 }
 
@@ -219,52 +244,20 @@ func buildEmbedder(ctx context.Context) (embedding.Embedder, func(), error) {
 }
 
 func runStatus(ctx context.Context, stdout, stderr io.Writer) error {
-	db, err := openDB(stderr)
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
+	if errors.Is(err, kb.ErrNoSuchKB) {
+		cfg, _ := ResolveConfig(os.Getenv)
+		fmt.Fprintf(stdout, "No knowledge base named %q yet (%s). Add one with `memo-mcp ingest`.\n", cfg.DBName, kb.Path(cfg.KBDir, cfg.DBName))
+		return nil
+	}
 	if err != nil {
 		return err
 	}
-	defer db.Close()
-
-	stats, err := search.NewService(db, nil).GetStats(ctx) // no embedder needed
+	defer closeFn()
+	st, err := store.Status(ctx)
 	if err != nil {
-		return fmt.Errorf("get stats: %w", err)
+		return fmt.Errorf("status: %w", err)
 	}
-	printStats(stdout, stats)
+	printStatus(stdout, st)
 	return nil
-}
-
-func printStats(w io.Writer, stats *search.JournalStats) {
-	fmt.Fprintln(w, "=== Journal Statistics ===")
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Total entries: %d\n", stats.TotalEntries)
-	if stats.TotalEntries == 0 {
-		fmt.Fprintln(w, "\nJournal is empty.")
-		return
-	}
-	fmt.Fprintf(w, "Date range: %s to %s\n",
-		stats.EarliestEntry.Format("2006-01-02"), stats.LatestEntry.Format("2006-01-02"))
-	coverage := float64(stats.EntriesWithEmbeddings) / float64(stats.TotalEntries) * 100
-	fmt.Fprintf(w, "Entries with embeddings: %d/%d (%.1f%%)\n", stats.EntriesWithEmbeddings, stats.TotalEntries, coverage)
-	fmt.Fprintln(w, "\nRecent activity:")
-	fmt.Fprintf(w, "  Last 7 days: %d entries\n", stats.RecentActivity["7d"])
-	fmt.Fprintf(w, "  Last 30 days: %d entries\n", stats.RecentActivity["30d"])
-	if len(stats.SectionCounts) > 0 {
-		fmt.Fprintln(w, "\nSection usage:")
-		type sc struct {
-			name  string
-			count int
-		}
-		sections := make([]sc, 0, len(stats.SectionCounts))
-		for name, count := range stats.SectionCounts {
-			sections = append(sections, sc{name, count})
-		}
-		sort.Slice(sections, func(i, j int) bool { return sections[i].count > sections[j].count })
-		for _, s := range sections {
-			fmt.Fprintf(w, "  %s: %d\n", s.name, s.count)
-		}
-	}
-	fmt.Fprintln(w, "\nStorage:")
-	fmt.Fprintf(w, "  Location: %s\n", stats.DatabasePath)
-	fmt.Fprintf(w, "  Size: %.2f MB\n", stats.DatabaseSizeMB)
-	fmt.Fprintf(w, "  Avg entry length: %d characters\n", stats.AvgEntryLength)
 }

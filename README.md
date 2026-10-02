@@ -74,9 +74,16 @@ On first start memo-mcp downloads the ~90MB embedding model before it begins ans
 
 ### Commands
 
-Running the binary with no arguments starts the MCP server on stdio. Other commands:
+Running the binary with no arguments starts the MCP server on stdio (still the journal tools
+until roadmap P2). The knowledge-base commands already work from the terminal:
 
-- `memo-mcp status` — print database statistics and exit (no model load, no network; note that it opens the database read-write, so a mistyped name creates an empty database)
+- `memo-mcp ingest <file|dir|-> [--ns --kind --uri --title --library --version --trust --context --embed=false]` — add markdown documents; identical content is a no-op, changed content becomes a new revision
+- `memo-mcp read <memo://doc/...>` — print a document, chunk or source with its provenance
+- `memo-mcp ls [--ns --kind --since --json]` — list live documents, newest first
+- `memo-mcp export --md <dir> [--ns]` — write markdown files with front-matter provenance (opens in Obsidian; re-importing yields no new revisions)
+- `memo-mcp verify [--repair]` — check chunks, vectors and indexes
+- `memo-mcp backfill` — embed chunks whose vectors are pending
+- `memo-mcp status` — print knowledge-base statistics (read-only; never creates a file)
 - `memo-mcp version` — print the build version, the MCP protocol version, the Go version and the model directory
 - `memo-mcp model redownload` — force a fresh model download, discarding any cached copy, and exit
 

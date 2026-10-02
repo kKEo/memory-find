@@ -741,3 +741,19 @@ func TestGetStatsFractionalAverageLength(t *testing.T) {
 		t.Fatalf("expected positive average length, got %d", stats.AvgEntryLength)
 	}
 }
+
+// EmbedBatch/Info satisfy the Embedder v2 interface; the legacy search
+// package only ever calls Embed and is deleted in roadmap P2.
+func (e *topicEmbedder) EmbedBatch(ctx context.Context, texts []string, _ embedding.Role) ([][]float32, error) {
+	out := make([][]float32, len(texts))
+	for i, t := range texts {
+		v, err := e.Embed(ctx, t)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = v
+	}
+	return out, nil
+}
+
+func (e *topicEmbedder) Info() embedding.ModelInfo { return embedding.ModelInfo{ID: "topic", Dim: 384} }
