@@ -1,5 +1,12 @@
 # memo-mcp — Review & Roadmap
 
+> **Status (2026-10-02):** this file was renamed from `review-roadmap.md` and
+> is being rewritten as the forward-looking knowledge-base roadmap. Until that
+> rewrite lands, the text below is the 2026-09-04 review: its Phases 0–1
+> shipped the same day (commits `94f81ad`, `73fb9d4`), so the defects in
+> "Context" are mostly fixed, and Phases 2–7 are superseded by
+> [`knowledge-base-sota.md`](knowledge-base-sota.md) §7.
+
 ## Context
 
 `memo-mcp` is a ~1,270-line pure-Go MCP server that gives Claude a private, searchable journal: 6 tools over stdio, local all-MiniLM-L6-v2 embeddings via hugot's pure-Go backend, one SQLite file per `JOURNAL_TOKEN` with `sqlite-vec` KNN + FTS5 BM25 fused by weighted RRF. It's a port of the TypeScript `obra/private-journal-mcp`. Four commits, last one 2026-06-10; dormant since.

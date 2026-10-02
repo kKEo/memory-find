@@ -17,9 +17,8 @@ test-race:
 
 # Only packages with test files: some Go toolchain installs fail with
 # "no such tool covdata" when asked to report coverage for a package that
-# has none. cmd/memo-mcp and internal/server currently have no tests
-# (tracked in the project roadmap) — once they do, they'll show up here
-# automatically.
+# has none. cmd/memo-mcp currently has no tests (tracked in docs/roadmap.md);
+# once it does, it will show up here automatically.
 cover:
 	go test $$(go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./...) -count=1 -coverprofile=coverage.out
 	go tool cover -func=coverage.out | tail -1
@@ -36,7 +35,8 @@ vet:
 lint:
 	golangci-lint run ./...
 
-# check runs everything CI runs, in the order that fails fastest.
+# check is the full local gate, in the order that fails fastest. It mirrors
+# the CI planned in docs/roadmap.md (P0 minimal, P6 full matrix).
 check: fmt vet lint test-race
 
 clean:

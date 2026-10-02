@@ -1,26 +1,24 @@
 # GraphRAG Evolution Plan: memo-mcp
 
-> **Superseded (2026-10-01)** by [`knowledge-base-sota.md`](knowledge-base-sota.md),
-> which replaces this plan's approach (entry-level co-occurrence edges,
-> keyword-only extraction, a separate global graph DB) with graph-as-index
-> retrieval (personalised PageRank as a routed strategy), bi-temporal facts,
-> and client-LLM-driven compaction. Kept for history.
-
-> **Stale "Current State Analysis" — read with that in mind.** This plan's
-> description of today's search as "pure vector similarity search... with
-> post-filtering by section/date" predates a later commit that added a
-> BM25 (FTS5) leg fused with the vector results via reciprocal rank
-> fusion, plus a recency tie-breaker. So is this doc's framing of Phase 3
-> ("Hybrid Search") as new work: a vector+keyword hybrid already ships,
-> and what Phase 3 would actually add is a *third* signal (graph) on top
-> of an existing fusion, not inventing hybrid retrieval from scratch. The
-> success metric "Hybrid search finds 20%+ more relevant entries than
-> vector-only" also has the wrong baseline as a result. The GraphRAG
-> vision, phases, and open questions below are otherwise still the
-> current plan for that work — this note only corrects the "current
-> state" framing, and per the project roadmap this whole document should
-> be revised against the real current search implementation before any
-> of Phases 1-5 are started.
+> **Historical document — superseded (2026-10-01), moved to `docs/history/` on
+> 2026-10-02.** The research synthesis
+> [`../knowledge-base-sota.md`](../knowledge-base-sota.md) replaces this
+> plan's approach (entity co-occurrence and "precedes" edges, keyword-only
+> extraction, a separate cross-project global graph DB, graph on every query)
+> with graph-as-index retrieval (personalised PageRank as one routed search
+> arm), bi-temporal facts, and client-LLM-driven compaction. The live plan for
+> that work is [`../roadmap.md`](../roadmap.md), phases P7 (entities and graph)
+> and P8 (compaction and pages). Nothing below is scheduled to be built as
+> written.
+>
+> Also note that the "Current State Analysis" was already stale when the plan
+> was written: it describes search as pure vector similarity with
+> post-filtering, but the shipped system is a hybrid of a BM25 (FTS5) arm and a
+> vector arm fused by reciprocal rank fusion with a recency factor. The plan's
+> "Hybrid Search" phase therefore proposes inventing something that already
+> existed, and its success metric baselines against the wrong system. The
+> `exp(-d/30)` recency formula below has a true half-life of about 20.8 days,
+> not 30. Kept for the design rationale and as a record of what was dropped.
 
 ## Context
 

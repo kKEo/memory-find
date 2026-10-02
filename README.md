@@ -96,7 +96,7 @@ memo-mcp exists as something different: a small, fully local, fully readable ret
 
 ## Project status
 
-This is currently a working, tested MCP server undergoing active hardening — see [`docs/`](docs/) for the design history and roadmap. Contributions and issues welcome.
+This is currently a working, tested MCP server undergoing active hardening. The plan for where it goes next is [`docs/roadmap.md`](docs/roadmap.md); the research behind it is [`docs/knowledge-base-sota.md`](docs/knowledge-base-sota.md). Contributions and issues welcome.
 
 ## License
 
