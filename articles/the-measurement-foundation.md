@@ -2,6 +2,17 @@
 
 *Why memo-mcp's next milestone wasn't a feature, and what it took to build it.*
 
+> **Status and errata (2026-10-02).** This article describes the journal era of memo-mcp (the
+> code tagged `v0.3.0`, before the knowledge-base rebuild planned in
+> [`../docs/roadmap.md`](../docs/roadmap.md)). "Phase one" and "phase two" below refer to Phases
+> 0 and 1 of the 2026-09-04 review. Four corrections from a later audit: the harness computes five
+> metrics, not four (recall at 1, 5 and 10, MRR, nDCG@10); the two fixture databases are
+> generated files that reproduce the two real on-disk schema shapes, not copies of real journals;
+> the explanation that the long-entry queries score 1.0 "because the keyword index holds the full
+> text" is an expectation the harness cannot confirm, since it records no per-arm attribution and
+> those queries share vocabulary with the embedded prefix; and not every fixed defect yet has a
+> test that would catch its return (roadmap §4 lists the gaps).
+
 ## A search engine that worked, according to its own tests
 
 Before this work started, `memo-mcp`'s test suite was green. Every package passed. And yet, if you'd pointed the real server at a real journal and asked it a real question, `search_journal` would have told you: *"No relevant entries found."* Every time. For every query.
