@@ -12,5 +12,10 @@ coverage.out
 # tracked (see internal/journal/migrate_test.go).
 !internal/**/testdata/*.db
 
-# JetBrains project files.
+# Editor and OS artefacts.
 .idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store

@@ -1,8 +1,10 @@
 # memo-mcp as a Domain Knowledge Base — State of the Art & Target Architecture
 
 *Research synthesis, 2026-10-01. Supersedes the design premises of
-[`graphrag-evolution-plan.md`](graphrag-evolution-plan.md) and extends
-[`review-roadmap.md`](review-roadmap.md) (whose Phases 0–1 have shipped).*
+[`history/graphrag-evolution-plan.md`](history/graphrag-evolution-plan.md) and
+extends the 2026-09-04 review (Phases 0–1 largely shipped on 2026-09-04,
+untagged; the leftovers are listed in the roadmap). The live plan that turns
+this research into phases is [`roadmap.md`](roadmap.md).*
 
 ## 0. The goal, restated
 
@@ -926,9 +928,13 @@ How `search` behaves:
 
 ## 7. Mapping onto the existing roadmap
 
-Phases 0–1 of [`review-roadmap.md`](review-roadmap.md) are done (fixes, fake
-embedder, golden-set eval, MCP golden tests). Recommended order from here, with
-each step gated on `make eval` showing no regression:
+Phases 0–1 of the 2026-09-04 review are done in substance (fixes, fake
+embedder, golden-set eval, MCP golden tests; see [`roadmap.md`](roadmap.md) §4
+for what shipped and what is carried over). Recommended order from here, with
+each step gated on `make eval` showing no regression. **The live, phased plan
+is [`roadmap.md`](roadmap.md)**; the mapping from these steps to its phases is
+A → P1/P2, B → P1 (schema) and P4 (semantics), C → P3, D → P3 onward,
+E → P0 (SDK) and P2/P5 (surface), F → P4 (fact arm) and P7, G → P8, H → P6.
 
 | Step | Contents | Relation to roadmap |
 |---|---|---|
@@ -937,7 +943,7 @@ each step gated on `make eval` showing no regression:
 | **C. Lab** | **First, a GoMLX op-coverage smoke test per model.** Then the embedder bake-off: granite-r2 small/base, granite-97m-r2, arctic-m-v2, Qwen3-0.6B, potion, MiniLM, and opt-in Gemma-256d, with **GoMLX latency measured**; the default must be Apache/MIT. Optional reranker (ms-marco-MiniLM, then Ettin-17M/32M). Named profiles, including RRF and linear fusion. `memo-mcp eval --strategy … --profile …` | Roadmap Phase 3 |
 | **D. Eval expansion** | Add LongMemEval-style categories: **knowledge update, temporal/as-of, abstention, multi-hop, version-pinned code lookup, conflict, cross-namespace**. Add a cost column (ms, tokens returned, write-path cost). Add a **"raw chunks + agent iterating" baseline** and a plain BM25 baseline that every L3–L5 feature must beat. Hold the embedder fixed when comparing architectures (MemDelta). Measure **write loss** separately from **retrieval loss** (WhenLoss), and check derived records for omission and corruption (TRUSTMEM). Plant validity intervals first, Veracium-style | New; **gates E–G** |
 | **E. Access surface** | go-sdk v1.6.0 → v1.8.0 with the 2026-07-28 spec (D-O). `search` v2 (§6.3), `read`, resources with `ttlMs`, structured `search_result`-shaped output plus a text mirror, annotations, budget packing, `export --md` / `--index`. A "using memo" `SKILL.md` | Roadmap Phase 5's annotations/outputSchema/resources, retargeted |
-| **F. Facts & graph** | Facts as extra keys. **Then an entity-match arm in RRF** (Mem0 v3 / Graphiti / Supermemory all have one; it is cheap and needs no edges). Then heuristic + client-supplied entities with deterministic resolution (D-H2), aliases, **entity↔chunk mention edges** (rung 1), a PPR arm over an in-memory CSR with hub penalisation, `explore`, and routing in `auto`. Typed entity↔entity edges are optional rung 2. Eval includes an **update-stream test**: index half the corpus, add the rest in batches, and check that old queries don't regress. Graph edges ship only if they beat the entity arm on the multi-hop eval: Mem0g gained only ~1.5 pp before Mem0 removed it from OSS | Replaces `graphrag-evolution-plan.md` Phases 1–3 |
+| **F. Facts & graph** | Facts as extra keys. **Then an entity-match arm in RRF** (Mem0 v3 / Graphiti / Supermemory all have one; it is cheap and needs no edges). Then heuristic + client-supplied entities with deterministic resolution (D-H2), aliases, **entity↔chunk mention edges** (rung 1), a PPR arm over an in-memory CSR with hub penalisation, `explore`, and routing in `auto`. Typed entity↔entity edges are optional rung 2. Eval includes an **update-stream test**: index half the corpus, add the rest in batches, and check that old queries don't regress. Graph edges ship only if they beat the entity arm on the multi-hop eval: Mem0g gained only ~1.5 pp before Mem0 removed it from OSS | Replaces `history/graphrag-evolution-plan.md` Phases 1–3 |
 | **G. Compaction** | `compact` / `submit` jobs: dedup/conflict items, `merge_candidates`, Louvain topics (only if the eval contains global questions), entity/topic pages, a **lint** pass (contradictions, orphans, stale claims), staleness sweep; optional Ollama executor (non-thinking model, constrained JSON) | Replaces old plan's Phase 5; new |
 | **H. Ship** | CI, GoReleaser, registry | Roadmap Phase 6 |
 
@@ -1120,7 +1126,8 @@ Re-verify each of these before building on it or citing it:
 - The Letta filesystem LoCoMo figure (~74%, from their blog); the Mem0 and Zep
   numbers on both sides of the dispute.
 - KAG, Triplex, ArchRAG, and NodeRAG gains (self-reported).
-- The "graph helps ~15% of queries" figure in `review-roadmap.md` (no primary
+- The "graph helps ~15% of queries" figure in the 2026-09-04 review (now in
+  git history: `git show 375f24c:docs/review-roadmap.md`; no primary
   source found; it is directionally consistent with
   [2502.11371](https://arxiv.org/abs/2502.11371) and
   [2506.05690](https://arxiv.org/abs/2506.05690)).
