@@ -190,15 +190,55 @@ func runIngest(ctx context.Context, args []string, stdout, stderr io.Writer) err
 }
 
 func runRead(ctx context.Context, args []string, stdout, stderr io.Writer) error {
-	if len(args) != 1 {
-		return errors.New("usage: memo-mcp read <memo://doc/...|memo://chunk/...|memo://source/...>")
+	fs := flag.NewFlagSet("read", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	history := fs.Bool("history", false, "print the revision or supersession chain instead of the text")
+	positional, err := parseInterspersed(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(positional) != 1 {
+		return errors.New("usage: memo-mcp read <memo://doc/...|memo://chunk/...|memo://source/...|memo://fact/...> [--history]")
 	}
 	store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
 	if err != nil {
 		return err
 	}
 	defer closeFn()
-	text, prov, err := store.Read(ctx, args[0])
+	if *history {
+		chain, err := store.History(ctx, positional[0])
+		if err != nil {
+			return err
+		}
+		for _, e := range chain {
+			state := "history"
+			if e.Live {
+				state = "LIVE"
+			}
+			if e.Forgotten != "" {
+				state = e.Forgotten
+			}
+			rev := ""
+			if e.Revision > 0 {
+				rev = fmt.Sprintf(" r%d", e.Revision)
+			}
+			if e.Version != "" {
+				rev += " @" + e.Version
+			}
+			fmt.Fprintf(stdout, "%s%s  %-10s %s\n    %s\n", e.At.Format("2006-01-02"), rev, state, e.Summary, e.URI)
+		}
+		return nil
+	}
+	if kind, id, perr := kb.ParseURI(positional[0]); perr == nil && kind == "fact" {
+		f, err := store.ReadFact(ctx, id)
+		if err != nil {
+			return err
+		}
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(f)
+	}
+	text, prov, err := store.Read(ctx, positional[0])
 	if err != nil {
 		return err
 	}
@@ -992,4 +1032,199 @@ func loadReranker(ctx context.Context, stderr io.Writer) (rerank.Reranker, func(
 	}
 	fmt.Fprintf(stderr, "reranker %s loaded\n", id)
 	return ce, ce.Close, nil
+}
+
+// --- facts, forgetting, trust (P4) ---
+
+func runRemember(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("remember", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	ns := fs.String("ns", "default", "namespace")
+	about := fs.String("about", "", "comma-separated names the fact is about")
+	validFrom := fs.String("valid-from", "", "YYYY-MM-DD when it became true")
+	validTo := fs.String("valid-to", "", "YYYY-MM-DD when it stopped being true")
+	supersedes := fs.String("supersedes", "", "memo://fact/<id> this fact replaces")
+	evidence := fs.String("evidence", "", "memo://chunk/<n> that supports it")
+	trust := fs.String("trust", kb.TrustUser, "user|curated")
+	origin := fs.String("origin", kb.OriginUserSaid, "web|user-said|agent-derived")
+	noEmbed := fs.Bool("no-model", false, "do not load the embedding model")
+	positional, err := parseInterspersed(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(positional) != 1 {
+		return errors.New("usage: memo-mcp remember \"<statement>\" [flags]")
+	}
+	if *trust != kb.TrustUser && *trust != kb.TrustCurated {
+		return errors.New("--trust must be user or curated")
+	}
+	vf, err := parseCLIDate(*validFrom)
+	if err != nil {
+		return fmt.Errorf("--valid-from: %w", err)
+	}
+	vt, err := parseCLIDate(*validTo)
+	if err != nil {
+		return fmt.Errorf("--valid-to: %w", err)
+	}
+	embedder, cleanup := loadEmbedder(ctx, !*noEmbed, stderr)
+	defer cleanup()
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{}, embedder)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	f, err := store.Remember(ctx, kb.RememberInput{Namespace: *ns, Statement: positional[0], About: splitCSV(*about), ValidFrom: vf, ValidTo: vt, Supersedes: *supersedes, EvidenceURI: *evidence, Origin: *origin, Trust: *trust, Actor: "cli", Channel: kb.ChannelCLI})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "recorded %s (trust %s)", f.URI, f.Trust)
+	if *supersedes != "" {
+		fmt.Fprintf(stdout, "; %s is now history", *supersedes)
+	}
+	fmt.Fprintln(stdout)
+	return nil
+}
+
+func runForget(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("forget", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	reason := fs.String("reason", "", "why (required; shown to anyone who reads the address later)")
+	redact := fs.Bool("redact", false, "also erase the stored text")
+	positional, err := parseInterspersed(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(positional) != 1 || *reason == "" {
+		return errors.New("usage: memo-mcp forget <memo://doc/...|memo://fact/...> --reason \"<why>\" [--redact]")
+	}
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{NoCreate: true}, nil)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	if err := store.Forget(ctx, kb.ForgetInput{URI: positional[0], Reason: *reason, Redact: *redact, Actor: "cli", Channel: kb.ChannelCLI}); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "forgot %s: %s\n", positional[0], *reason)
+	return nil
+}
+
+func runFacts(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 || args[0] != "ls" {
+		return errors.New("usage: memo-mcp facts ls [--ns <name>] [--as-of YYYY-MM-DD] [--history] [--json]")
+	}
+	fs := flag.NewFlagSet("facts ls", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	ns := fs.String("ns", "", "namespace")
+	asOf := fs.String("as-of", "", "what was believed on this date")
+	history := fs.Bool("history", false, "include replaced facts")
+	asJSON := fs.Bool("json", false, "print JSON")
+	if _, err := parseInterspersed(fs, args[1:]); err != nil {
+		return err
+	}
+	t, err := parseCLIDate(*asOf)
+	if err != nil {
+		return fmt.Errorf("--as-of: %w", err)
+	}
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	facts, err := store.ListFacts(ctx, kb.FactFilter{Namespace: *ns, AsOf: t, IncludeHistory: *history})
+	if err != nil {
+		return err
+	}
+	if *asJSON {
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(facts)
+	}
+	if len(facts) == 0 {
+		fmt.Fprintln(stdout, "(no facts)")
+		return nil
+	}
+	for _, f := range facts {
+		state := "live"
+		if f.InvalidatedAt != nil {
+			state = "replaced " + f.InvalidatedAt.Format("2006-01-02")
+		}
+		window := ""
+		if f.ValidFrom != nil || f.ValidTo != nil {
+			window = " valid " + dateOr(f.ValidFrom, "…") + "→" + dateOr(f.ValidTo, "…")
+		}
+		fmt.Fprintf(stdout, "%s  %-10s %-7s %-22s %s%s\n", f.RecordedAt.Format("2006-01-02"), f.Namespace, f.Trust, state, f.Statement, window)
+		fmt.Fprintf(stdout, "            %s", f.URI)
+		if f.EvidenceURI != "" {
+			fmt.Fprintf(stdout, "  evidence %s", f.EvidenceURI)
+		}
+		fmt.Fprintln(stdout)
+	}
+	return nil
+}
+
+func runTrust(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return errors.New("usage: memo-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user")
+	}
+	sub, rest := args[0], args[1:]
+	switch sub {
+	case "ls":
+		store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
+		if err != nil {
+			return err
+		}
+		defer closeFn()
+		rows, err := store.TrustSummary(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "%-10s %-10s %s\n", "trust", "documents", "facts")
+		for _, r := range rows {
+			fmt.Fprintf(stdout, "%-10s %-10d %d\n", r.Trust, r.Documents, r.Facts)
+		}
+		return nil
+	case "promote", "demote":
+		fs := flag.NewFlagSet("trust "+sub, flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		to := fs.String("to", "", "target trust")
+		positional, err := parseInterspersed(fs, rest)
+		if err != nil {
+			return err
+		}
+		if len(positional) != 1 || *to == "" {
+			return fmt.Errorf("usage: memo-mcp trust %s <uri> --to <trust>", sub)
+		}
+		store, closeFn, err := openStore(ctx, stderr, kb.Options{NoCreate: true}, nil)
+		if err != nil {
+			return err
+		}
+		defer closeFn()
+		if err := store.SetTrust(ctx, positional[0], *to, "cli", kb.ChannelCLI); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "%s: trust is now %s (audited, channel cli)\n", positional[0], *to)
+		return nil
+	default:
+		return fmt.Errorf("unknown trust subcommand %q", sub)
+	}
+}
+
+func parseCLIDate(s string) (*time.Time, error) {
+	if s == "" {
+		return nil, nil
+	}
+	for _, layout := range []string{time.RFC3339, "2006-01-02"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return &t, nil
+		}
+	}
+	return nil, fmt.Errorf("%q is not YYYY-MM-DD or RFC3339", s)
+}
+
+func dateOr(t *time.Time, def string) string {
+	if t == nil {
+		return def
+	}
+	return t.Format("2006-01-02")
 }

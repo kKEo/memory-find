@@ -78,7 +78,7 @@ func TestHybridSearchFindsAndExplains(t *testing.T) {
 	if top.Why.Final != top.Why.Fused*top.Why.RecencyFactor || top.Score != top.Why.Final {
 		t.Errorf("final/score mismatch: %+v", top.Why)
 	}
-	if resp.Trace == nil || resp.Trace.ModeResolved != "semantic+keyword" || resp.Trace.Filtered.LiveDocs != 4 || resp.Trace.Degraded.Flag {
+	if resp.Trace == nil || resp.Trace.ModeResolved != "semantic+keyword+fact" || resp.Trace.Filtered.LiveDocs != 4 || resp.Trace.Degraded.Flag {
 		t.Fatalf("trace: %+v", resp.Trace)
 	}
 	// Keyword arm reports the words it matched.
@@ -109,7 +109,7 @@ func TestAutoAddsExactArmForIdentifiers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.Trace.ModeResolved != "semantic+keyword+exact" {
+	if resp.Trace.ModeResolved != "semantic+keyword+exact+fact" {
 		t.Fatalf("mode resolved %q (%s)", resp.Trace.ModeResolved, resp.Trace.RoutingReason)
 	}
 	if len(resp.Results) == 0 || !strings.Contains(resp.Results[0].Content, "ERR_CONN_RESET") && !strings.Contains(resp.Results[0].Title, "Interceptors") {
@@ -201,7 +201,7 @@ func TestDegradedWithoutEmbedder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !resp.Degraded || !resp.Trace.Degraded.Flag || resp.Trace.ModeResolved != "keyword" {
+	if !resp.Degraded || !resp.Trace.Degraded.Flag || resp.Trace.ModeResolved != "keyword+fact" {
 		t.Fatalf("expected degraded keyword-only search: %+v", resp.Trace)
 	}
 	if len(resp.Results) == 0 || resp.Results[0].Relevance != nil || resp.Results[0].Band != "keyword-only" {
@@ -352,7 +352,13 @@ func TestHelpers(t *testing.T) {
 	if ftsQueryStemmed(`foo* -bar (baz) "q"`) != `"foo" OR "bar" OR "baz"` {
 		t.Error(ftsQueryStemmed(`foo* -bar (baz) "q"`))
 	}
-	if ftsQueryExact("call net/http and useCallback, then ERR_CONN_RESET.") != `"call" OR "net/http" OR "and" OR "useCallback" OR "then" OR "ERR_CONN_RESET"` {
+	if ftsQueryStemmed("the order of the interceptors") != `"order" OR "interceptors"` {
+		t.Error(ftsQueryStemmed("the order of the interceptors"))
+	}
+	if ftsQueryStemmed("to be or not") == "" {
+		t.Error("an all-stopword query must keep its words")
+	}
+	if ftsQueryExact("call net/http and useCallback, then ERR_CONN_RESET.") != `"call" OR "net/http" OR "useCallback" OR "ERR_CONN_RESET"` {
 		t.Error(ftsQueryExact("call net/http and useCallback, then ERR_CONN_RESET."))
 	}
 	for q, want := range map[string]bool{"how do interceptors work": false, "useCallback fires twice": true, "ERR_CONN_RESET": true, "net/http handler": true, "codes.Unavailable meaning": true, "release v1.8": false} {

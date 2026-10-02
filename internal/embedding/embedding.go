@@ -27,6 +27,7 @@ var MiniLM = ModelInfo{
 	MaxTokens: 512, // the graph's position limit; the model was tuned on 256
 	Normalize: true,
 	Licence:   "Apache-2.0",
+	Note:      "22M params; the journal's model and the latency floor for ONNX on this backend (~0.6 s per passage); no paraphrase recall in the bake-off.",
 }
 
 type HugotEmbedder struct {

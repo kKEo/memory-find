@@ -29,6 +29,7 @@ type Why struct {
 	Band          string     `json:"band"`      // strong | moderate | weak | keyword-only
 	Provenance    ProvRef    `json:"provenance"`
 	Freshness     Freshness  `json:"freshness"`
+	Time          *TimeInfo  `json:"time,omitempty"`
 	Rerank        *RerankHit `json:"rerank,omitempty"`
 }
 
@@ -125,4 +126,14 @@ type Budget struct {
 type Degraded struct {
 	Flag   bool   `json:"flag"`
 	Reason string `json:"reason,omitempty"`
+}
+
+// TimeInfo is the two-clock view of a fact result (P4).
+type TimeInfo struct {
+	ValidFrom     *time.Time `json:"valid_from,omitempty"`
+	ValidTo       *time.Time `json:"valid_to,omitempty"`
+	RecordedAt    time.Time  `json:"recorded_at"`
+	InvalidatedAt *time.Time `json:"invalidated_at,omitempty"`
+	SupersededBy  string     `json:"superseded_by,omitempty"`
+	AsOfApplied   *time.Time `json:"as_of_applied,omitempty"`
 }

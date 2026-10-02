@@ -76,6 +76,10 @@ type Request struct {
 	ExcludeIDs     []string
 	// Limit is an internal cap (CLI --limit); tools use the budget instead.
 	Limit int
+	// AsOf answers "what did we believe at this time": superseded revisions
+	// and invalidated facts that were current then are included; forgotten
+	// records never are (OD-20).
+	AsOf *time.Time
 }
 
 // Result is one hit.
@@ -166,7 +170,10 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 		}
 	}
 
-	tr := &Trace{ModeRequested: req.Mode, Profile: p.Name, CandidatesPerArm: map[string]int{}, LatencyMsPerArm: map[string]float64{}}
+	tr := &Trace{ModeRequested: req.Mode, Profile: p.Name, CandidatesPerArm: map[string]int{}, LatencyMsPerArm: map[string]float64{}, AsOf: req.AsOf}
+	if req.Granularity == GranularityFact {
+		return s.searchFacts(ctx, req, queries, limit, tr, start)
+	}
 
 	// Resolve arms.
 	arms, reason := resolveArms(req.Mode, queries)
@@ -191,7 +198,7 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 	}
 
 	// Scope → SQL fragment (pre-top-k), plus counts for the trace.
-	where, args, err := scopeSQL(req.Scope)
+	where, args, err := scopeSQL(req.Scope, req.AsOf)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +206,8 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM documents d JOIN sources s ON s.id = d.source_id WHERE `+where, args...).Scan(&tr.Filtered.LiveDocs); err != nil {
 		return nil, fmt.Errorf("count scope: %w", err)
 	}
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM documents d JOIN sources s ON s.id = d.source_id WHERE (d.deleted_at IS NOT NULL OR d.superseded_by IS NOT NULL) AND `+scopeOnly(where), args...).Scan(&tr.Filtered.ByRevocation); err != nil {
+	plainWhere, plainArgs, _ := scopeSQL(req.Scope, nil)
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM documents d JOIN sources s ON s.id = d.source_id WHERE (d.deleted_at IS NOT NULL OR d.superseded_by IS NOT NULL) AND `+scopeOnly(plainWhere), plainArgs...).Scan(&tr.Filtered.ByRevocation); err != nil {
 		return nil, fmt.Errorf("count revoked: %w", err)
 	}
 	if req.Scope.MinTrust != "" {
@@ -226,6 +234,8 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 				hits, err = s.keywordArm(ctx, "chunks_fts", ftsQueryStemmed(q), where, args, p.FetchDepth)
 			case ArmExact:
 				hits, err = s.keywordArm(ctx, "chunks_fts_exact", ftsQueryExact(q), where, args, p.FetchDepth)
+			case ArmFact:
+				hits, err = s.factArm(ctx, q, req, p.FetchDepth)
 			case ArmSemantic:
 				hits, modelID, err = s.semanticArm(ctx, q, where, args, p.FetchDepth)
 				if err != nil && modelID == "" {
@@ -438,7 +448,7 @@ func (s *Service) result(c *candidate, rank int, content string, req Request) Re
 	r := Result{Rank: rank, URI: uri, ChunkURI: chunkURI(c.chunkID), DocumentURI: docURI(c.docID), Title: c.title, SectionPath: section, Content: content, Score: c.final, Relevance: relevance, Band: band, Provenance: prov}
 	if req.ResponseFormat == FormatExplain {
 		arms := make([]ArmHit, 0, len(c.arms))
-		for _, a := range []string{ArmSemantic, ArmKeyword, ArmExact} {
+		for _, a := range []string{ArmSemantic, ArmKeyword, ArmExact, ArmFact} {
 			if h := c.arms[a]; h != nil {
 				arms = append(arms, *h)
 			}
@@ -619,14 +629,20 @@ func (s *Service) loadMetaBatch(ctx context.Context, byChunk map[int64]*candidat
 // scopeSQL builds the WHERE fragment applied inside every arm. It always
 // includes the live filter; a version scope replaces the "latest revision"
 // half of it so the revision for that version is reachable.
-func scopeSQL(sc Scope) (string, []any, error) {
+func scopeSQL(sc Scope, asOf *time.Time) (string, []any, error) {
 	var parts []string
 	var args []any
-	parts = append(parts, "d.deleted_at IS NULL")
-	if sc.Version != "" {
+	parts = append(parts, "d.deleted_at IS NULL") // forgotten: never, not even under as_of
+	switch {
+	case sc.Version != "":
 		parts = append(parts, "d.version = ?")
 		args = append(args, sc.Version)
-	} else {
+	case asOf != nil:
+		// The revision that was current at T: created by then and not yet
+		// superseded (a superseded revision's updated_at is when it was).
+		parts = append(parts, "d.created_at <= ? AND (d.superseded_by IS NULL OR d.updated_at > ?)")
+		args = append(args, asOf.UnixMilli(), asOf.UnixMilli())
+	default:
 		parts = append(parts, "d.superseded_by IS NULL")
 	}
 	in := func(col string, vals []string) {
@@ -682,7 +698,8 @@ func scopeSQL(sc Scope) (string, []any, error) {
 // scopeOnly strips the live-filter half so revoked documents in scope can be
 // counted for the trace.
 func scopeOnly(where string) string {
-	w := strings.Replace(where, "d.deleted_at IS NULL AND d.superseded_by IS NULL AND ", "", 1)
+	w := strings.Replace(where, "d.created_at <= ? AND (d.superseded_by IS NULL OR d.updated_at > ?)", "1=1", 1)
+	w = strings.Replace(w, "d.deleted_at IS NULL AND d.superseded_by IS NULL AND ", "", 1)
 	w = strings.Replace(w, "(d.deleted_at IS NULL AND d.superseded_by IS NULL)", "(1=1)", 1)
 	w = strings.Replace(w, "d.deleted_at IS NULL AND ", "", 1)
 	w = strings.Replace(w, "(d.deleted_at IS NULL)", "(1=1)", 1)
@@ -753,12 +770,37 @@ func hintForScope(sc Scope) string {
 
 // --- query text ---
 
+// stopwords are dropped from keyword queries when other words remain: with
+// OR-joined terms, "the" or "to" would match nearly every passage and let
+// noise through the abstention floor (audit S1). A query made only of
+// stopwords keeps them.
+var stopwords = map[string]bool{}
+
+func init() {
+	for _, w := range strings.Fields("a an the and or but if then so of to in on at by for from with without into onto over under about as is are was were be been being am do does did done have has had having it its this that these those there here he she they them his her their we you your i me my our us what which who whom whose when where why how not no yes can could may might will would shall should must also than too very just only") {
+		stopwords[w] = true
+	}
+}
+
+func dropStopwords(words []string) []string {
+	var kept []string
+	for _, w := range words {
+		if !stopwords[strings.ToLower(w)] {
+			kept = append(kept, w)
+		}
+	}
+	if len(kept) == 0 {
+		return words
+	}
+	return kept
+}
+
 // ftsQueryStemmed OR-joins the words of a natural-language query for the
-// stemmed index, dropping FTS operators and one-character tokens.
+// stemmed index, dropping FTS operators, one-character tokens and stopwords.
 func ftsQueryStemmed(q string) string {
 	words := strings.FieldsFunc(q, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsNumber(r) && r != '_' })
 	var terms []string
-	for _, w := range words {
+	for _, w := range dropStopwords(words) {
 		if len([]rune(w)) > 1 {
 			terms = append(terms, `"`+strings.ReplaceAll(w, `"`, "")+`"`)
 		}
@@ -773,7 +815,7 @@ func ftsQueryExact(q string) string {
 		return !unicode.IsLetter(r) && !unicode.IsNumber(r) && !strings.ContainsRune("_.:-/", r)
 	})
 	var terms []string
-	for _, w := range words {
+	for _, w := range dropStopwords(words) {
 		w = strings.Trim(w, ".:-/")
 		if len([]rune(w)) > 1 {
 			terms = append(terms, `"`+strings.ReplaceAll(w, `"`, "")+`"`)
@@ -826,14 +868,14 @@ func resolveArms(mode string, queries []string) ([]string, string) {
 	case ModeSemantic:
 		return []string{ArmSemantic}, "mode=semantic"
 	case ModeHybrid:
-		return []string{ArmSemantic, ArmKeyword}, "mode=hybrid"
+		return []string{ArmSemantic, ArmKeyword, ArmFact}, "mode=hybrid"
 	}
 	for _, q := range queries {
 		if looksLikeIdentifier(q) {
-			return []string{ArmSemantic, ArmKeyword, ArmExact}, "auto: query contains an identifier-like token, exact arm added"
+			return []string{ArmSemantic, ArmKeyword, ArmExact, ArmFact}, "auto: query contains an identifier-like token, exact arm added"
 		}
 	}
-	return []string{ArmSemantic, ArmKeyword}, "auto: natural-language query, hybrid"
+	return []string{ArmSemantic, ArmKeyword, ArmFact}, "auto: natural-language query, hybrid"
 }
 
 // oneLiner is the concise form of a passage: its first sentence or ~160 chars.
@@ -867,7 +909,7 @@ func (s *Service) logQuery(ctx context.Context, req Request, queries []string, t
 func validateEnum(field, got string) error {
 	allowed := map[string][]string{
 		"mode":            {ModeAuto, ModeHybrid, ModeKeyword, ModeExact, ModeSemantic},
-		"granularity":     {GranularityChunk, GranularityDocument},
+		"granularity":     {GranularityChunk, GranularityDocument, GranularityFact},
 		"response_format": {FormatConcise, FormatDetailed, FormatExplain},
 	}[field]
 	for _, a := range allowed {
@@ -946,4 +988,294 @@ func minMaxFuse(cands map[int64]*candidate, p Profile) {
 			c.fused += h.Contribution
 		}
 	}
+}
+
+// --- facts (P4) ---
+
+// factLiveSQL is the live filter for facts, or the as_of variant.
+func factLiveSQL(asOf *time.Time) (string, []any) {
+	if asOf != nil {
+		return "f.deleted_at IS NULL AND f.recorded_at <= ? AND (f.invalidated_at IS NULL OR f.invalidated_at > ?)", []any{asOf.UnixMilli(), asOf.UnixMilli()}
+	}
+	return "f.deleted_at IS NULL AND f.invalidated_at IS NULL", nil
+}
+
+func factScopeSQL(sc Scope, asOf *time.Time) (string, []any) {
+	where, args := factLiveSQL(asOf)
+	if len(sc.Namespaces) > 0 {
+		ph := make([]string, len(sc.Namespaces))
+		for i, ns := range sc.Namespaces {
+			ph[i] = "?"
+			args = append(args, ns)
+		}
+		where += " AND f.namespace IN (" + strings.Join(ph, ",") + ")"
+	}
+	if sc.MinTrust != "" {
+		where += " AND f.trust IN (" + trustAtLeast(sc.MinTrust) + ")"
+	}
+	return where, args
+}
+
+// factHit is one matched fact with its arm scores.
+type factHit struct {
+	id       string
+	evidence sql.NullInt64
+	bm25Rank int
+	bm25     float64
+	cosRank  int
+	cos      float64
+	terms    []string
+	hasBM25  bool
+	hasCos   bool
+}
+
+// matchFacts runs the keyword and (if possible) semantic search over facts
+// and returns hits keyed by fact id.
+func (s *Service) matchFacts(ctx context.Context, q string, req Request, depth int) (map[string]*factHit, error) {
+	where, args := factScopeSQL(req.Scope, req.AsOf)
+	hits := map[string]*factHit{}
+	if match := ftsQueryStemmed(q); match != "" {
+		if err := s.matchFactsKeyword(ctx, match, where, args, depth, hits); err != nil {
+			return nil, err
+		}
+	}
+	if s.embedder != nil {
+		if vecs, err := s.embedder.EmbedBatch(ctx, []string{q}, embedding.RoleQuery); err == nil && len(vecs) == 1 {
+			if err := s.matchFactsSemantic(ctx, kb.EncodeVector(vecs[0]), where, args, depth, hits); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return hits, nil
+}
+
+func (s *Service) matchFactsKeyword(ctx context.Context, match, where string, args []any, depth int, hits map[string]*factHit) error {
+	qargs := append([]any{match}, args...)
+	qargs = append(qargs, depth)
+	rows, err := s.db.QueryContext(ctx, `SELECT f.id, f.evidence_chunk_id, bm25(facts_fts), highlight(facts_fts, 0, char(1), char(2))
+		FROM facts_fts JOIN facts f ON f.rowid = facts_fts.rowid WHERE facts_fts MATCH ? AND `+where+` ORDER BY bm25(facts_fts) LIMIT ?`, qargs...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	rank := 0
+	for rows.Next() {
+		var h factHit
+		var hl string
+		if err := rows.Scan(&h.id, &h.evidence, &h.bm25, &hl); err != nil {
+			return err
+		}
+		rank++
+		h.bm25Rank, h.hasBM25, h.terms = rank, true, extractMarked(hl)
+		hits[h.id] = &h
+	}
+	return rows.Err()
+}
+
+func (s *Service) matchFactsSemantic(ctx context.Context, qv []byte, where string, args []any, depth int, hits map[string]*factHit) error {
+	qargs := append([]any{qv, s.embedder.Info().ID}, args...)
+	qargs = append(qargs, depth)
+	rows, err := s.db.QueryContext(ctx, `SELECT f.id, f.evidence_chunk_id, vec_distance_cosine(v.embedding, ?) AS dist
+		FROM fact_vecs v JOIN facts f ON f.id = v.fact_id WHERE v.model_id = ? AND `+where+` ORDER BY dist LIMIT ?`, qargs...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	rank := 0
+	for rows.Next() {
+		var id string
+		var ev sql.NullInt64
+		var dist float64
+		if err := rows.Scan(&id, &ev, &dist); err != nil {
+			return err
+		}
+		rank++
+		h := hits[id]
+		if h == nil {
+			h = &factHit{id: id, evidence: ev}
+			hits[id] = h
+		}
+		h.cosRank, h.cos, h.hasCos = rank, 1-dist, true
+	}
+	return rows.Err()
+}
+
+// factArm turns fact matches into votes for their evidence chunks. A fact's
+// rank is the better of its keyword and semantic ranks; facts without
+// evidence contribute nothing here (they are reachable via granularity=fact).
+func (s *Service) factArm(ctx context.Context, q string, req Request, depth int) ([]armRow, error) {
+	hits, err := s.matchFacts(ctx, q, req, depth)
+	if err != nil {
+		return nil, err
+	}
+	type scored struct {
+		h    *factHit
+		rank int
+	}
+	var list []scored
+	for _, h := range hits {
+		if !h.evidence.Valid {
+			continue
+		}
+		// The semantic floor applies here too: a fact that merely sits
+		// nearest in vector space is not a match.
+		if !h.hasBM25 && h.cos < s.profile.SemanticFloor {
+			continue
+		}
+		r := h.bm25Rank
+		if !h.hasBM25 || (h.hasCos && h.cosRank < r) {
+			r = h.cosRank
+		}
+		list = append(list, scored{h, r})
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].rank < list[j].rank })
+	var out []armRow
+	seen := map[int64]bool{}
+	for _, sc := range list {
+		if seen[sc.h.evidence.Int64] {
+			continue
+		}
+		seen[sc.h.evidence.Int64] = true
+		var docID string
+		if err := s.db.QueryRowContext(ctx, `SELECT document_id FROM chunks WHERE id = ?`, sc.h.evidence.Int64).Scan(&docID); err != nil {
+			continue // evidence chunk gone (document revised); the fact still exists
+		}
+		raw := sc.h.cos
+		kind := "cosine"
+		if !sc.h.hasCos {
+			raw, kind = sc.h.bm25, "bm25"
+		}
+		out = append(out, armRow{chunkID: sc.h.evidence.Int64, docID: docID, raw: raw, rawKind: kind, terms: sc.h.terms})
+	}
+	return out, nil
+}
+
+// searchFacts is granularity=fact: facts themselves are the results, fused
+// from their keyword and semantic ranks with the profile's weights, with
+// their evidence passage attached when response_format is detailed.
+func (s *Service) searchFacts(ctx context.Context, req Request, queries []string, limit int, tr *Trace, start time.Time) (*Response, error) {
+	p := s.profile
+	tr.ModeResolved = "fact"
+	tr.RoutingReason = "granularity=fact: keyword and semantic match over stored facts"
+	tr.ArmsRun = []string{ArmFact}
+	tr.Filtered.ByScope = describeScope(req.Scope)
+	type agg struct {
+		h     *factHit
+		fused float64
+		arms  []ArmHit
+	}
+	aggs := map[string]*agg{}
+	nq := float64(len(queries))
+	for _, q := range queries {
+		hits, err := s.matchFacts(ctx, q, req, p.FetchDepth)
+		if err != nil {
+			return nil, fmt.Errorf("fact search: %w", err)
+		}
+		tr.CandidatesPerArm[ArmFact] += len(hits)
+		for id, h := range hits {
+			a := aggs[id]
+			if a == nil {
+				a = &agg{h: h}
+				aggs[id] = a
+			}
+			if h.hasBM25 {
+				c := (p.Weights[ArmKeyword] / nq) / float64(p.RRFK+h.bm25Rank)
+				a.fused += c
+				r, raw := h.bm25Rank, h.bm25
+				a.arms = append(a.arms, ArmHit{Arm: ArmKeyword, Rank: &r, Raw: &raw, RawKind: "bm25", Contribution: c, MatchedTerms: h.terms})
+			}
+			if h.hasCos {
+				if h.cos < p.SemanticFloor && !h.hasBM25 {
+					tr.Filtered.BySemanticFloor++
+					delete(aggs, id)
+					continue
+				}
+				c := (p.Weights[ArmSemantic] / nq) / float64(p.RRFK+h.cosRank)
+				a.fused += c
+				r, raw := h.cosRank, h.cos
+				a.arms = append(a.arms, ArmHit{Arm: ArmSemantic, Rank: &r, Raw: &raw, RawKind: "cosine", Contribution: c})
+			}
+		}
+	}
+	if len(aggs) == 0 {
+		return s.abstain(ctx, req, queries, tr, start, "no fact matched", "try granularity=chunk, or record the fact with remember")
+	}
+	list := make([]*agg, 0, len(aggs))
+	for _, a := range aggs {
+		list = append(list, a)
+	}
+	// Conflicting facts: when two facts match about equally (within 10% of
+	// each other's fused score), the more trusted one goes first
+	// (docs/schema.md §7: trust decides conflicts; the loser is kept).
+	trustOf := map[string]int{}
+	for id := range aggs {
+		var tr string
+		if err := s.db.QueryRowContext(ctx, `SELECT trust FROM facts WHERE id = ?`, id).Scan(&tr); err == nil {
+			trustOf[id] = map[string]int{kb.TrustAgent: 0, kb.TrustUser: 1, kb.TrustCurated: 2}[tr]
+		}
+	}
+	sort.SliceStable(list, func(i, j int) bool {
+		a, b := list[i], list[j]
+		if math.Abs(a.fused-b.fused) <= 0.1*math.Max(a.fused, b.fused) && trustOf[a.h.id] != trustOf[b.h.id] {
+			return trustOf[a.h.id] > trustOf[b.h.id]
+		}
+		if a.fused != b.fused {
+			return a.fused > b.fused
+		}
+		return a.h.id < b.h.id
+	})
+	if len(list) > limit {
+		list = list[:limit]
+		tr.Cutoff = Cutoff{Kind: "limit", Position: limit}
+	} else {
+		tr.Cutoff = Cutoff{Kind: "none", Position: len(list)}
+	}
+	resp := &Response{}
+	tr.Budget.MaxTokens = req.MaxTokens
+	used := 0
+	for i, a := range list {
+		fact, err := s.store.ReadFact(ctx, a.h.id)
+		if err != nil {
+			continue
+		}
+		content := fact.Statement
+		var chunkURI, docURI, evidenceText string
+		if fact.EvidenceChunkID != nil {
+			if c, err := s.store.ReadChunk(ctx, *fact.EvidenceChunkID); err == nil {
+				chunkURI, docURI, evidenceText = c.URI, c.DocumentURI, c.Text
+			}
+		}
+		if req.ResponseFormat != FormatConcise && evidenceText != "" {
+			content += "\n\nEvidence: " + evidenceText
+		}
+		cost := chunk.EstimateTokens(content) + 24
+		if used+cost > req.MaxTokens && len(resp.Results) > 0 {
+			tr.Budget.TruncatedCount = len(list) - i
+			tr.Cutoff = Cutoff{Kind: "budget", Position: i}
+			break
+		}
+		used += cost
+		var relevance *float64
+		band := "keyword-only"
+		for _, ah := range a.arms {
+			if ah.Arm == ArmSemantic && ah.Raw != nil {
+				v := *ah.Raw
+				relevance = &v
+				band = s.band(v)
+			}
+		}
+		prov := ProvRef{Kind: "fact", Trust: fact.Trust, Origin: fact.Origin, Namespace: fact.Namespace, FetchedAt: fact.RecordedAt}
+		r := Result{Rank: len(resp.Results) + 1, URI: fact.URI, ChunkURI: chunkURI, DocumentURI: docURI, Title: oneLiner(fact.Statement), Content: content, Score: a.fused, Relevance: relevance, Band: band, Provenance: prov}
+		if req.ResponseFormat == FormatExplain {
+			r.Why = &Why{URI: fact.URI, Chunk: ChunkRef{URI: chunkURI}, Document: DocRef{URI: docURI}, Arms: a.arms, Fused: a.fused, RecencyFactor: 1, Final: a.fused, Rank: r.Rank, Relevance: relevance, Band: band, Provenance: prov,
+				Time: &TimeInfo{ValidFrom: fact.ValidFrom, ValidTo: fact.ValidTo, RecordedAt: fact.RecordedAt, InvalidatedAt: fact.InvalidatedAt, SupersededBy: fact.SupersededBy, AsOfApplied: req.AsOf}}
+		}
+		resp.Results = append(resp.Results, r)
+	}
+	tr.Budget.Used = used
+	if req.ResponseFormat == FormatExplain {
+		resp.Trace = tr
+	}
+	s.logQuery(ctx, req, queries, tr, resp, start)
+	return resp, nil
 }

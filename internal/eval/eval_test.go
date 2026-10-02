@@ -43,6 +43,13 @@ func loadSuite(t *testing.T) (*kb.Store, map[string]string, map[string]string) {
 	if err != nil {
 		t.Fatalf("load kb corpus: %v", err)
 	}
+	factIDs, err := LoadFacts(ctx, store, kbIDs, FactsKB(), ForgottenDocsKB())
+	if err != nil {
+		t.Fatalf("load facts: %v", err)
+	}
+	for k, v := range factIDs {
+		kbIDs[k] = v
+	}
 	return store, notes, kbIDs
 }
 
@@ -58,14 +65,14 @@ func TestRetrievalEval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kbRep, err := Run(ctx, svc, kbIDs, QueriesKB(), RunOptions{})
+	kbRep, err := Run(ctx, svc, kbIDs, append(QueriesKB(), QueriesFactsKB()...), RunOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	notes.Strategy, kbRep.Strategy = "default", "default"
 	suite := Suite{Name: "hash/default", Notes: notes, KB: kbRep}
 	t.Log("\n" + notes.Markdown("notes corpus (79 docs, 29 queries)"))
-	t.Log("\n" + kbRep.Markdown("knowledge-base corpus (314 docs, 19 queries)"))
+	t.Log("\n" + kbRep.Markdown("knowledge-base corpus (315 docs + 6 facts, 27 queries)"))
 
 	for _, q := range append(notes.PerQuery, kbRep.PerQuery...) {
 		if q.Category == "long-document" && !q.Skipped && !containsStr(q.FirstHitArms, retrieve.ArmSemantic) {
@@ -161,7 +168,11 @@ func TestQueriesReferenceRealKeys(t *testing.T) {
 		}
 	}
 	check(ToDocs(Corpus()), Queries())
-	check(CorpusKB(), QueriesKB())
+	docs := CorpusKB()
+	for _, f := range FactsKB() {
+		docs = append(docs, FixtureDoc{Key: f.Key})
+	}
+	check(docs, append(QueriesKB(), QueriesFactsKB()...))
 }
 
 func TestLongFixturesNeedSeveralChunks(t *testing.T) {

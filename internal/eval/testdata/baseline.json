@@ -19,7 +19,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 6.026917,
+        "latency_ms": 3.733666,
         "tokens_returned": 340
       },
       {
@@ -38,7 +38,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.377708,
+        "latency_ms": 3.321,
         "tokens_returned": 574
       },
       {
@@ -57,7 +57,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.298125,
+        "latency_ms": 3.386,
         "tokens_returned": 242
       },
       {
@@ -76,7 +76,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.010167,
+        "latency_ms": 3.314209,
         "tokens_returned": 435
       },
       {
@@ -95,7 +95,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.51825,
+        "latency_ms": 3.270292,
         "tokens_returned": 163
       },
       {
@@ -115,7 +115,7 @@
           "keyword",
           "exact"
         ],
-        "latency_ms": 5.361584,
+        "latency_ms": 3.136208,
         "tokens_returned": 181
       },
       {
@@ -132,7 +132,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.070708,
+        "latency_ms": 3.112708,
         "tokens_returned": 171
       },
       {
@@ -149,7 +149,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.283667,
+        "latency_ms": 3.160042,
         "tokens_returned": 411
       },
       {
@@ -166,7 +166,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 7.596334,
+        "latency_ms": 4.685542,
         "tokens_returned": 522
       },
       {
@@ -183,25 +183,25 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 9.005959,
+        "latency_ms": 6.019625,
         "tokens_returned": 562
       },
       {
         "query_id": "frontend-slow-mobile",
         "category": "lookup",
         "recall_at_1": 0.5,
-        "recall_at_5": 0.5,
+        "recall_at_5": 1,
         "recall_at_10": 1,
         "mrr": 1,
-        "ndcg_10": 0.8175295903539446,
+        "ndcg_10": 1,
         "num_relevant": 2,
-        "num_results": 10,
+        "num_results": 2,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.43925,
-        "tokens_returned": 533
+        "latency_ms": 3.201292,
+        "tokens_returned": 109
       },
       {
         "query_id": "flaky-tests",
@@ -217,7 +217,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.7095,
+        "latency_ms": 3.401833,
         "tokens_returned": 597
       },
       {
@@ -234,7 +234,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 6.773875,
+        "latency_ms": 4.46025,
         "tokens_returned": 736
       },
       {
@@ -253,7 +253,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.003167,
+        "latency_ms": 3.317709,
         "tokens_returned": 485
       },
       {
@@ -270,7 +270,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 8.6585,
+        "latency_ms": 5.810375,
         "tokens_returned": 553
       },
       {
@@ -287,8 +287,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 8.352625,
-        "tokens_returned": 890
+        "latency_ms": 3.441834,
+        "tokens_returned": 883
       },
       {
         "query_id": "user-context-deadline",
@@ -299,13 +299,13 @@
         "mrr": 1,
         "ndcg_10": 1,
         "num_relevant": 1,
-        "num_results": 10,
+        "num_results": 7,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 8.23325,
-        "tokens_returned": 1856
+        "latency_ms": 3.328459,
+        "tokens_returned": 395
       },
       {
         "query_id": "wk-negative-control-auth",
@@ -323,7 +323,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.184916,
+        "latency_ms": 3.194416,
         "tokens_returned": 340
       },
       {
@@ -342,7 +342,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.176125,
+        "latency_ms": 3.246583,
         "tokens_returned": 242
       },
       {
@@ -358,7 +358,7 @@
         "num_irrelevant": 3,
         "num_results": 0,
         "abstained": true,
-        "latency_ms": 4.628167,
+        "latency_ms": 2.919667,
         "tokens_returned": 0
       },
       {
@@ -374,7 +374,7 @@
         "num_irrelevant": 2,
         "num_results": 0,
         "abstained": true,
-        "latency_ms": 4.474375,
+        "latency_ms": 3.088208,
         "tokens_returned": 0
       },
       {
@@ -391,7 +391,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 6.248708,
+        "latency_ms": 4.090792,
         "tokens_returned": 781
       },
       {
@@ -408,7 +408,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 4.328584,
+        "latency_ms": 2.713125,
         "tokens_returned": 50
       },
       {
@@ -425,7 +425,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 7.87575,
+        "latency_ms": 4.640333,
         "tokens_returned": 592
       },
       {
@@ -442,7 +442,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.13825,
+        "latency_ms": 3.189917,
         "tokens_returned": 126
       },
       {
@@ -459,7 +459,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.310834,
+        "latency_ms": 3.348875,
         "tokens_returned": 54
       },
       {
@@ -476,7 +476,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.515625,
+        "latency_ms": 3.256916,
         "tokens_returned": 55
       },
       {
@@ -495,7 +495,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.747084,
+        "latency_ms": 3.346,
         "tokens_returned": 334
       },
       {
@@ -514,7 +514,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.537208,
+        "latency_ms": 3.481208,
         "tokens_returned": 581
       }
     ],
@@ -522,14 +522,14 @@
       "query_id": "MEAN",
       "category": "",
       "recall_at_1": 0.8271604938271605,
-      "recall_at_5": 0.9382716049382716,
+      "recall_at_5": 0.95679012345679,
       "recall_at_10": 0.9876543209876544,
       "mrr": 1,
-      "ndcg_10": 0.9682821932141222,
+      "ndcg_10": 0.9750403565343466,
       "irrelevant_mean_rank": 6.363636363636363,
       "num_relevant": 0,
       "num_results": 0,
-      "latency_ms": 6.066024814814816,
+      "latency_ms": 3.652192925925926,
       "tokens_returned": 0
     },
     "per_category": {
@@ -557,7 +557,7 @@
         "irrelevant_mean_rank": 3.5,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 5.642146,
+        "latency_ms": 3.4136040000000003,
         "tokens_returned": 0
       },
       "long-document": {
@@ -570,21 +570,21 @@
         "ndcg_10": 1,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 5.321569666666666,
+        "latency_ms": 3.265236,
         "tokens_returned": 0
       },
       "lookup": {
         "query_id": "MEAN",
         "category": "lookup",
         "recall_at_1": 0.8421052631578947,
-        "recall_at_5": 0.9736842105263158,
+        "recall_at_5": 1,
         "recall_at_10": 1,
         "mrr": 1,
-        "ndcg_10": 0.9839339424048417,
+        "ndcg_10": 0.9935376481756868,
         "irrelevant_mean_rank": 7,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 6.214769842105264,
+        "latency_ms": 3.712739105263158,
         "tokens_returned": 0
       },
       "recency": {
@@ -597,7 +597,7 @@
         "ndcg_10": 0.8315546295836226,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 7.87575,
+        "latency_ms": 4.640333,
         "tokens_returned": 0
       },
       "scoped": {
@@ -610,7 +610,7 @@
         "ndcg_10": 1,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 4.328584,
+        "latency_ms": 2.713125,
         "tokens_returned": 0
       },
       "stemming": {
@@ -623,16 +623,16 @@
         "ndcg_10": 0.6173196815056892,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 6.248708,
+        "latency_ms": 4.090792,
         "tokens_returned": 0
       }
     },
     "abstention_rate": 1,
     "num_abstention_queries": 2,
     "cost": {
-      "query_p50_ms": 5.43925,
-      "query_p95_ms": 8.352625,
-      "tokens_returned_p50": 411,
+      "query_p50_ms": 3.321,
+      "query_p95_ms": 4.685542,
+      "tokens_returned_p50": 340,
       "write_per_doc_ms": 0,
       "db_size_mb": 0,
       "docs": 0,
@@ -653,13 +653,14 @@
         "irrelevant_mean_rank": 11,
         "num_relevant": 1,
         "num_irrelevant": 1,
-        "num_results": 2,
+        "num_results": 1,
         "first_hit_arms": [
           "semantic",
-          "keyword"
+          "keyword",
+          "fact"
         ],
-        "latency_ms": 5.278708,
-        "tokens_returned": 103
+        "latency_ms": 3.183167,
+        "tokens_returned": 50
       },
       {
         "query_id": "xns-espresso",
@@ -670,13 +671,13 @@
         "mrr": 1,
         "ndcg_10": 1,
         "num_relevant": 1,
-        "num_results": 10,
+        "num_results": 4,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.774792,
-        "tokens_returned": 517
+        "latency_ms": 3.267625,
+        "tokens_returned": 244
       },
       {
         "query_id": "xns-kimchi",
@@ -687,13 +688,13 @@
         "mrr": 1,
         "ndcg_10": 1,
         "num_relevant": 1,
-        "num_results": 10,
+        "num_results": 1,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 7.222625,
-        "tokens_returned": 513
+        "latency_ms": 2.988417,
+        "tokens_returned": 49
       },
       {
         "query_id": "exact-rotatekeys3",
@@ -710,7 +711,7 @@
           "keyword",
           "exact"
         ],
-        "latency_ms": 9.292083,
+        "latency_ms": 5.494334,
         "tokens_returned": 642
       },
       {
@@ -728,7 +729,7 @@
           "keyword",
           "exact"
         ],
-        "latency_ms": 8.096458,
+        "latency_ms": 5.060833,
         "tokens_returned": 552
       },
       {
@@ -746,8 +747,8 @@
           "keyword",
           "exact"
         ],
-        "latency_ms": 13.146125,
-        "tokens_returned": 576
+        "latency_ms": 7.413875,
+        "tokens_returned": 650
       },
       {
         "query_id": "exact-qrm-1005-scoped",
@@ -764,7 +765,7 @@
           "keyword",
           "exact"
         ],
-        "latency_ms": 9.023375,
+        "latency_ms": 5.256333,
         "tokens_returned": 550
       },
       {
@@ -775,16 +776,16 @@
         "recall_at_10": 1,
         "mrr": 1,
         "ndcg_10": 1,
-        "irrelevant_mean_rank": 11,
+        "irrelevant_mean_rank": 2,
         "num_relevant": 1,
         "num_irrelevant": 1,
-        "num_results": 1,
+        "num_results": 2,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.112458,
-        "tokens_returned": 66
+        "latency_ms": 1.937667,
+        "tokens_returned": 139
       },
       {
         "query_id": "version-connect-latest",
@@ -801,9 +802,10 @@
         "first_hit_arms": [
           "semantic",
           "keyword",
-          "exact"
+          "exact",
+          "fact"
         ],
-        "latency_ms": 3.923167,
+        "latency_ms": 2.417666,
         "tokens_returned": 73
       },
       {
@@ -815,13 +817,13 @@
         "mrr": 1,
         "ndcg_10": 1,
         "num_relevant": 1,
-        "num_results": 10,
+        "num_results": 4,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 9.398625,
-        "tokens_returned": 551
+        "latency_ms": 3.22325,
+        "tokens_returned": 205
       },
       {
         "query_id": "longtail-certificate",
@@ -837,7 +839,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.777042,
+        "latency_ms": 3.278166,
         "tokens_returned": 485
       },
       {
@@ -854,7 +856,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.272042,
+        "latency_ms": 3.368792,
         "tokens_returned": 41
       },
       {
@@ -873,7 +875,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.546667,
+        "latency_ms": 3.503208,
         "tokens_returned": 438
       },
       {
@@ -892,7 +894,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.47725,
+        "latency_ms": 3.187,
         "tokens_returned": 238
       },
       {
@@ -908,7 +910,7 @@
         "num_irrelevant": 2,
         "num_results": 0,
         "abstained": true,
-        "latency_ms": 4.577167,
+        "latency_ms": 2.837541,
         "tokens_returned": 0
       },
       {
@@ -924,7 +926,7 @@
         "num_irrelevant": 1,
         "num_results": 0,
         "abstained": true,
-        "latency_ms": 4.472083,
+        "latency_ms": 2.790792,
         "tokens_returned": 0
       },
       {
@@ -940,9 +942,10 @@
         "first_hit_arms": [
           "semantic",
           "keyword",
-          "exact"
+          "exact",
+          "fact"
         ],
-        "latency_ms": 6.859041,
+        "latency_ms": 2.860666,
         "tokens_returned": 73
       },
       {
@@ -972,6 +975,148 @@
         "latency_ms": 0,
         "tokens_returned": 0,
         "skipped": true
+      },
+      {
+        "query_id": "ku-timeout-live",
+        "category": "knowledge-update",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "irrelevant_mean_rank": 11,
+        "num_relevant": 1,
+        "num_irrelevant": 1,
+        "num_results": 1,
+        "first_hit_arms": [
+          "keyword",
+          "semantic"
+        ],
+        "latency_ms": 0.278583,
+        "tokens_returned": 93
+      },
+      {
+        "query_id": "ku-timeout-asof",
+        "category": "temporal",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "irrelevant_mean_rank": 11,
+        "num_relevant": 1,
+        "num_irrelevant": 1,
+        "num_results": 1,
+        "first_hit_arms": [
+          "keyword",
+          "semantic"
+        ],
+        "latency_ms": 0.274125,
+        "tokens_returned": 82
+      },
+      {
+        "query_id": "factkey-hsm",
+        "category": "fact-key",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "num_relevant": 1,
+        "num_results": 9,
+        "first_hit_arms": [
+          "semantic",
+          "keyword"
+        ],
+        "latency_ms": 3.421042,
+        "tokens_returned": 828
+      },
+      {
+        "query_id": "conflict-feeding",
+        "category": "conflict",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "irrelevant_mean_rank": 2,
+        "num_relevant": 1,
+        "num_irrelevant": 1,
+        "num_results": 2,
+        "first_hit_arms": [
+          "keyword",
+          "semantic"
+        ],
+        "latency_ms": 0.309375,
+        "tokens_returned": 100
+      },
+      {
+        "query_id": "revoked-fact",
+        "category": "revocation",
+        "recall_at_1": 0,
+        "recall_at_5": 0,
+        "recall_at_10": 0,
+        "mrr": 0,
+        "ndcg_10": 0,
+        "irrelevant_mean_rank": 11,
+        "num_relevant": 0,
+        "num_irrelevant": 1,
+        "num_results": 0,
+        "abstained": true,
+        "latency_ms": 0.154209,
+        "tokens_returned": 0
+      },
+      {
+        "query_id": "revoked-doc",
+        "category": "revocation",
+        "recall_at_1": 0,
+        "recall_at_5": 0,
+        "recall_at_10": 0,
+        "mrr": 0,
+        "ndcg_10": 0,
+        "irrelevant_mean_rank": 11,
+        "num_relevant": 0,
+        "num_irrelevant": 1,
+        "num_results": 0,
+        "abstained": true,
+        "latency_ms": 1.94125,
+        "tokens_returned": 0
+      },
+      {
+        "query_id": "writeloss-hsm",
+        "category": "write-loss",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "num_relevant": 1,
+        "num_results": 7,
+        "first_hit_arms": [
+          "semantic",
+          "keyword"
+        ],
+        "latency_ms": 3.679417,
+        "tokens_returned": 351
+      },
+      {
+        "query_id": "poison-instruction",
+        "category": "poisoning",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "irrelevant_mean_rank": 11,
+        "num_relevant": 1,
+        "num_irrelevant": 1,
+        "num_results": 10,
+        "first_hit_arms": [
+          "semantic",
+          "keyword"
+        ],
+        "latency_ms": 3.839792,
+        "tokens_returned": 641
       }
     ],
     "mean": {
@@ -982,10 +1127,10 @@
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "irrelevant_mean_rank": 11,
+      "irrelevant_mean_rank": 9,
       "num_relevant": 0,
       "num_results": 0,
-      "latency_ms": 6.880030533333334,
+      "latency_ms": 3.2496825238095233,
       "tokens_returned": 0
     },
     "per_category": {
@@ -1002,6 +1147,20 @@
         "latency_ms": 0,
         "tokens_returned": 0
       },
+      "conflict": {
+        "query_id": "MEAN",
+        "category": "conflict",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "irrelevant_mean_rank": 2,
+        "num_relevant": 0,
+        "num_results": 0,
+        "latency_ms": 0.309375,
+        "tokens_returned": 0
+      },
       "cross-namespace": {
         "query_id": "MEAN",
         "category": "cross-namespace",
@@ -1013,7 +1172,7 @@
         "irrelevant_mean_rank": 11,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 6.092041666666667,
+        "latency_ms": 3.146403,
         "tokens_returned": 0
       },
       "exact": {
@@ -1026,7 +1185,34 @@
         "ndcg_10": 1,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 9.88951025,
+        "latency_ms": 5.80634375,
+        "tokens_returned": 0
+      },
+      "fact-key": {
+        "query_id": "MEAN",
+        "category": "fact-key",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "num_relevant": 0,
+        "num_results": 0,
+        "latency_ms": 3.421042,
+        "tokens_returned": 0
+      },
+      "knowledge-update": {
+        "query_id": "MEAN",
+        "category": "knowledge-update",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "irrelevant_mean_rank": 11,
+        "num_relevant": 0,
+        "num_results": 0,
+        "latency_ms": 0.278583,
         "tokens_returned": 0
       },
       "long-document": {
@@ -1039,7 +1225,7 @@
         "ndcg_10": 1,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 6.815903,
+        "latency_ms": 3.2900693333333337,
         "tokens_returned": 0
       },
       "long-tail": {
@@ -1053,7 +1239,7 @@
         "irrelevant_mean_rank": 11,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 5.47725,
+        "latency_ms": 3.187,
         "tokens_returned": 0
       },
       "multi-hop": {
@@ -1066,7 +1252,7 @@
         "ndcg_10": 1,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 6.859041,
+        "latency_ms": 2.860666,
         "tokens_returned": 0
       },
       "paraphrase": {
@@ -1082,6 +1268,20 @@
         "latency_ms": 0,
         "tokens_returned": 0
       },
+      "poisoning": {
+        "query_id": "MEAN",
+        "category": "poisoning",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "irrelevant_mean_rank": 11,
+        "num_relevant": 0,
+        "num_results": 0,
+        "latency_ms": 3.839792,
+        "tokens_returned": 0
+      },
       "recency": {
         "query_id": "MEAN",
         "category": "recency",
@@ -1093,7 +1293,34 @@
         "irrelevant_mean_rank": 11,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 5.546667,
+        "latency_ms": 3.503208,
+        "tokens_returned": 0
+      },
+      "revocation": {
+        "query_id": "MEAN",
+        "category": "revocation",
+        "recall_at_1": 0,
+        "recall_at_5": 0,
+        "recall_at_10": 0,
+        "mrr": 0,
+        "ndcg_10": 0,
+        "num_relevant": 0,
+        "num_results": 0,
+        "latency_ms": 0,
+        "tokens_returned": 0
+      },
+      "temporal": {
+        "query_id": "MEAN",
+        "category": "temporal",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "irrelevant_mean_rank": 11,
+        "num_relevant": 0,
+        "num_results": 0,
+        "latency_ms": 0.274125,
         "tokens_returned": 0
       },
       "version-pinned": {
@@ -1104,19 +1331,32 @@
         "recall_at_10": 1,
         "mrr": 1,
         "ndcg_10": 1,
-        "irrelevant_mean_rank": 11,
+        "irrelevant_mean_rank": 6.5,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 3.5178125,
+        "latency_ms": 2.1776665,
+        "tokens_returned": 0
+      },
+      "write-loss": {
+        "query_id": "MEAN",
+        "category": "write-loss",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "num_relevant": 0,
+        "num_results": 0,
+        "latency_ms": 3.679417,
         "tokens_returned": 0
       }
     },
     "abstention_rate": 1,
-    "num_abstention_queries": 2,
+    "num_abstention_queries": 4,
     "cost": {
-      "query_p50_ms": 5.774792,
-      "query_p95_ms": 9.398625,
-      "tokens_returned_p50": 438,
+      "query_p50_ms": 3.187,
+      "query_p95_ms": 5.256333,
+      "tokens_returned_p50": 139,
       "write_per_doc_ms": 0,
       "db_size_mb": 0,
       "docs": 0,

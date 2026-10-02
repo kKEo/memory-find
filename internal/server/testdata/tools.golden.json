@@ -1,6 +1,59 @@
 [
   {
     "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Remove a record from search for good, with a reason. The record becomes a tombstone: reading its address says when and why it was forgotten. Tool calls may forget records written by tools (trust agent); records a human wrote or curated need the human: the result then carries the command to run. Example: forget(uri: \"memo://fact/01a0…\", reason: \"the API changed in v1.9\").",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "description": "Why, in one sentence. Stored in the audit log and shown to anyone who reads the address later.",
+          "type": "string"
+        },
+        "redact": {
+          "description": "Also erase the stored text (default keeps it for audit).",
+          "type": "boolean"
+        },
+        "uri": {
+          "description": "memo://doc/\u003cid\u003e or memo://fact/\u003cid\u003e to retire. It leaves every index and is never served again; a reference to it will say when and why.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "name": "forget",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "forgotten": {
+          "type": "boolean"
+        },
+        "redacted": {
+          "type": "boolean"
+        },
+        "uri": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri",
+        "forgotten",
+        "redacted"
+      ],
+      "type": "object"
+    },
+    "title": "Retire a document or fact"
+  },
+  {
+    "annotations": {
       "destructiveHint": false,
       "idempotentHint": true,
       "openWorldHint": false,
@@ -123,6 +176,57 @@
       "openWorldHint": false,
       "readOnlyHint": true
     },
+    "description": "Request that a document, source or fact be trusted more (user or curated). Trust cannot be raised by a tool call alone; this returns the command a human runs (or, on clients that support it, asks the human directly).",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "to": {
+          "description": "Target trust: user or curated.",
+          "type": "string"
+        },
+        "uri": {
+          "description": "memo://doc, memo://source or memo://fact address.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri",
+        "to"
+      ],
+      "type": "object"
+    },
+    "name": "promote",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "applied": {
+          "description": "False when a human must confirm; then command says how",
+          "type": "boolean"
+        },
+        "command": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri",
+        "applied"
+      ],
+      "type": "object"
+    },
+    "title": "Ask to raise a record's trust"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
     "description": "Dereference a memo:// address from a search result and return its text with provenance. Use granularity=section to see a passage with its neighbours, or document for the whole text under a token budget. Example: read(uri: \"memo://chunk/812\", granularity: \"section\").",
     "inputSchema": {
       "additionalProperties": false,
@@ -227,6 +331,84 @@
   },
   {
     "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Store one atomic fact with where it came from and when it is true. Facts are only ever added: to correct one, pass supersedes with the old fact's address and the old one is kept as history. Example: remember(statement: \"SetCacheable sets ttlMs on list results\", about: [\"SetCacheable\"], evidence_uri: \"memo://chunk/812\", namespace: \"go-sdk\").",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "about": {
+          "description": "Names the fact is about (identifiers, libraries, people), used for matching.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "evidence_uri": {
+          "description": "memo://chunk/\u003cn\u003e of the passage that supports the fact (from a search result).",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Shelf to record it on. Default: default.",
+          "type": "string"
+        },
+        "origin": {
+          "description": "web, user-said or agent-derived. Default agent-derived.",
+          "type": "string"
+        },
+        "statement": {
+          "description": "One atomic claim in one sentence. Example: 'SetCacheable sets ttlMs on list results.'",
+          "type": "string"
+        },
+        "supersedes": {
+          "description": "memo://fact/\u003cid\u003e of the fact this one replaces. The old fact is kept as history and marked replaced, never deleted.",
+          "type": "string"
+        },
+        "valid_from": {
+          "description": "When the fact became true (RFC3339 or YYYY-MM-DD). Empty = unknown.",
+          "type": "string"
+        },
+        "valid_to": {
+          "description": "When it stopped being true. Empty = still true.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "statement"
+      ],
+      "type": "object"
+    },
+    "name": "remember",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "superseded": {
+          "type": "string"
+        },
+        "trust": {
+          "description": "Always agent for tool writes",
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri",
+        "trust"
+      ],
+      "type": "object"
+    },
+    "title": "Record a fact"
+  },
+  {
+    "annotations": {
       "idempotentHint": true,
       "openWorldHint": false,
       "readOnlyHint": true
@@ -235,6 +417,10 @@
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
+        "as_of": {
+          "description": "RFC3339 or YYYY-MM-DD: answer with what the knowledge base believed at that time (superseded revisions and replaced facts that were current then). Forgotten records are never returned.",
+          "type": "string"
+        },
         "exclude_ids": {
           "description": "memo:// addresses you have already read; they are left out. The server keeps no session state.",
           "items": {
@@ -246,7 +432,7 @@
           ]
         },
         "granularity": {
-          "description": "chunk (default: passages) or document (one result per document).",
+          "description": "chunk (default: passages), document (one result per document) or fact (stored facts with their evidence).",
           "type": "string"
         },
         "max_tokens": {
@@ -619,6 +805,48 @@
                       "model",
                       "score",
                       "before_rank"
+                    ],
+                    "type": [
+                      "null",
+                      "object"
+                    ]
+                  },
+                  "time": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "as_of_applied": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "invalidated_at": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "recorded_at": {
+                        "type": "string"
+                      },
+                      "superseded_by": {
+                        "type": "string"
+                      },
+                      "valid_from": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "valid_to": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "recorded_at"
                     ],
                     "type": [
                       "null",

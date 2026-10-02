@@ -6,6 +6,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -94,7 +95,8 @@ type searchArgs struct {
 	Queries        []string    `json:"queries,omitempty" jsonschema:"Several phrasings of the same question; results are fused. Use instead of or in addition to query."`
 	Mode           string      `json:"mode,omitempty" jsonschema:"auto (default), hybrid, keyword, exact, semantic. auto adds exact-identifier matching when the query looks like code."`
 	Scope          searchScope `json:"scope,omitempty" jsonschema:"Narrow before ranking; filters never lose results."`
-	Granularity    string      `json:"granularity,omitempty" jsonschema:"chunk (default: passages) or document (one result per document)."`
+	Granularity    string      `json:"granularity,omitempty" jsonschema:"chunk (default: passages), document (one result per document) or fact (stored facts with their evidence)."`
+	AsOf           string      `json:"as_of,omitempty" jsonschema:"RFC3339 or YYYY-MM-DD: answer with what the knowledge base believed at that time (superseded revisions and replaced facts that were current then). Forgotten records are never returned."`
 	ResponseFormat string      `json:"response_format,omitempty" jsonschema:"concise (default: one line per hit), detailed (full passage), explain (detailed plus why each result ranked and a per-query trace)."`
 	MaxTokens      int         `json:"max_tokens,omitempty" jsonschema:"Response budget; results are packed to fit and the trace says how many were left out. Default 2000."`
 	ExcludeIDs     []string    `json:"exclude_ids,omitempty" jsonschema:"memo:// addresses you have already read; they are left out. The server keeps no session state."`
@@ -125,6 +127,52 @@ type ReadOut struct {
 	Content    string        `json:"content"`
 	Truncated  bool          `json:"truncated"`
 	Provenance kb.Provenance `json:"provenance"`
+}
+
+// --- remember / forget / promote (P4) ---
+
+type rememberArgs struct {
+	Statement   string   `json:"statement" jsonschema:"One atomic claim in one sentence. Example: 'SetCacheable sets ttlMs on list results.'"`
+	Namespace   string   `json:"namespace,omitempty" jsonschema:"Shelf to record it on. Default: default."`
+	About       []string `json:"about,omitempty" jsonschema:"Names the fact is about (identifiers, libraries, people), used for matching."`
+	ValidFrom   string   `json:"valid_from,omitempty" jsonschema:"When the fact became true (RFC3339 or YYYY-MM-DD). Empty = unknown."`
+	ValidTo     string   `json:"valid_to,omitempty" jsonschema:"When it stopped being true. Empty = still true."`
+	Supersedes  string   `json:"supersedes,omitempty" jsonschema:"memo://fact/<id> of the fact this one replaces. The old fact is kept as history and marked replaced, never deleted."`
+	EvidenceURI string   `json:"evidence_uri,omitempty" jsonschema:"memo://chunk/<n> of the passage that supports the fact (from a search result)."`
+	Origin      string   `json:"origin,omitempty" jsonschema:"web, user-said or agent-derived. Default agent-derived."`
+}
+
+// RememberOut is the structured result of remember.
+type RememberOut struct {
+	URI        string `json:"uri"`
+	Superseded string `json:"superseded,omitempty"`
+	Trust      string `json:"trust" jsonschema:"Always agent for tool writes"`
+}
+
+type forgetArgs struct {
+	URI    string `json:"uri" jsonschema:"memo://doc/<id> or memo://fact/<id> to retire. It leaves every index and is never served again; a reference to it will say when and why."`
+	Reason string `json:"reason" jsonschema:"Why, in one sentence. Stored in the audit log and shown to anyone who reads the address later."`
+	Redact bool   `json:"redact,omitempty" jsonschema:"Also erase the stored text (default keeps it for audit)."`
+}
+
+// ForgetOut is the structured result of forget.
+type ForgetOut struct {
+	URI       string `json:"uri"`
+	Forgotten bool   `json:"forgotten"`
+	Redacted  bool   `json:"redacted"`
+}
+
+type promoteArgs struct {
+	URI string `json:"uri" jsonschema:"memo://doc, memo://source or memo://fact address."`
+	To  string `json:"to" jsonschema:"Target trust: user or curated."`
+}
+
+// PromoteOut is the structured result of promote.
+type PromoteOut struct {
+	URI     string `json:"uri"`
+	Applied bool   `json:"applied" jsonschema:"False when a human must confirm; then command says how"`
+	Command string `json:"command,omitempty"`
+	Reason  string `json:"reason,omitempty"`
 }
 
 // --- status ---
@@ -171,6 +219,29 @@ func (s *Server) registerTools() {
 		Description: "Dereference a memo:// address from a search result and return its text with provenance. Use granularity=section to see a passage with its neighbours, or document for the whole text under a token budget. Example: read(uri: \"memo://chunk/812\", granularity: \"section\").",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: closed},
 	}, s.handleRead)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:  "remember",
+		Title: "Record a fact",
+		Description: "Store one atomic fact with where it came from and when it is true. Facts are only ever added: to correct one, pass supersedes with the old fact's address and the old one is kept as history. " +
+			"Example: remember(statement: \"SetCacheable sets ttlMs on list results\", about: [\"SetCacheable\"], evidence_uri: \"memo://chunk/812\", namespace: \"go-sdk\").",
+		Annotations: &mcp.ToolAnnotations{IdempotentHint: false, DestructiveHint: boolPtr(false), OpenWorldHint: closed},
+	}, s.handleRemember)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:  "forget",
+		Title: "Retire a document or fact",
+		Description: "Remove a record from search for good, with a reason. The record becomes a tombstone: reading its address says when and why it was forgotten. Tool calls may forget records written by tools (trust agent); records a human wrote or curated need the human: the result then carries the command to run. " +
+			"Example: forget(uri: \"memo://fact/01a0…\", reason: \"the API changed in v1.9\").",
+		Annotations: &mcp.ToolAnnotations{IdempotentHint: true, DestructiveHint: boolPtr(true), OpenWorldHint: closed},
+	}, s.handleForget)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "promote",
+		Title:       "Ask to raise a record's trust",
+		Description: "Request that a document, source or fact be trusted more (user or curated). Trust cannot be raised by a tool call alone; this returns the command a human runs (or, on clients that support it, asks the human directly).",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: closed},
+	}, s.handlePromote)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "status",
@@ -236,9 +307,13 @@ func (s *Server) handleSearch(ctx context.Context, _ *mcp.CallToolRequest, args 
 	if err != nil {
 		return nil, SearchOut{}, err
 	}
+	asOf, err := parseDate(args.AsOf)
+	if err != nil {
+		return nil, SearchOut{}, fmt.Errorf("as_of: %w", err)
+	}
 	resp, err := s.search.Search(ctx, retrieve.Request{
 		Query: args.Query, Queries: args.Queries, Mode: args.Mode, Scope: scope,
-		Granularity: args.Granularity, ResponseFormat: args.ResponseFormat, MaxTokens: args.MaxTokens, ExcludeIDs: args.ExcludeIDs,
+		Granularity: args.Granularity, ResponseFormat: args.ResponseFormat, MaxTokens: args.MaxTokens, ExcludeIDs: args.ExcludeIDs, AsOf: asOf,
 	})
 	if err != nil {
 		return nil, SearchOut{}, err
@@ -366,6 +441,62 @@ func (s *Server) readAt(ctx context.Context, uri, granularity string) (string, k
 	default:
 		return "", kb.Provenance{}, fmt.Errorf("granularity must be chunk, section or document, got %q", granularity)
 	}
+}
+
+func (s *Server) handleRemember(ctx context.Context, req *mcp.CallToolRequest, args rememberArgs) (*mcp.CallToolResult, RememberOut, error) {
+	ns := args.Namespace
+	if ns == "" {
+		ns = "default"
+	}
+	origin := args.Origin
+	if origin == "" {
+		origin = kb.OriginAgentDerived
+	}
+	vf, err := parseDate(args.ValidFrom)
+	if err != nil {
+		return nil, RememberOut{}, fmt.Errorf("valid_from: %w", err)
+	}
+	vt, err := parseDate(args.ValidTo)
+	if err != nil {
+		return nil, RememberOut{}, fmt.Errorf("valid_to: %w", err)
+	}
+	f, err := s.store.Remember(ctx, kb.RememberInput{Namespace: ns, Statement: args.Statement, About: args.About, ValidFrom: vf, ValidTo: vt, Supersedes: args.Supersedes, EvidenceURI: args.EvidenceURI,
+		Origin: origin, Trust: kb.TrustAgent, Actor: clientName(req, s.actor), Channel: kb.ChannelTool})
+	if err != nil {
+		return nil, RememberOut{}, err
+	}
+	out := RememberOut{URI: f.URI, Superseded: args.Supersedes, Trust: kb.TrustAgent}
+	text := "Recorded " + f.URI
+	if args.Supersedes != "" {
+		text += " (replaces " + args.Supersedes + ", kept as history)"
+	}
+	return textResult(text), out, nil
+}
+
+func (s *Server) handleForget(ctx context.Context, req *mcp.CallToolRequest, args forgetArgs) (*mcp.CallToolResult, ForgetOut, error) {
+	err := s.store.Forget(ctx, kb.ForgetInput{URI: args.URI, Reason: args.Reason, Redact: args.Redact, Actor: clientName(req, s.actor), Channel: kb.ChannelTool})
+	if err != nil {
+		return nil, ForgetOut{}, err
+	}
+	out := ForgetOut{URI: args.URI, Forgotten: true, Redacted: args.Redact}
+	return textResult(fmt.Sprintf("Forgot %s: %s", args.URI, args.Reason)), out, nil
+}
+
+func (s *Server) handlePromote(ctx context.Context, req *mcp.CallToolRequest, args promoteArgs) (*mcp.CallToolResult, PromoteOut, error) {
+	if args.To != kb.TrustUser && args.To != kb.TrustCurated {
+		return nil, PromoteOut{}, fmt.Errorf("to must be user or curated")
+	}
+	// P4: no elicitation yet; the tool returns the command (P5 asks the human).
+	err := s.store.SetTrust(ctx, args.URI, args.To, clientName(req, s.actor), kb.ChannelTool)
+	var needs *kb.ErrNeedsHuman
+	if errors.As(err, &needs) {
+		out := PromoteOut{URI: args.URI, Applied: false, Command: needs.Command, Reason: "raising trust needs a human; tool calls cannot do it"}
+		return textResult("Not applied: raising trust needs a human. Ask them to run: " + needs.Command), out, nil
+	}
+	if err != nil {
+		return nil, PromoteOut{}, err
+	}
+	return textResult("Trust of " + args.URI + " is now " + args.To), PromoteOut{URI: args.URI, Applied: true}, nil
 }
 
 func (s *Server) handleStatus(ctx context.Context, _ *mcp.CallToolRequest, _ statusArgs) (*mcp.CallToolResult, StatusOut, error) {

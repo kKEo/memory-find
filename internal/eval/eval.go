@@ -66,11 +66,31 @@ type FixtureEntry struct {
 	AgeDays int
 }
 
+// FactFixture is a fact planted into the corpus after the documents: it may
+// cite a document's first chunk as evidence, supersede another fixture fact,
+// and be backdated. Forgotten facts are retired after creation (revocation
+// slice).
+type FactFixture struct {
+	Key           string
+	Namespace     string
+	Statement     string
+	About         []string
+	EvidenceKey   string // document fixture key whose first chunk is the evidence
+	SupersedesKey string
+	Trust         string
+	AgeDays       int
+	Forgotten     string // reason; empty = live
+}
+
 // Query is one labelled search.
 type Query struct {
 	ID    string
 	Query string
 	Scope retrieve.Scope
+	// Granularity defaults to document; "fact" runs the fact search.
+	Granularity string
+	// AsOfDaysAgo > 0 asks what was believed that many days ago.
+	AsOfDaysAgo int
 	// Category groups queries for per-category means (lookup, exact,
 	// abstention, ...). Empty counts as "lookup".
 	Category string
@@ -94,6 +114,64 @@ func ToDocs(entries []FixtureEntry) []FixtureDoc {
 		out = append(out, FixtureDoc{Key: e.Key, Namespace: "eval", Kind: kb.KindNote, Title: e.Key, Tags: sections, Content: "# " + e.Key + "\n\n" + content, AgeDays: e.AgeDays})
 	}
 	return out
+}
+
+// LoadFacts plants fact fixtures (after Load) and returns fact key → id.
+// Forgotten documents are retired here too, via ForgottenDocs.
+func LoadFacts(ctx context.Context, store *kb.Store, docIDs map[string]string, facts []FactFixture, forgottenDocs map[string]string) (map[string]string, error) {
+	ids := map[string]string{}
+	now := time.Now()
+	for _, f := range facts {
+		in := kb.RememberInput{Namespace: f.Namespace, Statement: f.Statement, About: f.About, Origin: kb.OriginUserSaid, Trust: f.Trust, Actor: "eval", Channel: kb.ChannelCLI}
+		if in.Trust == "" {
+			in.Trust = kb.TrustUser
+		}
+		if f.EvidenceKey != "" {
+			docID, ok := docIDs[f.EvidenceKey]
+			if !ok {
+				return nil, fmt.Errorf("fact %q: unknown evidence key %q", f.Key, f.EvidenceKey)
+			}
+			var chunkID int64
+			if err := store.DB().QueryRowContext(ctx, `SELECT id FROM chunks WHERE document_id = ? ORDER BY ord LIMIT 1`, docID).Scan(&chunkID); err != nil {
+				return nil, fmt.Errorf("fact %q: evidence chunk: %w", f.Key, err)
+			}
+			in.EvidenceURI = fmt.Sprintf("memo://chunk/%d", chunkID)
+		}
+		if f.SupersedesKey != "" {
+			old, ok := ids[f.SupersedesKey]
+			if !ok {
+				return nil, fmt.Errorf("fact %q supersedes unknown %q (order matters)", f.Key, f.SupersedesKey)
+			}
+			in.Supersedes = "memo://fact/" + old
+		}
+		if f.AgeDays != 0 {
+			at := now.AddDate(0, 0, -f.AgeDays)
+			store.SetNow(func() time.Time { return at })
+		} else {
+			store.SetNow(time.Now)
+		}
+		fact, err := store.Remember(ctx, in)
+		if err != nil {
+			return nil, fmt.Errorf("fact %q: %w", f.Key, err)
+		}
+		ids[f.Key] = fact.ID
+		if f.Forgotten != "" {
+			if err := store.Forget(ctx, kb.ForgetInput{URI: fact.URI, Reason: f.Forgotten, Actor: "eval", Channel: kb.ChannelCLI}); err != nil {
+				return nil, err
+			}
+		}
+	}
+	store.SetNow(time.Now)
+	for key, reason := range forgottenDocs {
+		id, ok := docIDs[key]
+		if !ok {
+			return nil, fmt.Errorf("forgotten doc %q unknown", key)
+		}
+		if err := store.Forget(ctx, kb.ForgetInput{URI: "memo://doc/" + id, Reason: reason, Actor: "eval", Channel: kb.ChannelCLI}); err != nil {
+			return nil, err
+		}
+	}
+	return ids, nil
 }
 
 // LoadStats reports the cost of loading a corpus.
@@ -217,7 +295,15 @@ func Run(ctx context.Context, svc *retrieve.Service, keyToID map[string]string, 
 			continue
 		}
 		t0 := time.Now()
-		req := retrieve.Request{Query: q.Query, Scope: q.Scope, Granularity: retrieve.GranularityDocument, ResponseFormat: retrieve.FormatExplain, Limit: k, MaxTokens: 1 << 20}
+		gran := q.Granularity
+		if gran == "" {
+			gran = retrieve.GranularityDocument
+		}
+		req := retrieve.Request{Query: q.Query, Scope: q.Scope, Granularity: gran, ResponseFormat: retrieve.FormatExplain, Limit: k, MaxTokens: 1 << 20}
+		if q.AsOfDaysAgo > 0 {
+			at := time.Now().AddDate(0, 0, -q.AsOfDaysAgo)
+			req.AsOf = &at
+		}
 		resp, err := svc.Search(ctx, req)
 		if err != nil {
 			return nil, fmt.Errorf("query %q: %w", q.ID, err)
@@ -242,7 +328,11 @@ func Run(ctx context.Context, svc *retrieve.Service, keyToID map[string]string, 
 		}
 		resultIDs := make([]string, len(resp.Results))
 		for i, r := range resp.Results {
-			_, id, _ := kb.ParseURI(r.DocumentURI)
+			uri := r.DocumentURI
+			if gran == retrieve.GranularityFact {
+				uri = r.URI
+			}
+			_, id, _ := kb.ParseURI(uri)
 			resultIDs[i] = id
 		}
 		relevantIDs := keysToIDs(keyToID, q.Relevant)

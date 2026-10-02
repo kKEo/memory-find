@@ -696,3 +696,6 @@ func (s *Store) Reindex(ctx context.Context, progress func(done, total int)) (in
 	}
 	return done, nil
 }
+
+// SetNow replaces the clock (tests, eval fixtures with explicit dates).
+func (s *Store) SetNow(f func() time.Time) { s.now = f }
