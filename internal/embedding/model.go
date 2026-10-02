@@ -39,6 +39,11 @@ type ModelInfo struct {
 	Files []string
 	// Note is shown by `model ls` (size, caveats, opt-in reasons).
 	Note string
+	// Bands are the model's own strong/moderate/weak cosine thresholds when
+	// its similarity scale differs from MiniLM's (granite scores unrelated
+	// text at ~0.6, so MiniLM's 0.30 floor would never abstain). Zero means
+	// "use the profile's bands".
+	Bands [3]float64
 }
 
 // ErrInputTooLong is returned when a text still exceeds the model's input

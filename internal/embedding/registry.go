@@ -17,12 +17,15 @@ var Known = []ModelInfo{
 	{
 		ID: "granite-small-r2", Name: "granite-embedding-small-english-r2", HFRepo: "onnx-community/granite-embedding-small-english-r2-ONNX",
 		OnnxPath: "onnx/model.onnx", ExternalDataPath: "onnx/model.onnx_data", Dim: 384, MaxTokens: 8192, Normalize: true, Licence: "Apache-2.0",
-		Note: "IBM, 47M params, 384-d (same dimension as MiniLM), 8k context; ~195 MB fp32 ONNX. Provisional favourite (OD-6).",
+		// Smoke S4: paraphrases 0.94, unrelated 0.63 → its scale sits far above MiniLM's.
+		Bands: [3]float64{0.88, 0.80, 0.72},
+		Note:  "IBM, 47M params, 384-d (same dimension as MiniLM), 8k context; ~195 MB fp32 ONNX. Provisional favourite (OD-6).",
 	},
 	{
 		ID: "granite-r2", Name: "granite-embedding-english-r2", HFRepo: "onnx-community/granite-embedding-english-r2-ONNX",
 		OnnxPath: "onnx/model.onnx", ExternalDataPath: "onnx/model.onnx_data", Dim: 768, MaxTokens: 8192, Normalize: true, Licence: "Apache-2.0",
-		Note: "IBM, 149M params, 768-d; ~600 MB fp32 ONNX.",
+		Bands: [3]float64{0.85, 0.75, 0.65}, // smoke S4: paraphrases 0.95, unrelated 0.47
+		Note:  "IBM, 149M params, 768-d; ~600 MB fp32 ONNX. Runs, but 12× slower than MiniLM on this backend.",
 	},
 	{
 		ID: "arctic-m-v2", Name: "snowflake-arctic-embed-m-v2.0", HFRepo: "Snowflake/snowflake-arctic-embed-m-v2.0",

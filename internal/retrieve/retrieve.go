@@ -36,8 +36,18 @@ func (s *Service) WithReranker(r rerank.Reranker) *Service {
 	return s
 }
 
-// New builds a Service. embedder may be nil (keyword-only, degraded).
+// New builds a Service. embedder may be nil (keyword-only, degraded). When
+// the embedder's model declares its own similarity bands, they replace the
+// profile's bands and semantic floor: cosine scales differ between models.
 func New(store *kb.Store, profile Profile, logQueries bool) *Service {
+	if e := store.Embedder(); e != nil {
+		if b := e.Info().Bands; b[0] > 0 {
+			profile.BandStrong, profile.BandModerate, profile.BandWeak = b[0], b[1], b[2]
+			if profile.SemanticFloor > 0 {
+				profile.SemanticFloor = b[2]
+			}
+		}
+	}
 	return &Service{store: store, db: store.DB(), embedder: store.Embedder(), profile: profile, logQueries: logQueries, now: time.Now}
 }
 
