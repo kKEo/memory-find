@@ -31,6 +31,9 @@ func TestContextHeader(t *testing.T) {
 	if got := ContextHeader("Guide", "", "release notes for v1.8"); got != "Guide — release notes for v1.8" {
 		t.Errorf("got %q", got)
 	}
+	if got := ContextHeader("Guide", "Guide > Errors", ""); got != "Guide > Errors" {
+		t.Errorf("duplicate title not removed: %q", got)
+	}
 	if got := ContextHeader("", "", ""); got != "" {
 		t.Errorf("got %q", got)
 	}

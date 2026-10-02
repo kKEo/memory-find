@@ -68,7 +68,7 @@ func TestReadOnlyOpenNeverCreates(t *testing.T) {
 // shapes) is refused with a clear error, and left untouched.
 func TestRejectsLegacyJournalFile(t *testing.T) {
 	for _, fixture := range []string{"v0-with-fts.db", "v0-without-fts.db"} {
-		src := filepath.Join("..", "journal", "testdata", fixture)
+		src := filepath.Join("testdata", fixture)
 		data, err := os.ReadFile(src)
 		if err != nil {
 			t.Fatal(err)

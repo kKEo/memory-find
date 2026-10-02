@@ -1,6 +1,9 @@
 package eval
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func almostEqual(a, b float64) bool {
 	const eps = 1e-9
@@ -80,19 +83,38 @@ func TestNDCGAtK(t *testing.T) {
 func TestMeanRank(t *testing.T) {
 	results := []string{"a", "b", "c"}
 
-	if got := MeanRank(results, nil); got != 0 {
+	if got := MeanRank(results, nil, 3); got != 0 {
 		t.Errorf("empty id set: got %v, want 0", got)
 	}
-	if got := MeanRank(results, []string{"a"}); !almostEqual(got, 1) {
+	if got := MeanRank(results, []string{"a"}, 3); !almostEqual(got, 1) {
 		t.Errorf("rank of a: got %v, want 1", got)
 	}
-	if got := MeanRank(results, []string{"a", "c"}); !almostEqual(got, 2) {
+	if got := MeanRank(results, []string{"a", "c"}, 3); !almostEqual(got, 2) {
 		t.Errorf("mean rank of a,c: got %v, want 2", got)
 	}
 	// An id absent from the results scores as len(results)+1, not
 	// excluded — it should look at least as "unranked" as the worst
 	// visible rank, not better.
-	if got := MeanRank(results, []string{"z"}); !almostEqual(got, 4) {
+	if got := MeanRank(results, []string{"z"}, 3); !almostEqual(got, 4) {
 		t.Errorf("absent id: got %v, want 4 (len+1)", got)
+	}
+}
+
+// Audit finding H3a: an absent irrelevant on an EMPTY result list must score
+// "past the page" (k+1), not rank 1, or correct abstention looks worst.
+func TestMeanRankOnEmptyListUsesDepth(t *testing.T) {
+	if got := MeanRank(nil, []string{"z"}, 10); !almostEqual(got, 11) {
+		t.Fatalf("MeanRank(empty) = %v, want 11", got)
+	}
+}
+
+// Audit finding H3b: nDCG's ideal must not shrink to the number of results
+// returned; a one-result list that found one of two relevant items is not
+// perfect.
+func TestNDCGShortListIsPenalised(t *testing.T) {
+	got := NDCGAtK([]string{"a"}, []string{"a", "b"}, 10)
+	want := 1.0 / (1.0 + 1.0/math.Log2(3))
+	if !almostEqual(got, want) {
+		t.Fatalf("NDCG short list = %.4f, want %.4f", got, want)
 	}
 }

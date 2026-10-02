@@ -96,7 +96,13 @@ func EstimateTokens(s string) int {
 // client-written document context.
 func ContextHeader(title, sectionPath, docContext string) string {
 	parts := make([]string, 0, 2)
-	if t := strings.TrimSpace(title); t != "" {
+	t := strings.TrimSpace(title)
+	// A document whose first heading is its title would otherwise read
+	// "Title > Title > Section"; drop the duplicate.
+	if sectionPath == t || strings.HasPrefix(sectionPath, t+" > ") {
+		t = ""
+	}
+	if t != "" {
 		parts = append(parts, t)
 	}
 	if sectionPath != "" {

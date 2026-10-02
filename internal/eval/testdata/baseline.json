@@ -2,6 +2,7 @@
   "per_query": [
     {
       "query_id": "auth-jwt-expiry",
+      "category": "lookup",
       "recall_at_1": 0.5,
       "recall_at_5": 1,
       "recall_at_10": 1,
@@ -9,10 +10,17 @@
       "ndcg_10": 1,
       "irrelevant_mean_rank": 11,
       "num_relevant": 2,
-      "num_irrelevant": 2
+      "num_irrelevant": 2,
+      "num_results": 5,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.684292
     },
     {
       "query_id": "auth-session-bug",
+      "category": "lookup",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
@@ -20,43 +28,71 @@
       "ndcg_10": 1,
       "irrelevant_mean_rank": 2,
       "num_relevant": 1,
-      "num_irrelevant": 1
+      "num_irrelevant": 1,
+      "num_results": 10,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.205167
     },
     {
       "query_id": "postgres-index",
+      "category": "lookup",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "irrelevant_mean_rank": 11,
+      "irrelevant_mean_rank": 4,
       "num_relevant": 1,
-      "num_irrelevant": 1
+      "num_irrelevant": 1,
+      "num_results": 4,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.122667
     },
     {
       "query_id": "postgres-migration-lock",
+      "category": "lookup",
       "recall_at_1": 0.5,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 0.8772153153380494,
-      "irrelevant_mean_rank": 11,
+      "irrelevant_mean_rank": 7,
       "num_relevant": 2,
-      "num_irrelevant": 1
+      "num_irrelevant": 1,
+      "num_results": 7,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.025583
     },
     {
       "query_id": "react-rerender",
+      "category": "lookup",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "irrelevant_mean_rank": 11,
+      "irrelevant_mean_rank": 3,
       "num_relevant": 1,
-      "num_irrelevant": 1
+      "num_irrelevant": 1,
+      "num_results": 3,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.042208
     },
     {
       "query_id": "grpc-interceptor",
+      "category": "lookup",
       "recall_at_1": 0.5,
       "recall_at_5": 1,
       "recall_at_10": 1,
@@ -64,73 +100,130 @@
       "ndcg_10": 1,
       "irrelevant_mean_rank": 3,
       "num_relevant": 2,
-      "num_irrelevant": 1
+      "num_irrelevant": 1,
+      "num_results": 3,
+      "first_hit_arms": [
+        "semantic",
+        "keyword",
+        "exact"
+      ],
+      "latency_ms": 1.164833
     },
     {
       "query_id": "docker-image-size",
+      "category": "lookup",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "num_relevant": 1
+      "num_relevant": 1,
+      "num_results": 2,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.0075
     },
     {
       "query_id": "kubernetes-rollout",
+      "category": "lookup",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "num_relevant": 1
+      "num_relevant": 1,
+      "num_results": 3,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.565125
     },
     {
       "query_id": "auth-random-logout",
+      "category": "lookup",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "num_relevant": 1
+      "num_relevant": 1,
+      "num_results": 9,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.364042
     },
     {
       "query_id": "db-slow-backup",
-      "recall_at_1": 0,
+      "category": "lookup",
+      "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
-      "mrr": 0.5,
-      "ndcg_10": 0.6309297535714574,
-      "num_relevant": 1
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 1,
+      "num_results": 10,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.977375
     },
     {
       "query_id": "frontend-slow-mobile",
+      "category": "lookup",
       "recall_at_1": 0.5,
       "recall_at_5": 0.5,
       "recall_at_10": 1,
       "mrr": 1,
-      "ndcg_10": 0.8315546295836226,
-      "num_relevant": 2
+      "ndcg_10": 0.8065735963827292,
+      "num_relevant": 2,
+      "num_results": 10,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.417709
     },
     {
       "query_id": "flaky-tests",
+      "category": "lookup",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "num_relevant": 1
+      "num_relevant": 1,
+      "num_results": 9,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.21575
     },
     {
       "query_id": "onboarding-drop-off",
+      "category": "lookup",
       "recall_at_1": 0.5,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "num_relevant": 2
+      "num_relevant": 2,
+      "num_results": 10,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.233917
     },
     {
       "query_id": "mood-deadline-stress",
+      "category": "lookup",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
@@ -138,37 +231,65 @@
       "ndcg_10": 1,
       "irrelevant_mean_rank": 11,
       "num_relevant": 1,
-      "num_irrelevant": 1
+      "num_irrelevant": 1,
+      "num_results": 9,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.097959
     },
     {
       "query_id": "mood-burnout",
+      "category": "lookup",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "num_relevant": 1
+      "num_relevant": 1,
+      "num_results": 10,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.5935
     },
     {
       "query_id": "mood-oncall-anxiety",
+      "category": "lookup",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "num_relevant": 1
+      "num_relevant": 1,
+      "num_results": 10,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 2.764667
     },
     {
       "query_id": "user-context-deadline",
+      "category": "lookup",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "num_relevant": 1
+      "num_relevant": 1,
+      "num_results": 10,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 2.479625
     },
     {
       "query_id": "wk-negative-control-auth",
+      "category": "lookup",
       "recall_at_1": 0.5,
       "recall_at_5": 1,
       "recall_at_10": 1,
@@ -176,21 +297,35 @@
       "ndcg_10": 1,
       "irrelevant_mean_rank": 11,
       "num_relevant": 2,
-      "num_irrelevant": 3
+      "num_irrelevant": 3,
+      "num_results": 5,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.117333
     },
     {
       "query_id": "wk-negative-control-db",
+      "category": "lookup",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "irrelevant_mean_rank": 10.5,
+      "irrelevant_mean_rank": 11,
       "num_relevant": 1,
-      "num_irrelevant": 2
+      "num_irrelevant": 2,
+      "num_results": 4,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.074792
     },
     {
       "query_id": "no-match-cooking",
+      "category": "abstention",
       "recall_at_1": 0,
       "recall_at_5": 0,
       "recall_at_10": 0,
@@ -198,104 +333,260 @@
       "ndcg_10": 0,
       "irrelevant_mean_rank": 11,
       "num_relevant": 0,
-      "num_irrelevant": 3
+      "num_irrelevant": 3,
+      "num_results": 0,
+      "abstained": true,
+      "latency_ms": 0.828958
     },
     {
       "query_id": "no-match-astronomy",
+      "category": "abstention",
       "recall_at_1": 0,
       "recall_at_5": 0,
       "recall_at_10": 0,
       "mrr": 0,
       "ndcg_10": 0,
-      "irrelevant_mean_rank": 7,
+      "irrelevant_mean_rank": 11,
       "num_relevant": 0,
-      "num_irrelevant": 2
+      "num_irrelevant": 2,
+      "num_results": 0,
+      "abstained": true,
+      "latency_ms": 0.79325
     },
     {
       "query_id": "stemming-gap-review",
-      "recall_at_1": 0,
-      "recall_at_5": 1,
+      "category": "stemming",
+      "recall_at_1": 0.3333333333333333,
+      "recall_at_5": 0.6666666666666666,
       "recall_at_10": 1,
-      "mrr": 0.3333333333333333,
-      "ndcg_10": 0.5,
-      "num_relevant": 1
+      "mrr": 1,
+      "ndcg_10": 0.8603443310417203,
+      "num_relevant": 3,
+      "num_results": 10,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 0.991959
     },
     {
       "query_id": "section-filtered-standup",
+      "category": "scoped",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "num_relevant": 1
+      "num_relevant": 1,
+      "num_results": 1,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.099917
     },
     {
       "query_id": "recency-rate-limit",
+      "category": "recency",
       "recall_at_1": 0.5,
-      "recall_at_5": 1,
+      "recall_at_5": 0.5,
       "recall_at_10": 1,
       "mrr": 1,
-      "ndcg_10": 0.8503449055347547,
-      "num_relevant": 2
+      "ndcg_10": 0.8175295903539446,
+      "num_relevant": 2,
+      "num_results": 10,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.521125
     },
     {
       "query_id": "long-entry-incident-code",
+      "category": "long-document",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "num_relevant": 1
+      "num_relevant": 1,
+      "num_results": 2,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.292458
     },
     {
       "query_id": "long-entry-websocket-ticket",
+      "category": "long-document",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "num_relevant": 1
+      "num_relevant": 1,
+      "num_results": 1,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.218708
     },
     {
       "query_id": "long-entry-billing-account",
+      "category": "long-document",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "num_relevant": 1
+      "num_relevant": 1,
+      "num_results": 1,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.078208
     },
     {
       "query_id": "hybrid-frontend-performance",
+      "category": "hybrid",
       "recall_at_1": 0.5,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "irrelevant_mean_rank": 11,
+      "irrelevant_mean_rank": 4,
       "num_relevant": 2,
-      "num_irrelevant": 1
+      "num_irrelevant": 1,
+      "num_results": 5,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.028542
     },
     {
       "query_id": "hybrid-grpc-chain-order",
+      "category": "hybrid",
       "recall_at_1": 1,
       "recall_at_5": 1,
       "recall_at_10": 1,
       "mrr": 1,
       "ndcg_10": 1,
-      "irrelevant_mean_rank": 2,
+      "irrelevant_mean_rank": 4,
       "num_relevant": 1,
-      "num_irrelevant": 1
+      "num_irrelevant": 1,
+      "num_results": 10,
+      "first_hit_arms": [
+        "semantic",
+        "keyword"
+      ],
+      "latency_ms": 1.161791
     }
   ],
   "mean": {
     "query_id": "MEAN",
-    "recall_at_1": 0.7241379310344828,
-    "recall_at_5": 0.9137931034482759,
-    "recall_at_10": 0.9310344827586207,
-    "mrr": 0.8908045977011494,
-    "ndcg_10": 0.8858636070354442,
-    "irrelevant_mean_rank": 8.653846153846153,
-    "num_relevant": 0
-  }
+    "category": "",
+    "recall_at_1": 0.8271604938271605,
+    "recall_at_5": 0.9506172839506173,
+    "recall_at_10": 1,
+    "mrr": 1,
+    "ndcg_10": 0.9763578827080165,
+    "irrelevant_mean_rank": 6.454545454545454,
+    "num_relevant": 0,
+    "num_results": 0,
+    "latency_ms": 1.3535834074074076
+  },
+  "per_category": {
+    "abstention": {
+      "query_id": "MEAN",
+      "category": "abstention",
+      "recall_at_1": 0,
+      "recall_at_5": 0,
+      "recall_at_10": 0,
+      "mrr": 0,
+      "ndcg_10": 0,
+      "num_relevant": 0,
+      "num_results": 0,
+      "latency_ms": 0
+    },
+    "hybrid": {
+      "query_id": "MEAN",
+      "category": "hybrid",
+      "recall_at_1": 0.75,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "irrelevant_mean_rank": 4,
+      "num_relevant": 0,
+      "num_results": 0,
+      "latency_ms": 1.0951665
+    },
+    "long-document": {
+      "query_id": "MEAN",
+      "category": "long-document",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 0,
+      "num_results": 0,
+      "latency_ms": 1.196458
+    },
+    "lookup": {
+      "query_id": "MEAN",
+      "category": "lookup",
+      "recall_at_1": 0.8421052631578947,
+      "recall_at_5": 0.9736842105263158,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 0.9833573111431989,
+      "irrelevant_mean_rank": 7,
+      "num_relevant": 0,
+      "num_results": 0,
+      "latency_ms": 1.4291602105263153
+    },
+    "recency": {
+      "query_id": "MEAN",
+      "category": "recency",
+      "recall_at_1": 0.5,
+      "recall_at_5": 0.5,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 0.8175295903539446,
+      "num_relevant": 0,
+      "num_results": 0,
+      "latency_ms": 1.521125
+    },
+    "scoped": {
+      "query_id": "MEAN",
+      "category": "scoped",
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 1,
+      "num_relevant": 0,
+      "num_results": 0,
+      "latency_ms": 1.099917
+    },
+    "stemming": {
+      "query_id": "MEAN",
+      "category": "stemming",
+      "recall_at_1": 0.3333333333333333,
+      "recall_at_5": 0.6666666666666666,
+      "recall_at_10": 1,
+      "mrr": 1,
+      "ndcg_10": 0.8603443310417203,
+      "num_relevant": 0,
+      "num_results": 0,
+      "latency_ms": 0.991959
+    }
+  },
+  "abstention_rate": 1,
+  "num_abstention_queries": 2
 }
