@@ -1,5 +1,11 @@
 # GraphRAG Evolution Plan: memo-mcp
 
+> **Superseded (2026-10-01)** by [`knowledge-base-sota.md`](knowledge-base-sota.md),
+> which replaces this plan's approach (entry-level co-occurrence edges,
+> keyword-only extraction, a separate global graph DB) with graph-as-index
+> retrieval (personalised PageRank as a routed strategy), bi-temporal facts,
+> and client-LLM-driven compaction. Kept for history.
+
 > **Stale "Current State Analysis" — read with that in mind.** This plan's
 > description of today's search as "pure vector similarity search... with
 > post-filtering by section/date" predates a later commit that added a
