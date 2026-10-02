@@ -376,15 +376,26 @@ Notable details:
 | nomic-embed-text v1.5 / v2-moe | 137M / 475M | 768 → 64/256 | 8k / 512 | BEIR 52.9 (v2) | ✓ | Apache-2.0 |
 | **potion-retrieval-32M** (model2vec, static) | 32M | 512 | ∞ | ~92% of MiniLM on MTEB avg (vendor) | not needed (lookup + mean pool) | MIT |
 | CodeRankEmbed | 137M | 768 | 8k | strong on code search | ✓ | Apache-2.0 |
+| **granite-embedding-97m-multilingual-r2** (Apr–May 2026) | 97M | 384 (no MRL) | 32k | Eng retrieval 50.1, code 60.4, multilingual 60.3 | **shipped** (q-ONNX ≈98 MB) | Apache-2.0 |
+| snowflake-arctic-embed-m-v2.0 (Dec 2024) | 305M | 768 → 256 | 8k | BEIR 55.4 (54.4 @256) | official | Apache-2.0 |
+| Harrier-OSS-v1-270m (Microsoft, Mar 2026) | 270M | 640 | 32k | MMTEB v2 66.5 | none official | MIT |
+| jina-embeddings-v5-text-nano (Feb 2026) | 239M | 768, MRL | 8k | Eng v2 71.0 | ✓ | **CC-BY-NC** |
 
-Two caveats:
+Three caveats:
 
-- jina v3/v4 and jina-reranker are **CC-BY-NC**, so they are out for
-  distribution.
+- jina v3/v4/v5, jina-code, and jina-reranker are **CC-BY-NC**, so they are out
+  for distribution.
 - **hugot's pure-Go backend is about 10× slower than ONNX Runtime.** The
   query-time latency of a 300M model under GoMLX is **unmeasured**. A static
   model (potion) can be implemented in roughly 150 lines of Go with no ONNX at
   all, and makes a good instant tier or fallback.
+- **Op coverage is the real constraint, not quality.** onnx-gomlx says "not all
+  ops are converted yet" and confirms only MiniLM. Nothing confirms that the
+  ModernBERT (Granite R2, Ettin), Gemma3 (EmbeddingGemma, Harrier), or Qwen3
+  graphs run. So the **first step of the bake-off is a load-and-embed smoke test
+  per candidate**, and candidates that fail it are dropped.
+- **Code-specific embedders are low priority.** Small general models from
+  2025–26 already score 60–71 on the MTEB code tasks.
 
 ### 3.2 Reranking: the second lever
 
@@ -397,11 +408,24 @@ Two caveats:
 | + contextual BM25 | −49% |
 | + reranker | **−67%** |
 
-Local reranker options:
+Later studies of hybrid RRF found reranking adds +11–24% relative nDCG@10
+([2604.01733](https://arxiv.org/abs/2604.01733)). Reranking mostly *reorders*
+candidates and rarely surfaces new ones
+([2608.00452](https://arxiv.org/abs/2608.00452)), so the recall of the fused
+candidate set is still what limits the result.
 
-- `ms-marco-MiniLM-L-6-v2` (22M): fast enough for top-30 on CPU.
-- `mxbai-rerank-v2` (0.5B, Apache-2.0).
-- `Qwen3-Reranker-0.6B` (Apache-2.0).
+Local reranker options, from the [HF Ettin benchmark](https://huggingface.co/blog/ettin-reranker)
+(May 2026). Scores are MTEB-R nDCG@10 over top-100; throughput is PyTorch on a
+desktop CPU:
+
+| Reranker | Params | nDCG@10 | CPU pairs/s | Notes |
+|---|---|---|---|---|
+| `ms-marco-MiniLM-L-6-v2` | 22M | 0.508 | 144 | Same architecture as the embedder, so it is **known to load under GoMLX**. Try it first |
+| **Ettin-17M** | 18M | 0.558 | **267** | Apache-2.0, 8K context, ModernBERT-style. Its op coverage is unverified |
+| **Ettin-32M** | 33M | 0.578 | 93 | Apache-2.0 |
+| granite-reranker-english-r2 | 149M | 0.566 | 15 | Apache-2.0 |
+| `mxbai-rerank-base-v2` | 0.5B | 0.592 | 3.5 | Apache-2.0; too slow for pure Go |
+| `Qwen3-Reranker-0.6B` | 0.6B | n/a (scored on its own setup) | slow | Apache-2.0; LLM-style scoring |
 
 Late interaction (ColBERT, or MUVERA [2405.19504](https://arxiv.org/abs/2405.19504))
 is not worth its storage and code cost at this scale.
@@ -421,7 +445,15 @@ is not worth its storage and code cost at this scale.
   (plus entity labels once they exist), and accept an optional client-written
   `context` string per document.
 - **Propositions** (Dense X, [2312.06648](https://arxiv.org/abs/2312.06648)) help
-  fact lookup. They map naturally onto client-supplied facts (§1, D-C).
+  fact lookup. They map naturally onto client-supplied facts (§1, D-C). The gain
+  is +10 Recall@20 for unsupervised retrievers but only +2 for supervised ones,
+  and it fades as context budgets grow.
+- **RAPTOR-style trees** lost to vanilla RAG by 2–8 points at budgets above
+  5K tokens with GPT-4o ([2506.03989](https://arxiv.org/abs/2506.03989),
+  EMNLP 2025).
+- **Small corpora do not need RAG at all.** Anthropic advises skipping retrieval
+  under about 200K tokens. A namespace that small can be served whole, as
+  `granularity=document` or as an export resource, and the token budget decides.
 
 ### 3.4 Query time: the agent is the router
 
@@ -431,6 +463,24 @@ is not worth its storage and code cost at this scale.
   - accept `queries[]` and fuse them (RAG-Fusion style);
   - expose a few clearly distinct modes;
   - return **calibrated relevance** so the agent can tell when to retry.
+- **Server-side query expansion is not worth adding.**
+  - The stronger the retriever, the less LLM expansion helps. Weller et al.
+    ([2309.08541](https://arxiv.org/abs/2309.08541)) found a strong negative
+    correlation across 24 retrievers.
+  - HyDE's gains may come partly from benchmark leakage
+    ([2504.14175](https://arxiv.org/abs/2504.14175)).
+  - `queries[]` stays, but only because the *agent* chooses to send several
+    queries.
+- **Agentic iteration over simple tools beats clever one-shot retrieval.**
+  - **A-RAG** ([2602.03442](https://arxiv.org/abs/2602.03442), Feb 2026) gives
+    the agent three tools: `keyword_search`, `semantic_search` over sentence
+    snippets, and `chunk_read(ids)` with ±1 neighbours. It beat naive RAG by
+    **+21–39 points** on multi-hop QA while reading *fewer* tokens. The authors
+    recommend "agent-friendly interfaces rather than complex retrieval
+    algorithms."
+  - AgenticRAG ([2605.05538](https://arxiv.org/abs/2605.05538)) reports
+    recall@1 rising from 8% to 43–50% at 2–3× the tokens.
+  - This is the strongest support for the `search` → `read` design in §6.3.
 - **Coding agents: lexical and semantic search are complementary.**
   - Claude Code chose agentic grep over vector RAG.
   - [Cursor (Nov 2025)](https://cursor.com/blog/semsearch) measured
@@ -455,7 +505,9 @@ is not worth its storage and code cost at this scale.
 | **Elasticsearch** | Composable `retriever` tree (`knn`, `rrf`, `linear`, `text_similarity_reranker`) |
 | **Weaviate** | `alpha`, fusion type, `maxVectorDistance`, `autocut`, rerank module |
 | **Zep** | `scope` (edges/nodes/episodes), reranker enum (rrf/mmr/node_distance/cross_encoder), `center_node_uuid` |
-| **Mem0** | `top_k`, `threshold`, boolean metadata filters, `rerank` |
+| **Mem0 v3** | `top_k`, `threshold`, boolean metadata filters, `rerank` (off by default, +200–400 ms); `keyword_search` removed in favour of one multi-signal score |
+| **OpenSearch 3.x** | Per-request `search_pipeline`: RRF with weights, or min-max/l2/z-score linear fusion. On their BEIR test, RRF averaged **3.9% lower nDCG@10** than score fusion |
+| **Vectara** | `lexical_interpolation`, `sentences_before/after` (granularity), reranker chain ending in a `knee()` cutoff and MMR |
 | **OpenAI file_search** | `max_num_results`, `ranking_options.score_threshold`, attribute filters |
 | **Context7** | Two-step `resolve-library-id` → `get-library-docs(topic, tokens)`, with a **token budget** |
 
@@ -469,6 +521,18 @@ Evidence on LLM tool use:
   named strategies plus a few orthogonal, typed, defaulted parameters**.
 - Raw weights (`alpha`, `rrf_k`, half-life) belong in server-side profiles and
   the eval lab, **not in the LLM-facing schema**.
+- **Absolute score thresholds are fragile.** Zep deprecated `min_score`, Mem0
+  has changed its threshold defaults, and fused RRF scores top out around
+  0.016. Gap-based cutoffs (Weaviate `autocut`, Vectara `knee()`) hold up better.
+  Products are also moving from `k` toward **token or character budgets** (Zep
+  `max_characters`, LightRAG token caps).
+- **Description quality matters measurably.** In one study 97% of 856 MCP tools
+  had description smells, and fixing them gave +5.9 pp task success
+  ([2602.14878](https://arxiv.org/abs/2602.14878)). With complex parameters,
+  examples in descriptions raised accuracy from 72% to 90% (Anthropic). MCP has
+  no `input_examples` field, so put 1–2 examples in the description text.
+- **MCP 2026-07-28 is stateless at its core**, so per-session "already read"
+  tracking cannot live on the server. Instead the client passes `exclude_ids`.
 
 **Decision drivers**
 
@@ -486,8 +550,14 @@ Evidence on LLM tool use:
 
   Each model must win its place in `memo-mcp eval`, with latency measured under
   GoMLX.
-- **D-J (reranking).** Add an optional cross-encoder rerank stage, promoted only
-  if it improves nDCG@10.
+- **D-J (reranking).** Add an optional cross-encoder rerank stage over the top
+  20–40 fused candidates, promoted only if it improves nDCG@10.
+  - Try ms-marco-MiniLM first, because it is known to load under GoMLX.
+  - Then try Ettin-17M/32M if they pass the op-coverage smoke test.
+  - Rerank is part of the `precise` profile and is never a raw LLM parameter.
+- **D-J2 (fusion and cutoffs).** Keep weighted RRF as the default. Add a min-max
+  linear-fusion profile and let the eval decide between them. Replace absolute
+  thresholds with a **gap-based cutoff** inside the token budget.
 - **D-K (access surface).** About seven defaulted parameters per tool, with named
   profiles for everything numeric (§6.3).
 
@@ -514,10 +584,32 @@ They converge on three things:
 3. **Markdown as the storage and interchange format** (llms.txt, AGENTS.md,
    Skills, DeepWiki pages).
 
-One more data point points the same way: Vercel's report (Jan 2026,
-*unverified details*) that a compressed docs index in AGENTS.md beat retrieval
-tools, because agents often *forget to call* retrieval tools. That argues for
-offering a passive, file-shaped face alongside the tools.
+One more data point points the same way: [Vercel's eval](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals)
+(Jan 27 2026). An **8 KB docs index in AGENTS.md scored 100%**, while Skills
+scored 53% by default and 79% with explicit instructions. The reason is that
+agents didn't invoke the skill in 56% of cases. This argues for a passive,
+file-shaped face alongside the tools.
+
+Other 2026 market signals:
+
+- **Docfork shut down** on 2026-06-14. It had BM25 + vectors with RRF,
+  AST-aware chunks, and pinned versions.
+- **Context7** renamed `get-library-docs` to `query-docs`, and added a
+  CLI + Skills mode that needs no MCP.
+- Mintlify's ChromaFs (Apr 2026) emulates `ls/cat/grep` over a vector DB.
+  Filesystem-shaped access is converging from several directions.
+- Counter-evidence: Arize found a SQL skill (99/100) beat a fake filesystem
+  (93/100).
+- The AWS study ([2602.23368](https://arxiv.org/abs/2602.23368)) found that
+  keyword-only agents reach about 90% of RAG.
+
+**Version keying is the product.** Context7 keys by git tag
+(`/vercel/next.js/v15.1.8`), and Next.js 16.2 ships version-matched docs inside
+`node_modules`. GitChameleon 2.0 ([2507.12367](https://arxiv.org/abs/2507.12367))
+shows that even *with* retrieved docs, version-specific code generation tops out
+at 58.5%. So `(namespace, library, version)` must be a first-class filter that
+applies **before** top-k, and the agent's manifest (`go.mod`, `package.json`)
+picks the version.
 
 ### 4.2 The ingestion pipeline
 
@@ -529,14 +621,26 @@ offering a passive, file-shaped face alongside the tools.
   ([Jun 2025](https://www.anthropic.com/engineering/multi-agent-research-system)).
 - **Acquisition is done client-side.** The agent already has web fetch/read
   tools and passes markdown plus a source URI. The server does not fetch (§8,
-  decision 2). For reference only: a pure-Go fetch path would have been
-  `go-shiori/go-readability` + `JohannesKaufmann/html-to-markdown` v2. Docling,
-  MarkItDown, and Crawl4AI are Python and would stay out of the binary either
-  way.
+  decision 2). The ingestion research suggested a server-side `learn(url)` with
+  ETag checks; that conflicts with decision 2 and is not adopted. The client
+  sends `source.version` and `content_hash` instead. For reference only: a
+  pure-Go fetch path would have been `codeberg.org/readeck/go-readability/v2` +
+  `JohannesKaufmann/html-to-markdown` v2. Docling (best structure; 77 vs 57 on a
+  Jul 2026 PDF benchmark), MarkItDown, and Crawl4AI are Python and would stay
+  out of the binary either way. Crawl4AI also had several Docker RCE/SSRF CVEs
+  in 2026. The recommended **client-side source order** is llms.txt /
+  llms-full.txt, then the repo docs folder at the matching git tag, then a
+  crawl. llms.txt is a useful source when present but is not a discovery
+  mechanism: Ahrefs found 97% of such files got zero requests.
 - **Code-aware chunking.** AST chunking (cAST,
-  [2506.15655](https://arxiv.org/abs/2506.15655)) beats line chunking.
-  tree-sitter for Go needs CGo, so fall back to fenced-block- and
-  heading-aware splitting, with `go/parser` for Go code only.
+  [2506.15655](https://arxiv.org/abs/2506.15655)) beats line chunking: +4.3
+  Recall@5 on RepoEval. **Pure-Go tree-sitter now exists:**
+  - `odvcencio/gotreesitter`: no CGo, 206 grammars.
+  - `malivvan/tree-sitter`: the C runtime compiled to Wasm and run on wazero.
+
+  Evaluate one of them for code chunking. Until then, use fenced-block- and
+  heading-aware splitting, with `go/parser` for Go code. Maturity of both ports
+  is unverified.
 - **Provenance and freshness.** Store `source_uri`, `fetched_at`,
   `content_hash`, `etag`, and `version` (semver or git SHA). Re-ingest on TTL
   expiry or hash mismatch, and **mark derived pages stale** when a source they
@@ -554,27 +658,71 @@ Related work: MCP tool-poisoning and "rug pulls" (Invariant Labs, Apr 2025), and
 Simon Willison's **lethal trifecta** of private data + untrusted content +
 exfiltration channel.
 
+2026 additions:
+
+- **ContextCrush** (CVE-2026-75130, disclosed Mar 2026). Context7 served
+  library-owner "Custom Rules" unfiltered next to docs, and a demo exfiltrated
+  `.env` files.
+- **"From Untrusted Input to Trusted Memory"**
+  ([2606.04329](https://arxiv.org/abs/2606.04329)) found that prompt-injection
+  defences do not cover memory poisoning, and that aggressive memory writers
+  are easier to exploit.
+- **"Revoked but Still Authoritative"**
+  ([2609.08258](https://arxiv.org/abs/2609.08258), Sep 2026) found that none of
+  five memory systems enforces revocation by default. Revoked facts often
+  **outrank** their replacements.
+- Graphiti's MCP server fixed a Cypher injection in v1.0.2 (Mar 2026).
+
 For a store that ingests web content and serves it to agents with tools, this is
 the main risk. Mitigations:
 
 - **Trust tiers** recorded on every record.
 - Retrieved text is wrapped and labelled as *data*.
 - Web-ingested content never lands in a high-trust tier automatically.
+- **Never serve instruction-shaped fields** ("rules", "system notes") from
+  ingested sources as anything other than quoted content.
+- **Revocation is a hard filter.** Tombstoned, superseded, and invalidated
+  records are excluded *before* ranking by default. They are reachable only
+  through an explicit `as_of` query, never by a soft score penalty.
 - Namespace isolation.
 - An audit log.
+- **An eval slice for poisoning and revocation**, so regressions are measured.
 
 ### 4.4 MCP features relevant to this project
 
+**The 2026-07-28 spec is final.** Sources: the
+[changelog](https://modelcontextprotocol.io/specification/2026-07-28/changelog)
+and the [launch post](https://blog.modelcontextprotocol.io/posts/2026-07-28/).
+- **Stateless core:** there is no `initialize` handshake and there are no
+  sessions. Servers implement `server/discover`.
+- **Multi Round-Trip Requests (MRTR)** replace server→client requests:
+  `input_required`, then the client retries.
+- List and read results carry `ttlMs` and `cacheScope`.
+- Schemas can use full JSON Schema 2020-12.
+- Tasks moved to an extension.
+- **Sampling, Roots, and Logging are deprecated** (SEP-2577). Removal comes no
+  sooner than 12 months later.
+
+**Go SDK:**
+- v1.7.0 (2026-07-28) supports the new spec; over HTTP only with
+  `Stateless=true`.
+- v1.8.0 (2026-09-14) adds `SetCacheable`, `SupportedProtocolVersions`, and
+  `NotifyElicitationComplete`.
+- **memo-mcp pins v1.6.0.**
+
 | Feature | Status | Use here |
 |---|---|---|
-| `outputSchema` / `structuredContent` | 2025-06-18 | Citation-ready, typed search results |
-| Resources + templates | stable | `memo://…` URIs for documents, chunks, pages |
-| Tool annotations | 2025-03-26 | `readOnlyHint`, `openWorldHint: false` |
-| **Tasks** (long-running) | experimental since 2025-11-25 | Ingest and compact jobs. Go SDK support **unverified**; fall back to a job-ID + status-tool pattern |
-| **Sampling** | Poor client support (Claude Code never shipped it); reportedly deprecated in 2026-07-28 (**unverified**) | **Do not depend on it** |
-| Elicitation | 2025-06-18 | Confirm destructive operations or trust promotion |
-| MCP Apps (`ui://`) | extension, 2026 | Optional KB/graph browser later |
-| Anthropic `search_result` blocks | GA 2025 | Shape results so Claude cites natively (passthrough in Claude Code **unverified**) |
+| `outputSchema` / `structuredContent` | 2025-06-18; JSON Schema 2020-12 in 2026-07-28 | Citation-ready, typed search results. Always add a text mirror in `content`: OpenAI asks for it, and ChatGPT only cites hits that have a non-empty `url` |
+| Resources + templates | stable; `subscriptions/listen` replaces `resources/subscribe` | `memo://…` URIs for documents, chunks, and pages. Claude Code supports `@server:uri`, but its **template support is unclear**. Put core capability in tools and mirror it as resources |
+| `ttlMs` / `cacheScope` | 2026-07-28 | Freshness hints on list and read results (via `SetCacheable` in v1.8.0) |
+| Tool annotations | 2025-03-26 | `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint: false` on every tool |
+| **Tasks** | extension (`io.modelcontextprotocol/tasks`) | Not in Go SDK v1.8.0 and not in the client matrix yet. Use a **job handle + `status` tool**, which the spec endorses as server-minted handles passed back as arguments |
+| **Sampling** | **Deprecated** (SEP-2577); Claude Code never shipped it | **Do not depend on it.** The SEP itself says servers that need an LLM should call a provider API directly, which matches D-L |
+| Elicitation | 2025-06-18; carried over MRTR in 2026-07-28 | Trust promotion (§8.1) and destructive confirmations |
+| **Skills extension** (`io.modelcontextprotocol/skills`, SEP-2640 Final) | Go SDK PR open (go-sdk#1238); partial client support | Ship a "how to use this KB" skill. Also ship a plain `SKILL.md` for other clients |
+| MCP Apps (`io.modelcontextprotocol/ui`) | Claude web/Desktop, Cursor, VS Code, ChatGPT | Optional curation/graph UI for chatbots later; irrelevant to coding agents |
+| Anthropic `search_result` blocks | GA | MCP has **no `search_result` content type**, and clients don't map tool results onto it. Shape `structuredContent` the same way (`source`, `title`, `content[]`). SEP-3094 "Granular Citations" is an open PR to watch |
+| Registry | preview, API frozen at v0.1 | Publish in step H, expecting changes |
 
 **Decision drivers**
 
@@ -586,7 +734,12 @@ the main risk. Mitigations:
   (resources plus `memo-mcp export --md`) that agents can grep and that AGENTS.md
   or Skills can link to.
 - **D-N (provenance and trust).** Provenance and trust go in the schema from the
-  first migration that touches documents.
+  first migration that touches documents. Revocation is a hard pre-ranking
+  filter.
+- **D-O (SDK and spec).** Upgrade go-sdk from v1.6.0 to **v1.8.0** and serve
+  2026-07-28 on stdio. Use `Stateless=true` if HTTP is ever added. Rely on no
+  server-side session state; `exclude_ids` and job handles travel as arguments.
+  Do not use sampling, roots, or logging.
 
 ---
 
@@ -632,7 +785,8 @@ L0  sources     uri, version, content_hash, fetched_at, trust, namespace  (prove
 ### 6.2 Schema sketch (additive migrations on the existing scaffold)
 
 ```sql
-sources   (id, namespace, uri, title, kind /*doc|note|code|conversation*/, version,
+sources   (id, namespace, uri, title, kind /*doc|note|code|conversation*/,
+           library /*e.g. "vercel/next.js"; nullable*/, version /*semver|git tag|SHA*/,
            content_hash, etag, fetched_at, ttl_s,
            trust  /*curated|user|agent — assigned by channel, §8.1*/,
            origin /*web|user-said|agent-derived — client-declared hint*/)
@@ -705,12 +859,13 @@ so on) are registered only when `MEMO_LEGACY_TOOLS=1` is set, for one release
 search(
   query | queries[]                                   # multi-query, fused with RRF
   mode:        auto|hybrid|keyword|exact|semantic|graph = auto
-  scope:       {namespaces[], kinds[], sources[], version, tags[], date_from, date_to,
-                min_trust}
+  scope:       {namespaces[], kinds[], sources[], library, version, tags[], date_from,
+                date_to, min_trust}                          # applied before top-k
   granularity: chunk|document|fact|page             = chunk   # small-to-big / compaction level
   as_of:       timestamp?                                     # bi-temporal "what was true then"
   response_format: concise|detailed                 = concise # IDs + titles + 1-liners first
   max_tokens:  int                                  = 2000    # server packs results to budget
+  exclude_ids: [uri]?                                         # already-read results; MCP is stateless
 )
 ```
 
@@ -728,10 +883,14 @@ How `search` behaves:
   `profile` enum is exposed only if the eval shows profiles matter per request.
 - **Results** are `search_result`-shaped structured content:
   - `uri`, `title`, `section_path`, `content`;
-  - `relevance` (raw cosine) plus a band (`strong`/`moderate`/`weak`);
+  - `relevance` (raw cosine) plus a band (`strong`/`moderate`/`weak`). The
+    list is cut at the first large score gap (autocut-style), never at a fixed
+    threshold;
   - `trust`, `version`, `stale`;
   - a `degraded` flag, and a next-step hint when matches are weak, which
     supports abstention.
+- **Truncation is explained.** When the budget cuts results off, a footer says
+  how many remain and which `scope` field would narrow the search.
 - **Retrieved text is wrapped as data**, never as instructions.
 
 ### 6.4 Where computation happens
@@ -755,6 +914,9 @@ How `search` behaves:
     document with front-matter provenance. AGENTS.md or Skills can link it, and
     plain grep works on it. This also covers "passive context beats tools the
     agent forgets to call."
+  - **`memo-mcp export --index [--ns … --library …@…]`** writes an index of at
+    most 8 KB, sized to be pasted into or linked from AGENTS.md or CLAUDE.md.
+    This is the shape that scored 100% in Vercel's eval (§4.1).
 - **Both** can load a compact per-namespace index resource
   (`memo://ns/{namespace}/index`) at session start. It has `MEMORY.md`-style
   one-liners per page or topic and mirrors Claude Code Auto Memory and Letta
@@ -772,9 +934,9 @@ each step gated on `make eval` showing no regression:
 |---|---|---|
 | **A. Chunks** | `internal/chunk`, `chunks`, external-content FTS (stemmed + exact), chunk vectors, `models` table with dim as a parameter, backfill worker | Roadmap Phase 2 unchanged, plus the exact-match FTS and the `models` table pulled forward |
 | **B. Sources & time** | `sources` (provenance, trust, version, hash), `documents` generalising `entries`, `namespace` column, bi-temporal fields, `ingest` / `remember` / `forget` | Merges roadmap Phase 4 with D-B and D-N |
-| **C. Lab** | Embedder bake-off: granite-r2 small/base, Qwen3-0.6B, potion, MiniLM, and opt-in Gemma-256d, with **GoMLX latency measured**; the default must be Apache/MIT. Optional reranker, named profiles, `memo-mcp eval --strategy … --profile …` | Roadmap Phase 3 |
+| **C. Lab** | **First, a GoMLX op-coverage smoke test per model.** Then the embedder bake-off: granite-r2 small/base, granite-97m-r2, arctic-m-v2, Qwen3-0.6B, potion, MiniLM, and opt-in Gemma-256d, with **GoMLX latency measured**; the default must be Apache/MIT. Optional reranker (ms-marco-MiniLM, then Ettin-17M/32M). Named profiles, including RRF and linear fusion. `memo-mcp eval --strategy … --profile …` | Roadmap Phase 3 |
 | **D. Eval expansion** | Add LongMemEval-style categories: **knowledge update, temporal/as-of, abstention, multi-hop, version-pinned code lookup, conflict, cross-namespace**. Add a cost column (ms, tokens returned, write-path cost). Add a **"raw chunks + agent iterating" baseline** and a plain BM25 baseline that every L3–L5 feature must beat. Hold the embedder fixed when comparing architectures (MemDelta). Measure **write loss** separately from **retrieval loss** (WhenLoss), and check derived records for omission and corruption (TRUSTMEM). Plant validity intervals first, Veracium-style | New; **gates E–G** |
-| **E. Access surface** | `search` v2 (§6.3), `read`, resources, structured `search_result` output, budget packing, `export --md` | Roadmap Phase 5's annotations/outputSchema/resources, retargeted |
+| **E. Access surface** | go-sdk v1.6.0 → v1.8.0 with the 2026-07-28 spec (D-O). `search` v2 (§6.3), `read`, resources with `ttlMs`, structured `search_result`-shaped output plus a text mirror, annotations, budget packing, `export --md` / `--index`. A "using memo" `SKILL.md` | Roadmap Phase 5's annotations/outputSchema/resources, retargeted |
 | **F. Facts & graph** | Facts as extra keys. **Then an entity-match arm in RRF** (Mem0 v3 / Graphiti / Supermemory all have one; it is cheap and needs no edges). Then heuristic + client-supplied entities with deterministic resolution (D-H2), aliases, **entity↔chunk mention edges** (rung 1), a PPR arm over an in-memory CSR with hub penalisation, `explore`, and routing in `auto`. Typed entity↔entity edges are optional rung 2. Eval includes an **update-stream test**: index half the corpus, add the rest in batches, and check that old queries don't regress. Graph edges ship only if they beat the entity arm on the multi-hop eval: Mem0g gained only ~1.5 pp before Mem0 removed it from OSS | Replaces `graphrag-evolution-plan.md` Phases 1–3 |
 | **G. Compaction** | `compact` / `submit` jobs: dedup/conflict items, `merge_candidates`, Louvain topics (only if the eval contains global questions), entity/topic pages, a **lint** pass (contradictions, orphans, stale claims), staleness sweep; optional Ollama executor (non-thinking model, constrained JSON) | Replaces old plan's Phase 5; new |
 | **H. Ship** | CI, GoReleaser, registry | Roadmap Phase 6 |
@@ -940,12 +1102,17 @@ every result, and conflict resolution and compaction respect the levels.
 
 Re-verify each of these before building on it or citing it:
 
-- **MCP 2026-07-28:** whether the revision contains everything the roadmap
-  claims (stateless core, `server/discover`, sampling/roots/logging
-  deprecation), and go-sdk v1.7.0's feature set. The research could confirm
-  2025-11-25 (Tasks, extensions) but **not every 2026-07-28 item**.
-- Go SDK support for MCP Tasks; Claude Code passing `search_result` blocks
-  through from MCP tools.
+- **MCP 2026-07-28:** now **confirmed** by the official changelog and launch
+  post: stateless core, `server/discover`, MRTR, `ttlMs`, Tasks moved to an
+  extension, and the sampling/roots/logging deprecation in SEP-2577. Go SDK
+  v1.7.0 and v1.8.0 release notes were read as well.
+- Still open:
+  - Go SDK support for the Tasks extension. It appears to be absent, but that
+    rests on the release notes plus a third-party issue.
+  - Claude Code support for resource templates.
+  - SEP-3094 contents (only its title has been seen).
+- Maturity of `gotreesitter` / `malivvan/tree-sitter`; the Context7 CVE fix
+  status; Mem0 OpenMemory sunset (third-party report).
 - EmbeddingGemma and Qwen3 CPU latency under hugot's GoMLX backend (no published
   numbers); whether hugot exposes token-level outputs (needed for late
   chunking).
@@ -961,6 +1128,12 @@ Re-verify each of these before building on it or citing it:
 - Vercel's AGENTS.md-vs-Skills eval details; AGENTS.md stewardship under the
   Linux Foundation.
 - Claude Code "Auto Dream" consolidation details.
+- §3 follow-up items:
+  - **Which ONNX graphs hugot/GoMLX can run beyond MiniLM** (ModernBERT,
+    Gemma3, Qwen3). This is the largest single risk for D-I and D-J.
+  - The granite-small-english-r2 dimension (384 assumed).
+  - Ettin CPU throughput, measured in PyTorch, not Go.
+  - ConTEB contextual vs late-chunking figures (secondary source).
 - §2 follow-up items: the LightRAG HotpotQA token count, the maturity of a
   Go Leiden implementation, GoMLX support for GLiNER/DeBERTa, and RAGSearch's
   corpus setup (graphs built per question, which favours the graph). LiteRAG,
