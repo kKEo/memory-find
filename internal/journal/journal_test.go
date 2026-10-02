@@ -362,3 +362,21 @@ func searchString(s, substr string) bool {
 	}
 	return false
 }
+
+// EmbedBatch/Info satisfy the Embedder v2 interface; the legacy journal
+// package only ever calls Embed and is deleted in roadmap P2.
+func (e *lengthLimitedEmbedder) EmbedBatch(ctx context.Context, texts []string, _ embedding.Role) ([][]float32, error) {
+	out := make([][]float32, len(texts))
+	for i, t := range texts {
+		v, err := e.Embed(ctx, t)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = v
+	}
+	return out, nil
+}
+
+func (e *lengthLimitedEmbedder) Info() embedding.ModelInfo {
+	return embedding.ModelInfo{ID: "test", Dim: 384}
+}

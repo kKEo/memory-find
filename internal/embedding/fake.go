@@ -42,6 +42,21 @@ func (h *HashEmbedder) Embed(_ context.Context, text string) ([]float32, error) 
 	return HashEmbed(text, h.dim), nil
 }
 
+// EmbedBatch embeds each text independently; roles are ignored because the
+// hash embedder has no prefixes.
+func (h *HashEmbedder) EmbedBatch(_ context.Context, texts []string, _ Role) ([][]float32, error) {
+	out := make([][]float32, len(texts))
+	for i, t := range texts {
+		out[i] = HashEmbed(t, h.dim)
+	}
+	return out, nil
+}
+
+// Info describes the fake as a model so tests can key vectors by it.
+func (h *HashEmbedder) Info() ModelInfo {
+	return ModelInfo{ID: "hash", Name: "hash-embedder (test)", HFRepo: "", Dim: h.dim, MaxTokens: 1 << 20, Normalize: true, Licence: "n/a"}
+}
+
 var _ Embedder = (*HashEmbedder)(nil)
 
 // HashEmbed computes the same vector HashEmbedder.Embed would, without the
@@ -126,6 +141,14 @@ func NewFailingEmbedder(err error) *FailingEmbedder {
 
 func (f *FailingEmbedder) Embed(_ context.Context, _ string) ([]float32, error) {
 	return nil, f.Err
+}
+
+func (f *FailingEmbedder) EmbedBatch(_ context.Context, _ []string, _ Role) ([][]float32, error) {
+	return nil, f.Err
+}
+
+func (f *FailingEmbedder) Info() ModelInfo {
+	return ModelInfo{ID: "failing", Name: "failing-embedder (test)", Dim: 384, MaxTokens: 512}
 }
 
 var _ Embedder = (*FailingEmbedder)(nil)
