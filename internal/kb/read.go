@@ -245,7 +245,7 @@ func (s *Store) List(ctx context.Context, opts ListOptions) ([]ListEntry, error)
 		q += ` AND d.updated_at >= ?`
 		args = append(args, opts.Since.UnixMilli())
 	}
-	q += ` ORDER BY d.updated_at DESC LIMIT ?`
+	q += ` ORDER BY d.updated_at DESC, d.rowid DESC LIMIT ?`
 	args = append(args, opts.Limit)
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -572,4 +572,28 @@ func (s *Store) QueryLogPrune(ctx context.Context, maxRows int, maxAge time.Dura
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+// Neighbours returns the text of the chunks just before and after c in its
+// document (empty strings at the edges), for "detailed" results that show a
+// passage in context.
+func (s *Store) Neighbours(ctx context.Context, c *ChunkRead) (prev, next string, err error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT ord, text FROM chunks WHERE document_id = ? AND ord IN (?, ?)`, c.DocumentID, c.Ord-1, c.Ord+1)
+	if err != nil {
+		return "", "", err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var ord int
+		var text string
+		if err := rows.Scan(&ord, &text); err != nil {
+			return "", "", err
+		}
+		if ord < c.Ord {
+			prev = text
+		} else {
+			next = text
+		}
+	}
+	return prev, next, rows.Err()
 }

@@ -235,6 +235,20 @@ func TestSearchAndExplainCommands(t *testing.T) {
 	if code != 0 || !strings.Contains(out, "no results") {
 		t.Fatalf("abstention: %s", out)
 	}
+	// log replay turns the logged searches into unlabelled eval candidates.
+	out, _, code = run("log", "replay")
+	if code != 0 || !strings.Contains(out, `"query":"ERR_CONN_RESET"`) || !strings.Contains(out, `"category":"unlabelled"`) {
+		t.Fatalf("log replay: %s", out)
+	}
+	// export --index is the AGENTS.md view: one line per document, under the cap.
+	out, _, code = run("export", "--index", "--max-bytes", "8192")
+	if code != 0 || !strings.Contains(out, "memo://doc/") || !strings.Contains(out, "# memo-mcp knowledge base index") || len(out) > 8192 {
+		t.Fatalf("export --index: %d bytes, code %d\n%s", len(out), code, out)
+	}
+	out, _, code = run("export", "--index", "--max-bytes", "300")
+	if code != 0 || len(out) > 300 || !strings.Contains(out, "omitted to fit") {
+		t.Fatalf("export --index cap: %d bytes\n%s", len(out), out)
+	}
 }
 
 // Facts, forgetting and trust from the terminal: the CLI is the human channel,

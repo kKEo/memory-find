@@ -105,6 +105,11 @@ type Response struct {
 	Degraded bool     `json:"degraded"`
 	Reason   string   `json:"reason,omitempty"` // set on abstention
 	Hint     string   `json:"hint,omitempty"`
+	// Truncated is how many ranked results the token budget left out, and
+	// NarrowHint how to get a shorter list; present in every format so the
+	// text mirror can say it.
+	Truncated  int    `json:"truncated,omitempty"`
+	NarrowHint string `json:"narrow_hint,omitempty"`
 }
 
 // candidate accumulates one chunk's evidence across arms.
@@ -401,8 +406,25 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 	used := 0
 	for i, c := range list {
 		content := c.text
-		if req.ResponseFormat == FormatConcise {
+		switch req.ResponseFormat {
+		case FormatConcise:
 			content = oneLiner(c.text)
+		case FormatDetailed, FormatExplain:
+			// Detailed shows the passage with its neighbours so the agent
+			// reads it in context without a second call (small-to-big).
+			if cr, err := s.store.ReadChunk(ctx, c.chunkID); err == nil {
+				if prev, next, err := s.store.Neighbours(ctx, cr); err == nil && (prev != "" || next != "") {
+					var sb strings.Builder
+					if prev != "" {
+						sb.WriteString("[…before:] " + oneLiner(prev) + "\n\n")
+					}
+					sb.WriteString(c.text)
+					if next != "" {
+						sb.WriteString("\n\n[…after:] " + oneLiner(next))
+					}
+					content = sb.String()
+				}
+			}
 		}
 		cost := chunk.EstimateTokens(content) + 24 // ~24 tokens of metadata per result
 		if used+cost > req.MaxTokens && len(resp.Results) > 0 {
@@ -419,6 +441,7 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 		resp.Results = append(resp.Results, r)
 	}
 	tr.Budget.Used = used
+	resp.Truncated, resp.NarrowHint = tr.Budget.TruncatedCount, tr.Budget.NarrowHint
 	if req.ResponseFormat == FormatExplain {
 		resp.Trace = tr
 	}

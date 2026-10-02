@@ -260,7 +260,7 @@ number and the decision.
 | S4 | GoMLX op coverage: which candidate ONNX models load and embed sanely under `hugot.NewGoSession` (`sim(a,a') > sim(a,b)`), at what p50 latency for 256 tokens and batch 16? Candidates: MiniLM (control), granite-small-r2, granite-r2, granite-97m-multilingual-r2, arctic-embed-m-v2, Qwen3-Embedding-0.6B, EmbeddingGemma-300M q8, potion-retrieval-32M (no ONNX); rerankers ms-marco-MiniLM-L-6-v2, Ettin-17M/32M | P3 bake-off (D-I, D-J) | table: loads, sane, dims, p50 ms, licence; failures dropped | MiniLM and potion are the floor; the schema never depends on a dimension | P0 (quick), P3 (full) |
 | S5 | Pure-Go tree-sitter (`odvcencio/gotreesitter`, `malivvan/tree-sitter` on wazero): parses Go, TypeScript and Python samples without panics; binary growth under 10 MB? | P1 code chunking (OD-17) | both criteria | heading- and fence-aware splitter plus `go/parser` | P1 |
 | S6 | CSR adjacency and personalised PageRank on a 100k-node power-law graph: build time, power-iteration time, hub-capped fixed-depth joins versus recursive CTEs; is a Go Louvain available? | P7 graph arm | PPR under 50 ms at 100k nodes / 1M edges; adjacency load under 500 ms | cap hops at 1–2, cache per namespace, skip Louvain | P7 |
-| S7 | Does elicitation over stdio work in Claude Code: does the dialog show, are accept and decline respected? | P5 `promote` | manual test recorded | `promote` returns the CLI command | P4/P5 |
+| S7 | Does elicitation over stdio work in Claude Code: does the dialog show, are accept and decline respected? | P5 `promote` | manual test recorded | `promote` returns the CLI command | P4/P5 (SDK side done: `docs/spikes/S7-elicitation.md`; live Claude Code check open) |
 
 ---
 
@@ -754,8 +754,8 @@ less and shipped two phases in a month, so treat these as ranges, not promises.
 > for documents and facts, stopwords dropped from keyword queries. Tools `remember`, `forget`,
 > `promote` (seven in total) and `search.as_of`; CLI `remember | forget | facts ls | trust |
 > read --history`. Eval slices: knowledge-update, temporal, fact-key, conflict, revocation,
-> write-loss, poisoning (`docs/eval/v0.8.0.md`). Spike S7 (elicitation in a real client) is
-> deferred to P5 where `promote` is wired to it. Remaining: commit, CI, `git tag -a v0.8.0`.
+> write-loss, poisoning (`docs/eval/v0.8.0.md`). Spike S7 (elicitation in a real client) ran
+> in P5, where `promote` is wired to it. Remaining: commit, CI, `git tag -a v0.8.0`.
 
 
 - **Story.** (a) `remember`; (b) correctness of cited answers.
@@ -823,6 +823,23 @@ less and shipped two phases in a month, so treat these as ranges, not promises.
 - **Effort.** 4–5 days.
 
 ### P5 — The agent surface · 4 days · `v0.9.0`
+
+> **Status (2026-10-02): built.** Seven tool descriptions each carry an example; `search`
+> returns the token-budget footer (`truncated`, `narrow_hint`) in every format and the text
+> mirror says it; `detailed` shows a passage with its neighbours (small-to-big); `promote` asks
+> the human through a multi round-trip elicitation on 2026-07-28 (the first call returns the
+> question with excerpt, source, origin and target level; the retry carries the answer; the
+> request state binds the answer to that exact promotion) and falls back to the CLI command on
+> clients without the capability (spike S7, `docs/spikes/S7-elicitation.md`). Resources mirror
+> the read tools (`memo://doc|chunk|source|fact/{id}` templates, `memo://ns/{namespace}/index`,
+> static `memo://index`) with `SetCacheable` hints (tools 1 h, resource reads 1 min);
+> `export --index` (≤ 8 KB, footer counts omitted lines); `SKILL.md`; `log replay` (logged
+> searches as unlabelled eval candidates). Tests: resources list and read, elicitation accept,
+> decline and no-capability, budget footer, neighbours, README tool table against the golden.
+> Eval unchanged from v0.8.0 (protocol-only phase). Not done: a live check in Claude Code of
+> template resolution and the dialog (recorded as open in S7). Remaining: commit, `git tag -a
+> v0.9.0`.
+
 
 - **Story.** (a) and (b) complete at chunk and fact level.
 - **Goal.** Give coding agents and chatbots a small, typed, budgeted tool surface with examples,

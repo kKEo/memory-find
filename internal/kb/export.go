@@ -206,3 +206,95 @@ func shortID(id string) string {
 	}
 	return id
 }
+
+// IndexOptions filters ExportIndex.
+type IndexOptions struct {
+	Namespace string
+	Library   string
+	Version   string
+	MaxBytes  int // default 8192: the size that scored 100% in Vercel's AGENTS.md eval
+}
+
+// ExportIndex writes a compact markdown index of the knowledge base, sized
+// for AGENTS.md or CLAUDE.md: one line per document (title, address, kind,
+// version) grouped by namespace, with facts summarised, cut to MaxBytes with
+// a note saying how many lines were left out. Agents read it passively, so
+// it must be short and must say how to get the rest.
+func (s *Store) ExportIndex(ctx context.Context, opts IndexOptions) (string, error) {
+	if opts.MaxBytes <= 0 {
+		opts.MaxBytes = 8192
+	}
+	entries, err := s.List(ctx, ListOptions{Namespace: opts.Namespace, Limit: 1 << 20})
+	if err != nil {
+		return "", err
+	}
+	var kept []ListEntry
+	for _, e := range entries {
+		if opts.Library != "" && e.Library != opts.Library {
+			continue
+		}
+		if opts.Version != "" && e.Version != opts.Version {
+			continue
+		}
+		kept = append(kept, e)
+	}
+	facts, err := s.ListFacts(ctx, FactFilter{Namespace: opts.Namespace, Limit: 1 << 20})
+	if err != nil {
+		return "", err
+	}
+	var header strings.Builder
+	fmt.Fprintf(&header, "# memo-mcp knowledge base index (%d documents, %d facts)\n\n", len(kept), len(facts))
+	header.WriteString("Search with the `search` tool (scope by namespace/library/version), read an address with `read`. Lines: title · address · kind · version · trust.\n")
+	var lines []string
+	byNS := map[string][]ListEntry{}
+	var nsOrder []string
+	for _, e := range kept {
+		if _, ok := byNS[e.Namespace]; !ok {
+			nsOrder = append(nsOrder, e.Namespace)
+		}
+		byNS[e.Namespace] = append(byNS[e.Namespace], e)
+	}
+	sort.Strings(nsOrder)
+	for _, ns := range nsOrder {
+		lines = append(lines, "", "## "+ns)
+		list := byNS[ns]
+		sort.Slice(list, func(i, j int) bool { return list[i].Title < list[j].Title })
+		for _, e := range list {
+			v := ""
+			if e.Version != "" {
+				v = " · " + e.Version
+			}
+			lines = append(lines, fmt.Sprintf("- %s · %s · %s%s · %s", orTitle(e.Title), e.URI, e.Kind, v, e.Trust))
+		}
+	}
+	if len(facts) > 0 {
+		lines = append(lines, "", "## facts")
+		for _, f := range facts {
+			lines = append(lines, fmt.Sprintf("- %s · %s · %s", oneLineIndex(f.Statement, 100), f.URI, f.Trust))
+		}
+	}
+	out := header.String()
+	budget := opts.MaxBytes - len(out) - 80 // room for the footer
+	used := 0
+	written := 0
+	for _, l := range lines {
+		if used+len(l)+1 > budget {
+			break
+		}
+		out += l + "\n"
+		used += len(l) + 1
+		written++
+	}
+	if written < len(lines) {
+		out += fmt.Sprintf("\n_%d more line(s) omitted to fit %d bytes; use `search` or `memo-mcp ls`._\n", len(lines)-written, opts.MaxBytes)
+	}
+	return out, nil
+}
+
+func oneLineIndex(s string, max int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if r := []rune(s); len(r) > max {
+		return string(r[:max]) + "…"
+	}
+	return s
+}

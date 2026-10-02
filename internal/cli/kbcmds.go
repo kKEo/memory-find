@@ -341,17 +341,30 @@ func runExport(ctx context.Context, args []string, stdout, stderr io.Writer) err
 	fs.SetOutput(stderr)
 	md := fs.String("md", "", "directory to write markdown files into")
 	ns := fs.String("ns", "", "only this namespace")
+	index := fs.Bool("index", false, "print a compact index for AGENTS.md/CLAUDE.md instead of writing files")
+	library := fs.String("library", "", "with --index: only this library, as name or name@version")
+	maxBytes := fs.Int("max-bytes", 8192, "with --index: size cap")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return err
 	}
-	if *md == "" {
-		return errors.New("usage: memo-mcp export --md <dir> [--ns <name>]")
+	if *md == "" && !*index {
+		return errors.New("usage: memo-mcp export --md <dir> [--ns <name>] | export --index [--ns <name>] [--library x@v] [--max-bytes 8192]")
 	}
 	store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
 	if err != nil {
 		return err
 	}
 	defer closeFn()
+	if *index {
+		opts := kb.IndexOptions{Namespace: *ns, MaxBytes: *maxBytes}
+		opts.Library, opts.Version, _ = strings.Cut(*library, "@")
+		text, err := store.ExportIndex(ctx, opts)
+		if err != nil {
+			return err
+		}
+		_, err = io.WriteString(stdout, text)
+		return err
+	}
 	res, err := store.Export(ctx, *md, kb.ExportOptions{Namespace: *ns})
 	if err != nil {
 		return err
@@ -649,7 +662,7 @@ func splitCSV(s string) []string {
 
 func runLog(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: memo-mcp log tail [--n 20] | show <id> | prune")
+		return errors.New("usage: memo-mcp log tail [--n 20] | show <id> | replay [--n 200] | prune")
 	}
 	sub, rest := args[0], args[1:]
 	store, closeFn, err := openStore(ctx, stderr, kb.Options{NoCreate: true}, nil)
@@ -692,6 +705,32 @@ func runLog(ctx context.Context, args []string, stdout, stderr io.Writer) error 
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(e)
+	case "replay":
+		// Turns logged queries into unlabelled eval candidates: one JSON
+		// object per line with the query, scope, and the addresses that
+		// came back, ready to be labelled and pasted into a corpus file.
+		fs := flag.NewFlagSet("log replay", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		n := fs.Int("n", 200, "rows")
+		if _, err := parseInterspersed(fs, rest); err != nil {
+			return err
+		}
+		entries, err := store.QueryLogTail(ctx, *n)
+		if err != nil {
+			return err
+		}
+		enc := json.NewEncoder(stdout)
+		for _, e := range entries {
+			var args map[string]any
+			_ = json.Unmarshal([]byte(e.Args), &args)
+			var top []string
+			_ = json.Unmarshal(e.TopURIs, &top)
+			cand := map[string]any{"id": fmt.Sprintf("log-%d", e.ID), "query": loggedQueries(e.Args), "scope": args["scope"], "mode": e.Mode, "returned": top, "relevant": []string{}, "irrelevant": []string{}, "category": "unlabelled"}
+			if err := enc.Encode(cand); err != nil {
+				return err
+			}
+		}
+		return nil
 	case "prune":
 		n, err := store.QueryLogPrune(ctx, 10000, 30*24*time.Hour)
 		if err != nil {
