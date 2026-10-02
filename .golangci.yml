@@ -1,0 +1,30 @@
+# Lint configuration (roadmap P0). Beyond the defaults, the checkers enabled
+# here target the bug classes this codebase has actually had: unchecked
+# errors, unchecked rows.Err(), unclosed rows and bodies.
+#
+# errcheck exclusions are deliberate and narrow: writes to stdout/stderr via
+# fmt.Fprint*, and deferred cleanup calls whose error has nowhere useful to
+# go (Close/Rollback/Destroy/Unlock/RemoveAll). Everything else must be
+# checked.
+version: "2"
+linters:
+  enable:
+    - errcheck
+    - rowserrcheck
+    - sqlclosecheck
+    - bodyclose
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*database/sql.Rows).Close
+        - (*database/sql.DB).Close
+        - (*database/sql.Stmt).Close
+        - (*database/sql.Tx).Rollback
+        - (*os.File).Close
+        - os.RemoveAll
+        - (*github.com/gofrs/flock.Flock).Unlock
+        - (*github.com/knights-analytics/hugot.Session).Destroy
+        - (*github.com/modelcontextprotocol/go-sdk/mcp.ClientSession).Close

@@ -16,7 +16,7 @@ import (
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
 
-	"github.com/kmaziarz/memo-mcp/internal/embedding"
+	"github.com/kKEo/memory-find/internal/embedding"
 )
 
 func testDB(t *testing.T) *sql.DB {
@@ -64,7 +64,9 @@ func TestWriteAndReadBack(t *testing.T) {
 	}
 
 	var sections []string
-	json.Unmarshal([]byte(sectionsJSON), &sections)
+	if err := json.Unmarshal([]byte(sectionsJSON), &sections); err != nil {
+		t.Fatalf("sections JSON: %v", err)
+	}
 	if len(sections) != 2 {
 		t.Errorf("expected 2 sections, got %d: %v", len(sections), sections)
 	}

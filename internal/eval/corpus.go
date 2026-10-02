@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kmaziarz/memo-mcp/internal/journal"
-	"github.com/kmaziarz/memo-mcp/internal/search"
+	"github.com/kKEo/memory-find/internal/journal"
+	"github.com/kKEo/memory-find/internal/search"
 )
 
 // longFiller generates repeated, topic-flavored filler text long enough

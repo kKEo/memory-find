@@ -8,11 +8,12 @@ What is current, what is history, and where to start. Dates are the last substan
 |---|---|---|
 | [`roadmap.md`](roadmap.md) | The plan: ten phases from "reset the map" to an explainable local knowledge base, with decisions, spikes, verification and a glossary. Start here. | 2026-10-02 |
 | [`knowledge-base-sota.md`](knowledge-base-sota.md) | The research behind the roadmap: agent memory systems, graph RAG, retrieval, MCP, security, with the decision drivers (D-A … D-O) the roadmap cites. Long and technical; the roadmap's glossary defines its terms. | 2026-10-02 (links) |
+| [`spikes/`](spikes/) | One note per spike (S1 go-sdk bump, S2 vector storage, S3 FTS5, S4 embedding models): the question, the number, the decision. | 2026-10-02 |
 
 ## Planned documents
 
-These are created by the roadmap phases named: `schema.md` (P1), `spikes/` (P0 onward),
-`eval/` (P2 onward), `architecture.md` (P6).
+These are created by the roadmap phases named: `schema.md` (P1), `eval/` (P2 onward),
+`architecture.md` (P6).
 
 ## History (superseded, kept for the record)
 

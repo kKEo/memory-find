@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kmaziarz/memo-mcp/internal/embedding"
+	"github.com/kKEo/memory-find/internal/embedding"
 )
 
 type Manager struct {

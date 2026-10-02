@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kmaziarz/memo-mcp/internal/embedding"
-	"github.com/kmaziarz/memo-mcp/internal/journal"
-	"github.com/kmaziarz/memo-mcp/internal/search"
+	"github.com/kKEo/memory-find/internal/embedding"
+	"github.com/kKEo/memory-find/internal/journal"
+	"github.com/kKEo/memory-find/internal/search"
 )
 
 // FixtureEntry is one journal entry in the eval corpus. Key is a stable,

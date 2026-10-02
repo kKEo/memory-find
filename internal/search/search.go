@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -12,8 +13,8 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/kmaziarz/memo-mcp/internal/embedding"
-	"github.com/kmaziarz/memo-mcp/internal/journal"
+	"github.com/kKEo/memory-find/internal/embedding"
+	"github.com/kKEo/memory-find/internal/journal"
 )
 
 type Service struct {
@@ -604,6 +605,9 @@ func (s *Service) GetStats(ctx context.Context) (*JournalStats, error) {
 		}
 		stats.SectionCounts[section] = count
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate sections: %w", err)
+	}
 
 	// Query 5: Recent activity (7 and 30 days)
 	for _, days := range []int{7, 30} {
@@ -617,13 +621,15 @@ func (s *Service) GetStats(ctx context.Context) (*JournalStats, error) {
 	}
 
 	// Query 6: Average entry length
-	var avgLength sql.NullInt64
+	// AVG() returns a float even over integer lengths, so scanning into an
+	// integer type fails whenever the mean is not whole (e.g. 83.5).
+	var avgLength sql.NullFloat64
 	err = s.db.QueryRowContext(ctx, `SELECT AVG(LENGTH(content)) FROM entries`).Scan(&avgLength)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("avg length: %w", err)
 	}
 	if avgLength.Valid {
-		stats.AvgEntryLength = int(avgLength.Int64)
+		stats.AvgEntryLength = int(math.Round(avgLength.Float64))
 	}
 
 	// Query 7: Database path and size

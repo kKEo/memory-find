@@ -15,9 +15,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kmaziarz/memo-mcp/internal/embedding"
-	"github.com/kmaziarz/memo-mcp/internal/journal"
-	"github.com/kmaziarz/memo-mcp/internal/search"
+	"github.com/kKEo/memory-find/internal/embedding"
+	"github.com/kKEo/memory-find/internal/journal"
+	"github.com/kKEo/memory-find/internal/search"
 )
 
 var updateGolden = flag.Bool("update", false, "update golden files")
@@ -42,7 +42,7 @@ func newTestSession(t *testing.T) (*mcp.ClientSession, *sql.DB) {
 	t.Cleanup(func() { db.Close() })
 
 	emb := embedding.NewHashEmbedder(384)
-	srv := New(journal.NewManager(db, emb), search.NewService(db, emb))
+	srv := New(journal.NewManager(db, emb), search.NewService(db, emb), "test")
 
 	clientTransport, serverTransport := mcp.NewInMemoryTransports()
 
@@ -298,4 +298,19 @@ func TestStructuredContentValidates(t *testing.T) {
 // throughout (a private journal is a closed world).
 func TestAnnotations(t *testing.T) {
 	t.Skip("pending Phase 4: tools don't carry annotations yet")
+}
+
+// TestNegotiatesCurrentProtocolVersion pins the MCP spec date this server
+// speaks. It moved from 2025-11-25 (go-sdk v1.6.0) to 2026-07-28 with the
+// v1.8.0 bump; if a future SDK change alters the negotiated version, this
+// test is where the project finds out, not a client.
+func TestNegotiatesCurrentProtocolVersion(t *testing.T) {
+	cs, _ := newTestSession(t)
+	got := cs.InitializeResult().ProtocolVersion
+	if got != "2026-07-28" {
+		t.Fatalf("negotiated protocol version %q, want 2026-07-28", got)
+	}
+	if ProtocolVersion != got {
+		t.Fatalf("server.ProtocolVersion = %q but the SDK negotiated %q; update the constant", ProtocolVersion, got)
+	}
 }
