@@ -30,6 +30,15 @@ type ModelInfo struct {
 	DocPrefix        string
 	Normalize        bool
 	Licence          string
+	// Truncate keeps only the first N dimensions (Matryoshka models) and
+	// renormalises; 0 = full vector. Dim reports the stored size.
+	Truncate int
+	// Static marks a model2vec-style lookup-table model run without ONNX.
+	Static bool
+	// Files lists the extra files a static model needs.
+	Files []string
+	// Note is shown by `model ls` (size, caveats, opt-in reasons).
+	Note string
 }
 
 // ErrInputTooLong is returned when a text still exceeds the model's input

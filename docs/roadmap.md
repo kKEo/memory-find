@@ -639,6 +639,20 @@ less and shipped two phases in a month, so treat these as ranges, not promises.
 
 ### P3 — The lab: eval v2, embedding models, profiles · 6–7 days · `v0.7.0`
 
+> **Status (2026-10-02): built; bake-off numbers in `docs/eval/v0.7.0.md`.** Named profiles
+> with written derivations and JSON overrides (`default`, `precise`, `recency`, `code`,
+> `minmax`, `keyword-only`, `semantic-only`; `memo-mcp profiles show`); min-max score fusion as
+> an alternative to RRF; the model registry (`memo-mcp model ls|smoke|pull|use|redownload`,
+> `MEMO_MODEL`) with the hugot loader generalised to any ONNX export (external weight files,
+> pinned revisions, Matryoshka truncation) and a pure-Go static model2vec embedder (potion);
+> `memo-mcp reindex` with vectors for several models coexisting; the cross-encoder reranker
+> (`internal/rerank`, ms-marco-MiniLM) attached by `MEMO_RERANK=1` and used by `precise`; eval
+> v2: a second corpus (300-page library namespace, 5-note namespace, two versions of one page,
+> tail-only long documents, aged notes), categories, cost columns, the agent-iterating proxy, a
+> paired per-query gate, `memo-mcp eval`. Remaining before the tag: commit, CI green,
+> `git tag -a v0.7.0`.
+
+
 - **Story.** (d).
 - **Goal.** Write down the kinds of questions a knowledge base must answer and build fixtures for
   them; make every tuning constant a named, documented setting; make the embedding model

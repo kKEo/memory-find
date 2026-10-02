@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/kKEo/memory-find/internal/embedding"
+	"github.com/kKEo/memory-find/internal/eval"
 	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/rerank"
 	"github.com/kKEo/memory-find/internal/retrieve"
 )
 
@@ -440,6 +442,8 @@ func runSearch(ctx context.Context, args []string, stdout, stderr io.Writer, exp
 	explain := fs.Bool("explain", explainCmd, "include why each result ranked and the per-query trace")
 	maxTokens := fs.Int("max-tokens", 8000, "response budget in estimated tokens")
 	noEmbed := fs.Bool("no-model", false, "do not load the embedding model (keyword-only)")
+	profileName := fs.String("profile", os.Getenv("MEMO_PROFILE"), "ranking profile (see `memo-mcp profiles show`)")
+	withRerank := fs.Bool("rerank", os.Getenv("MEMO_RERANK") == "1", "attach the cross-encoder reranker (used by profiles with rerank on, e.g. precise)")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err
@@ -463,7 +467,19 @@ func runSearch(ctx context.Context, args []string, stdout, stderr io.Writer, exp
 		return err
 	}
 	defer closeFn()
-	svc := retrieve.New(store, retrieve.Default, cfg.LogQueries)
+	profile, err := retrieve.Lookup(*profileName)
+	if err != nil {
+		return err
+	}
+	svc := retrieve.New(store, profile, cfg.LogQueries)
+	if *withRerank {
+		rr, closeRR, err := loadReranker(ctx, stderr)
+		if err != nil {
+			return err
+		}
+		defer closeRR()
+		svc.WithReranker(rr)
+	}
 	rf := retrieve.FormatDetailed
 	if *explain || focus != "" {
 		rf = retrieve.FormatExplain
@@ -657,4 +673,323 @@ func loggedQueries(args string) string {
 		return args
 	}
 	return strings.Join(v.Queries, " | ")
+}
+
+func runModelLs(ctx context.Context, stdout, stderr io.Writer) error {
+	installed := map[string]kb.InstalledModel{}
+	if store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil); err == nil {
+		rows, err := store.InstalledModels(ctx)
+		closeFn()
+		if err != nil {
+			return err
+		}
+		for _, m := range rows {
+			installed[m.ID] = m
+		}
+	}
+	selected, _ := selectedModel()
+	fmt.Fprintf(stdout, "%-18s %-5s %-20s %-10s %s\n", "id", "dim", "licence", "vectors", "note")
+	for _, m := range embedding.Known {
+		marks := ""
+		if m.ID == selected.ID {
+			marks += "*"
+		}
+		if im, ok := installed[m.ID]; ok {
+			if im.IsDefault {
+				marks += " (kb default)"
+			}
+			fmt.Fprintf(stdout, "%-18s %-5d %-20s %-10d %s%s\n", m.ID, m.Dim, m.Licence, im.Vectors, m.Note, marks)
+		} else {
+			fmt.Fprintf(stdout, "%-18s %-5d %-20s %-10s %s%s\n", m.ID, m.Dim, m.Licence, "-", m.Note, marks)
+		}
+	}
+	fmt.Fprintln(stdout, "\n* = selected by MEMO_MODEL (or the registry default). `model smoke --all` tests which models load.")
+	return nil
+}
+
+// runModelSmoke downloads and loads candidate models, embeds three
+// sentences and checks sim(a,a') > sim(a,b), and times a ~256-token input.
+// It is spike S4 as a command, so the bake-off can repeat it anywhere.
+func runModelSmoke(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	var ids []string
+	all := false
+	for _, a := range args {
+		if a == "--all" {
+			all = true
+		} else {
+			ids = append(ids, a)
+		}
+	}
+	if all {
+		ids = nil
+		for _, m := range embedding.Known {
+			ids = append(ids, m.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return errors.New("usage: memo-mcp model smoke <id>... | --all")
+	}
+	fmt.Fprintln(stdout, "| model | loads | sane | dim | p50 ms (1 × ~256 tok) | p50 ms (batch 16) | note |")
+	fmt.Fprintln(stdout, "|---|---|---|---|---|---|---|")
+	for _, id := range ids {
+		info, err := embedding.LookupModel(id)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(stdout, embedding.Smoke(ctx, info, embedding.DefaultModelDir()))
+	}
+	return nil
+}
+
+func runReindex(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("reindex", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	model := fs.String("model", "", "model id (default: MEMO_MODEL or minilm)")
+	if _, err := parseInterspersed(fs, args); err != nil {
+		return err
+	}
+	if *model != "" {
+		if err := os.Setenv("MEMO_MODEL", *model); err != nil {
+			return err
+		}
+	}
+	embedder, cleanup, err := buildEmbedder(ctx)
+	if err != nil {
+		return fmt.Errorf("reindex needs the embedding model: %w", err)
+	}
+	defer cleanup()
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{NoCreate: true}, embedder)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	last := -1
+	n, err := store.Reindex(ctx, func(done, total int) {
+		pct := done * 100 / max(total, 1)
+		if pct/10 != last/10 {
+			fmt.Fprintf(stderr, "reindex %s: %d/%d (%d%%)\n", embedder.Info().ID, done, total, pct)
+			last = pct
+		}
+	})
+	fmt.Fprintf(stdout, "embedded %d chunk(s) with %s\n", n, embedder.Info().ID)
+	return err
+}
+
+func runProfiles(args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 || args[0] != "show" {
+		return errors.New("usage: memo-mcp profiles show [<name>]")
+	}
+	if len(args) == 2 {
+		p, err := retrieve.Lookup(args[1])
+		if err != nil {
+			return err
+		}
+		fmt.Fprint(stdout, retrieve.Describe(p))
+		return nil
+	}
+	for _, p := range retrieve.Profiles() {
+		fmt.Fprint(stdout, retrieve.Describe(p))
+		fmt.Fprintln(stdout)
+	}
+	return nil
+}
+
+// runEval is the lab instrument: it loads the fixture corpora into a fresh
+// temporary knowledge base with the chosen embedding model(s), runs the
+// labelled queries under the chosen profile(s), and prints quality next to
+// cost. It never touches the configured knowledge base.
+func runEval(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("eval", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	models := fs.String("models", "hash", "comma-separated model ids (hash = the deterministic test embedder; others download)")
+	profilesFlag := fs.String("profiles", "default", "comma-separated profile names, or 'all'")
+	corpus := fs.String("corpus", "all", "notes|kb|all")
+	format := fs.String("format", "table", "table|md|json")
+	explainFailures := fs.Bool("explain-failures", false, "print why each missed query was missed")
+	agentProxy := fs.Bool("agent-proxy", false, "add the two-round agent proxy strategy")
+	withRerank := fs.Bool("rerank", false, "attach the cross-encoder reranker so the precise profile can use it")
+	if _, err := parseInterspersed(fs, args); err != nil {
+		return err
+	}
+	var reranker rerank.Reranker
+	if *withRerank {
+		rr, closeRR, err := loadReranker(ctx, stderr)
+		if err != nil {
+			return err
+		}
+		defer closeRR()
+		reranker = rr
+	}
+	profileNames := splitCSV(*profilesFlag)
+	if *profilesFlag == "all" {
+		profileNames = nil
+		for _, p := range retrieve.Profiles() {
+			profileNames = append(profileNames, p.Name)
+		}
+	}
+	type run struct {
+		model, profile string
+		notes, kbRep   *eval.Report
+	}
+	var runs []run
+	for _, modelID := range splitCSV(*models) {
+		var emb embedding.Embedder
+		cleanup := func() {}
+		if modelID == "hash" {
+			emb = embedding.NewHashEmbedder(384)
+		} else {
+			info, err := embedding.LookupModel(modelID)
+			if err != nil {
+				return err
+			}
+			e, c, err := embedding.Load(ctx, info, embedding.DefaultModelDir())
+			if err != nil {
+				return fmt.Errorf("model %s: %w", modelID, err)
+			}
+			emb, cleanup = e, c
+		}
+		dir, err := os.MkdirTemp("", "memo-eval-")
+		if err != nil {
+			cleanup()
+			return err
+		}
+		db, err := kb.Open(ctx, dir, "eval", kb.Options{})
+		if err != nil {
+			cleanup()
+			return err
+		}
+		store := kb.NewStore(db, emb)
+		t0 := time.Now()
+		var notesIDs, kbIDs map[string]string
+		var loadStats *eval.LoadStats
+		if *corpus != "kb" {
+			if notesIDs, _, err = eval.Load(ctx, store, eval.ToDocs(eval.Corpus())); err != nil {
+				db.Close()
+				cleanup()
+				return err
+			}
+		}
+		if *corpus != "notes" {
+			if kbIDs, loadStats, err = eval.Load(ctx, store, eval.CorpusKB()); err != nil {
+				db.Close()
+				cleanup()
+				return err
+			}
+		}
+		fmt.Fprintf(stderr, "loaded corpora with %s in %.1fs\n", modelID, time.Since(t0).Seconds())
+		for _, pname := range profileNames {
+			p, err := retrieve.Lookup(pname)
+			if err != nil {
+				db.Close()
+				cleanup()
+				return err
+			}
+			svc := retrieve.New(store, p, false)
+			if reranker != nil {
+				svc.WithReranker(reranker)
+			}
+			r := run{model: modelID, profile: pname}
+			opts := eval.RunOptions{RealModel: modelID != "hash"}
+			if notesIDs != nil {
+				if r.notes, err = eval.Run(ctx, svc, notesIDs, eval.Queries(), opts); err != nil {
+					db.Close()
+					cleanup()
+					return err
+				}
+				r.notes.Strategy, r.notes.Model = pname, modelID
+			}
+			if kbIDs != nil {
+				if r.kbRep, err = eval.Run(ctx, svc, kbIDs, eval.QueriesKB(), opts); err != nil {
+					db.Close()
+					cleanup()
+					return err
+				}
+				r.kbRep.Strategy, r.kbRep.Model = pname, modelID
+				if loadStats != nil {
+					r.kbRep.Cost.WritePerDocMs, r.kbRep.Cost.Docs, r.kbRep.Cost.Chunks = loadStats.PerDocMs, loadStats.Docs, loadStats.Chunks
+				}
+			}
+			runs = append(runs, r)
+		}
+		if *agentProxy && kbIDs != nil {
+			r, err := eval.Run(ctx, retrieve.New(store, retrieve.Default, false), kbIDs, eval.QueriesKB(), eval.RunOptions{AgentProxy: true, RealModel: modelID != "hash"})
+			if err == nil {
+				r.Strategy, r.Model = "agent-proxy", modelID
+				runs = append(runs, run{model: modelID, profile: "agent-proxy", kbRep: r})
+			}
+		}
+		db.Close()
+		cleanup()
+		os.RemoveAll(dir)
+	}
+
+	switch *format {
+	case "json":
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(runs)
+	default:
+		var notes, kbs []*eval.Report
+		for _, r := range runs {
+			if r.notes != nil {
+				r.notes.Strategy = r.model + "/" + r.profile
+				notes = append(notes, r.notes)
+			}
+			if r.kbRep != nil {
+				r.kbRep.Strategy = r.model + "/" + r.profile
+				kbs = append(kbs, r.kbRep)
+			}
+		}
+		if len(notes) > 0 {
+			fmt.Fprint(stdout, eval.CompareMarkdown("notes corpus (79 docs, 29 queries)", notes))
+			fmt.Fprintln(stdout)
+		}
+		if len(kbs) > 0 {
+			fmt.Fprint(stdout, eval.CompareMarkdown("knowledge-base corpus (314 docs, 19 queries)", kbs))
+			fmt.Fprintln(stdout)
+		}
+		if *format == "md" && len(runs) == 1 {
+			if runs[0].notes != nil {
+				fmt.Fprint(stdout, runs[0].notes.Markdown("notes corpus: per query"))
+			}
+			if runs[0].kbRep != nil {
+				fmt.Fprint(stdout, runs[0].kbRep.Markdown("knowledge-base corpus: per query"))
+			}
+		}
+		if *explainFailures {
+			for _, r := range runs {
+				for _, rep := range []*eval.Report{r.notes, r.kbRep} {
+					if rep == nil {
+						continue
+					}
+					for _, q := range rep.PerQuery {
+						if q.Skipped || q.Abstained != nil || q.MRR == 1 {
+							continue
+						}
+						fmt.Fprintf(stdout, "miss  %s/%s  %s (%s): R@1 %.2f MRR %.2f nDCG %.2f; first relevant hit via %s\n", r.model, r.profile, q.QueryID, q.Category, q.RecallAt1, q.MRR, q.NDCG10, strings.Join(q.FirstHitArms, "+"))
+					}
+				}
+			}
+		}
+		return nil
+	}
+}
+
+// loadReranker loads the registry's default cross-encoder (MEMO_RERANKER
+// names another id).
+func loadReranker(ctx context.Context, stderr io.Writer) (rerank.Reranker, func(), error) {
+	id := os.Getenv("MEMO_RERANKER")
+	if id == "" {
+		id = "ms-marco-minilm"
+	}
+	info, err := rerank.Lookup(id)
+	if err != nil {
+		return nil, nil, err
+	}
+	ce, err := rerank.Load(ctx, info, embedding.DefaultModelDir())
+	if err != nil {
+		return nil, nil, fmt.Errorf("reranker: %w", err)
+	}
+	fmt.Fprintf(stderr, "reranker %s loaded\n", id)
+	return ce, ce.Close, nil
 }

@@ -272,3 +272,58 @@ func TestVectorRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+// Switching models: vectors for several models coexist, reindex fills the
+// gaps for the configured embedder, and the default is an explicit choice.
+func TestReindexAndSetDefaultModel(t *testing.T) {
+	db, err := Open(context.Background(), t.TempDir(), "t", Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := context.Background()
+	a := NewStore(db, embedding.NewHashEmbedder(32))
+	res, err := a.Ingest(ctx, docInput("grpc", "https://example.com/i", longDoc()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A second embedder with a different model id and dimension.
+	b := NewStore(db, &namedEmbedder{HashEmbedder: embedding.NewHashEmbedder(16), id: "other"})
+	n, err := b.Reindex(ctx, nil)
+	if err != nil || n != res.Chunks {
+		t.Fatalf("reindex: %d %v", n, err)
+	}
+	if n, _ = b.Reindex(ctx, nil); n != 0 {
+		t.Fatalf("second reindex should do nothing, did %d", n)
+	}
+	models, err := a.InstalledModels(ctx)
+	if err != nil || len(models) != 2 {
+		t.Fatalf("installed models: %+v %v", models, err)
+	}
+	if models[0].ID != "hash" || !models[0].IsDefault || models[0].Vectors != res.Chunks {
+		t.Fatalf("default should still be hash: %+v", models[0])
+	}
+	if err := a.SetDefaultModel(ctx, "other", "test", ChannelCLI); err != nil {
+		t.Fatal(err)
+	}
+	if id, _ := a.DefaultModelID(ctx); id != "other" {
+		t.Fatalf("default = %q", id)
+	}
+	if err := a.SetDefaultModel(ctx, "unknown", "test", ChannelCLI); err == nil {
+		t.Fatal("unknown model accepted as default")
+	}
+	if n := count(t, db, `SELECT COUNT(*) FROM audit WHERE op = 'model-use'`); n != 1 {
+		t.Fatalf("audit rows for model-use: %d", n)
+	}
+}
+
+type namedEmbedder struct {
+	*embedding.HashEmbedder
+	id string
+}
+
+func (n *namedEmbedder) Info() embedding.ModelInfo {
+	i := n.HashEmbedder.Info()
+	i.ID = n.id
+	return i
+}

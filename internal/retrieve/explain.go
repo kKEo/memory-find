@@ -17,18 +17,26 @@ type ArmHit struct {
 
 // Why explains one result.
 type Why struct {
-	URI           string    `json:"uri"`
-	Chunk         ChunkRef  `json:"chunk"`
-	Document      DocRef    `json:"document"`
-	Arms          []ArmHit  `json:"arms"`
-	Fused         float64   `json:"fused"`
-	RecencyFactor float64   `json:"recency_factor"`
-	Final         float64   `json:"final"`
-	Rank          int       `json:"rank"`
-	Relevance     *float64  `json:"relevance"` // best raw cosine; null when the semantic arm did not run
-	Band          string    `json:"band"`      // strong | moderate | weak | keyword-only
-	Provenance    ProvRef   `json:"provenance"`
-	Freshness     Freshness `json:"freshness"`
+	URI           string     `json:"uri"`
+	Chunk         ChunkRef   `json:"chunk"`
+	Document      DocRef     `json:"document"`
+	Arms          []ArmHit   `json:"arms"`
+	Fused         float64    `json:"fused"`
+	RecencyFactor float64    `json:"recency_factor"`
+	Final         float64    `json:"final"`
+	Rank          int        `json:"rank"`
+	Relevance     *float64   `json:"relevance"` // best raw cosine; null when the semantic arm did not run
+	Band          string     `json:"band"`      // strong | moderate | weak | keyword-only
+	Provenance    ProvRef    `json:"provenance"`
+	Freshness     Freshness  `json:"freshness"`
+	Rerank        *RerankHit `json:"rerank,omitempty"`
+}
+
+// RerankHit records what the cross-encoder did to one result.
+type RerankHit struct {
+	Model      string  `json:"model"`
+	Score      float64 `json:"score"`
+	BeforeRank int     `json:"before_rank"`
 }
 
 // ChunkRef locates the winning chunk.
@@ -79,6 +87,14 @@ type Trace struct {
 	LatencyMsPerArm  map[string]float64 `json:"latency_ms_per_arm"`
 	Degraded         Degraded           `json:"degraded"`
 	AsOf             *time.Time         `json:"as_of,omitempty"`
+	Rerank           *RerankTrace       `json:"rerank,omitempty"`
+}
+
+// RerankTrace says what the reranker was applied to.
+type RerankTrace struct {
+	Model     string  `json:"model"`
+	TopN      int     `json:"top_n"`
+	LatencyMs float64 `json:"latency_ms"`
 }
 
 // Filtered counts what the pre-ranking filters removed or constrained.

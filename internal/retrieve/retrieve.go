@@ -16,6 +16,7 @@ import (
 	"github.com/kKEo/memory-find/internal/chunk"
 	"github.com/kKEo/memory-find/internal/embedding"
 	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/rerank"
 )
 
 // Service runs searches over a knowledge base.
@@ -26,6 +27,13 @@ type Service struct {
 	profile    Profile
 	logQueries bool
 	now        func() time.Time
+	reranker   rerank.Reranker
+}
+
+// WithReranker attaches a cross-encoder; profiles with Rerank=true use it.
+func (s *Service) WithReranker(r rerank.Reranker) *Service {
+	s.reranker = r
+	return s
 }
 
 // New builds a Service. embedder may be nil (keyword-only, degraded).
@@ -152,6 +160,16 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 
 	// Resolve arms.
 	arms, reason := resolveArms(req.Mode, queries)
+	if len(p.Arms) > 0 {
+		var kept []string
+		for _, a := range arms {
+			if contains(p.Arms, a) {
+				kept = append(kept, a)
+			}
+		}
+		arms = kept
+		reason += "; profile " + p.Name + " restricts arms to " + strings.Join(p.Arms, "+")
+	}
 	tr.RoutingReason = reason
 	if s.embedder == nil && contains(arms, ArmSemantic) {
 		arms = remove(arms, ArmSemantic)
@@ -242,6 +260,9 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 	tr.ArmsRun = arms
 	tr.ModeResolved = strings.Join(arms, "+")
 	tr.ModelID = modelID
+	if p.Fusion == FusionMinMax {
+		minMaxFuse(cands, p)
+	}
 
 	// Semantic-only candidates below the floor are noise, not matches.
 	if p.SemanticFloor > 0 {
@@ -312,13 +333,39 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 		list = kept
 	}
 
-	// Cut: limit, then gap.
+	// Optional cross-encoder rerank of the top N (precise profile).
+	rerankHits := map[int64]*RerankHit{}
+	if p.Rerank && s.reranker != nil && len(list) > 1 {
+		n := p.RerankTopN
+		if n <= 0 || n > len(list) {
+			n = len(list)
+		}
+		t0 := s.now()
+		passages := make([]string, n)
+		for i := 0; i < n; i++ {
+			passages[i] = list[i].text
+		}
+		scores, err := s.reranker.Score(ctx, queries[0], passages)
+		if err != nil {
+			tr.Degraded = Degraded{Flag: true, Reason: "reranker failed: " + err.Error()}
+		} else {
+			for i := 0; i < n; i++ {
+				rerankHits[list[i].chunkID] = &RerankHit{Model: s.reranker.Name(), Score: scores[i], BeforeRank: i + 1}
+			}
+			head := list[:n]
+			sort.SliceStable(head, func(i, j int) bool { return rerankHits[head[i].chunkID].Score > rerankHits[head[j].chunkID].Score })
+			tr.Rerank = &RerankTrace{Model: s.reranker.Name(), TopN: n, LatencyMs: ms(s.now().Sub(t0))}
+		}
+	}
+
+	// Cut: limit, then gap (the gap cut is skipped after reranking: the
+	// fused scores no longer define the order).
 	tr.Cutoff = Cutoff{Kind: "none", Position: len(list)}
 	if len(list) > limit {
 		list = list[:limit]
 		tr.Cutoff = Cutoff{Kind: "limit", Position: limit}
 	}
-	if p.CutoffGap > 0 {
+	if p.CutoffGap > 0 && tr.Rerank == nil {
 		for i := 1; i < len(list); i++ {
 			if i >= p.MinResults && list[i].final < list[i-1].final*(1-p.CutoffGap) {
 				tr.Cutoff = Cutoff{Kind: "gap", Position: i, Gap: 1 - list[i].final/list[i-1].final}
@@ -345,7 +392,11 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 			break
 		}
 		used += cost
-		resp.Results = append(resp.Results, s.result(c, len(resp.Results)+1, content, req))
+		r := s.result(c, len(resp.Results)+1, content, req)
+		if h := rerankHits[c.chunkID]; h != nil && r.Why != nil {
+			r.Why.Rerank = h
+		}
+		resp.Results = append(resp.Results, r)
 	}
 	tr.Budget.Used = used
 	if req.ResponseFormat == FormatExplain {
@@ -464,12 +515,15 @@ func (s *Service) keywordArm(ctx context.Context, table, match, where string, ar
 // semanticArm embeds the query and scans the default model's vectors over
 // the scoped chunks. Returns the model id used ("" if embedding failed).
 func (s *Service) semanticArm(ctx context.Context, q, where string, args []any, depth int) ([]armRow, string, error) {
-	modelID, err := s.store.DefaultModelID(ctx)
-	if err != nil {
+	// Queries use the vectors of the model that embeds the query; vectors
+	// for other models may coexist in the table.
+	modelID := s.embedder.Info().ID
+	var have int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM chunk_vecs WHERE model_id = ?`, modelID).Scan(&have); err != nil {
 		return nil, "", err
 	}
-	if modelID == "" {
-		return nil, "", errors.New("no vectors stored yet")
+	if have == 0 {
+		return nil, "", fmt.Errorf("no vectors stored for model %s yet (run `memo-mcp reindex`)", modelID)
 	}
 	vecs, err := s.embedder.EmbedBatch(ctx, []string{q}, embedding.RoleQuery)
 	if err != nil {
@@ -835,4 +889,51 @@ func remove(list []string, v string) []string {
 		}
 	}
 	return out
+}
+
+// minMaxFuse replaces the RRF contributions with score fusion: within each
+// arm the raw scores of all candidates are scaled to 0..1 (bm25 is negated
+// first, lower is better in FTS5), multiplied by the arm's weight and summed.
+// Contributions and fused scores are rewritten so the explain block stays
+// truthful about what was summed.
+func minMaxFuse(cands map[int64]*candidate, p Profile) {
+	type span struct{ lo, hi float64 }
+	spans := map[string]*span{}
+	rawOf := func(h *ArmHit) float64 {
+		if h.Raw == nil {
+			return 0
+		}
+		if h.RawKind == "bm25" {
+			return -*h.Raw
+		}
+		return *h.Raw
+	}
+	for _, c := range cands {
+		for arm, h := range c.arms {
+			v := rawOf(h)
+			sp := spans[arm]
+			if sp == nil {
+				spans[arm] = &span{v, v}
+				continue
+			}
+			if v < sp.lo {
+				sp.lo = v
+			}
+			if v > sp.hi {
+				sp.hi = v
+			}
+		}
+	}
+	for _, c := range cands {
+		c.fused = 0
+		for arm, h := range c.arms {
+			sp := spans[arm]
+			scaled := 1.0
+			if sp.hi > sp.lo {
+				scaled = (rawOf(h) - sp.lo) / (sp.hi - sp.lo)
+			}
+			h.Contribution = p.Weights[arm] * scaled
+			c.fused += h.Contribution
+		}
+	}
 }

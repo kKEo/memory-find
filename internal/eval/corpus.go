@@ -194,7 +194,7 @@ func Queries() []Query {
 		// this can't assert "zero results" — instead it declares no
 		// Relevant entries and tracks whether specific unrelated entries
 		// get pulled to the top regardless (they shouldn't dominate).
-		{ID: "no-match-cooking", Query: "sourdough starter fermentation baking technique", Category: "abstention", Irrelevant: []string{"auth-1", "db-1", "fe-1"}},
+		{ID: "no-match-cello", Query: "cello bowing rosin technique", Category: "abstention", Irrelevant: []string{"auth-1", "db-1", "fe-1"}},
 		{ID: "no-match-astronomy", Query: "exoplanet atmospheric spectroscopy telescope", Category: "abstention", Irrelevant: []string{"rpc-1", "infra-1"}},
 
 		// --- Stem-variant: documents the current gap. stem-1 and stem-3

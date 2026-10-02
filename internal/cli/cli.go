@@ -132,7 +132,13 @@ func Main(ctx context.Context, version string, args []string, stdout, stderr io.
 	case "log":
 		err = runLog(ctx, rest, stdout, stderr)
 	case "model":
-		err = runModel(ctx, rest, stderr)
+		err = runModel(ctx, rest, stdout, stderr)
+	case "reindex":
+		err = runReindex(ctx, rest, stdout, stderr)
+	case "profiles":
+		err = runProfiles(rest, stdout, stderr)
+	case "eval":
+		err = runEval(ctx, rest, stdout, stderr)
 	case "help", "-h", "--help":
 		usage(stdout)
 	default:
@@ -165,12 +171,18 @@ Usage:
   memo-mcp backfill                embed chunks whose vectors are pending
   memo-mcp status                  print knowledge-base statistics
   memo-mcp version                 print version, protocol version, Go version, model dir
-  memo-mcp model redownload        fetch a fresh copy of the embedding model
+  memo-mcp model ls|smoke|pull|use|redownload   the embedding-model registry (MEMO_MODEL picks one)
+  memo-mcp reindex [--model <id>]  embed every passage that lacks a vector for the model
+  memo-mcp profiles show [<name>]  print every ranking constant with its derivation (MEMO_PROFILE picks one)
+  memo-mcp eval [--models hash,minilm --profiles default,all --corpus notes|kb|all --format table|md|json --explain-failures]
 
 Environment:
   MEMO_KB        knowledge-base name (default "default"); file is $MEMO_HOME/kb/<name>.db
   MEMO_HOME      base directory (default ~/.memo-mcp)
   MEMO_QUERY_LOG=1               keep an opt-in log of searches in the same file
+  MEMO_MODEL     embedding model id from 'memo-mcp model ls' (default minilm)
+  MEMO_PROFILE   ranking profile (default "default"); overrides in $MEMO_HOME/profiles.json
+  MEMO_RERANK=1  attach the cross-encoder reranker (used by the precise profile)
   JOURNAL_TOKEN, JOURNAL_PATH    deprecated aliases of MEMO_KB / MEMO_HOME (old journal files are not opened)
 `)
 }
@@ -183,17 +195,66 @@ func runVersion(version string, w io.Writer) error {
 	return nil
 }
 
-func runModel(ctx context.Context, args []string, stderr io.Writer) error {
-	if len(args) != 1 || args[0] != "redownload" {
-		return errors.New("usage: memo-mcp model redownload")
+func runModel(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return errors.New("usage: memo-mcp model ls | smoke [<id>|--all] | pull <id> | use <id> | redownload [<id>]")
 	}
-	modelDir := embedding.DefaultModelDir()
-	fmt.Fprintf(stderr, "Redownloading embedding model into %s...\n", modelDir)
-	if _, err := embedding.RedownloadModel(ctx, modelDir); err != nil {
-		return fmt.Errorf("redownload model: %w", err)
+	sub, rest := args[0], args[1:]
+	switch sub {
+	case "ls":
+		return runModelLs(ctx, stdout, stderr)
+	case "smoke":
+		return runModelSmoke(ctx, rest, stdout, stderr)
+	case "pull":
+		if len(rest) != 1 {
+			return errors.New("usage: memo-mcp model pull <id>")
+		}
+		info, err := embedding.LookupModel(rest[0])
+		if err != nil {
+			return err
+		}
+		_, cleanup, err := embedding.Load(ctx, info, embedding.DefaultModelDir())
+		if err != nil {
+			return err
+		}
+		cleanup()
+		fmt.Fprintf(stdout, "%s is downloaded and loads under the pure-Go backend\n", info.ID)
+		return nil
+	case "use":
+		if len(rest) != 1 {
+			return errors.New("usage: memo-mcp model use <id>")
+		}
+		if _, err := embedding.LookupModel(rest[0]); err != nil {
+			return err
+		}
+		store, closeFn, err := openStore(ctx, stderr, kb.Options{NoCreate: true}, nil)
+		if err != nil {
+			return err
+		}
+		defer closeFn()
+		if err := store.SetDefaultModel(ctx, rest[0], "cli", kb.ChannelCLI); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "default model is now %s; set MEMO_MODEL=%s in the MCP server config so queries embed with it\n", rest[0], rest[0])
+		return nil
+	case "redownload":
+		info := embedding.MiniLM
+		if len(rest) == 1 {
+			var err error
+			if info, err = embedding.LookupModel(rest[0]); err != nil {
+				return err
+			}
+		}
+		modelDir := embedding.DefaultModelDir()
+		fmt.Fprintf(stderr, "Redownloading %s into %s...\n", info.HFRepo, modelDir)
+		if _, err := embedding.RedownloadModelFor(ctx, info, modelDir); err != nil {
+			return fmt.Errorf("redownload model: %w", err)
+		}
+		fmt.Fprintln(stderr, "Done.")
+		return nil
+	default:
+		return fmt.Errorf("unknown model subcommand %q", sub)
 	}
-	fmt.Fprintln(stderr, "Done.")
-	return nil
 }
 
 func runServe(ctx context.Context, stderr io.Writer) error {
@@ -210,6 +271,9 @@ func runServe(ctx context.Context, stderr io.Writer) error {
 	}
 	defer cleanup()
 
+	if err := retrieve.LoadOverrides(filepath.Join(filepath.Dir(cfg.KBDir), "profiles.json")); err != nil {
+		return err
+	}
 	db, err := kb.Open(ctx, cfg.KBDir, cfg.DBName, kb.Options{})
 	if err != nil {
 		return err
@@ -228,7 +292,21 @@ func runServe(ctx context.Context, stderr io.Writer) error {
 		}()
 	}
 
-	srv := server.New(store, retrieve.New(store, retrieve.Default, cfg.LogQueries), serverVersion)
+	profile, err := retrieve.Lookup(os.Getenv("MEMO_PROFILE"))
+	if err != nil {
+		return err
+	}
+	svc := retrieve.New(store, profile, cfg.LogQueries)
+	if os.Getenv("MEMO_RERANK") == "1" {
+		rr, closeRR, err := loadReranker(ctx, stderr)
+		if err != nil {
+			fmt.Fprintf(stderr, "warning: %v; continuing without a reranker\n", err)
+		} else {
+			defer closeRR()
+			svc.WithReranker(rr)
+		}
+	}
+	srv := server.New(store, svc, serverVersion)
 	return srv.Run(ctx)
 }
 
@@ -239,16 +317,30 @@ var serverVersion = "dev"
 // SetVersion records the build version for the MCP server's Implementation.
 func SetVersion(v string) { serverVersion = v }
 
-// buildEmbedder constructs the embedding backend, returning a genuinely nil
+// buildEmbedder constructs the embedding backend for the model MEMO_MODEL
+// names (default: the registry's MiniLM), returning a genuinely nil
 // embedding.Embedder interface value on failure — not a non-nil interface
-// wrapping a nil *embedding.HugotEmbedder. Every caller checks
-// "if embedder != nil", and that only works with a true nil interface.
+// wrapping a nil pointer. Every caller checks "if embedder != nil", and that
+// only works with a true nil interface.
 func buildEmbedder(ctx context.Context) (embedding.Embedder, func(), error) {
-	e, err := embedding.NewHugotEmbedder(ctx, embedding.DefaultModelDir())
+	info, err := selectedModel()
 	if err != nil {
 		return nil, func() {}, err
 	}
-	return e, e.Destroy, nil
+	e, cleanup, err := embedding.Load(ctx, info, embedding.DefaultModelDir())
+	if err != nil {
+		return nil, func() {}, err
+	}
+	return e, cleanup, nil
+}
+
+// selectedModel resolves MEMO_MODEL against the registry.
+func selectedModel() (embedding.ModelInfo, error) {
+	id := os.Getenv("MEMO_MODEL")
+	if id == "" {
+		return embedding.MiniLM, nil
+	}
+	return embedding.LookupModel(id)
 }
 
 func runStatus(ctx context.Context, stdout, stderr io.Writer) error {

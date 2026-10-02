@@ -85,6 +85,13 @@ Running the binary with no arguments starts the MCP server on stdio. From the te
 - `memo-mcp verify [--repair]` — check chunks, vectors and indexes
 - `memo-mcp backfill` — embed chunks whose vectors are pending
 - `memo-mcp status` — print knowledge-base statistics (read-only; never creates a file)
+
+The lab:
+
+- `memo-mcp eval [--models hash,minilm,potion,granite-small-r2 --profiles default,all --corpus notes|kb|all --format table|md|json --explain-failures --rerank --agent-proxy]` — load the fixture corpora into a throwaway knowledge base with each model, run the labelled queries under each profile, print quality (recall, MRR, nDCG, abstention) next to cost (latency, tokens). `hash` is the deterministic test embedder; other ids download real models.
+- `memo-mcp model ls | smoke <id>|--all | pull <id> | use <id> | redownload [<id>]` — the embedding-model registry: list candidates with licences, prove which ones load under the pure-Go backend and how fast, download, or make one the knowledge base's default.
+- `memo-mcp reindex [--model <id>]` — embed every passage that lacks a vector for a model ("re-embed, don't re-chunk"); vectors for several models coexist, so switching back is free.
+- `memo-mcp profiles show [<name>]` — print every ranking constant of a profile with its derivation. Profiles: `default`, `precise` (deeper fetch, cross-encoder rerank when attached), `recency`, `code`, `minmax` (score fusion instead of rank fusion), and the ablations `keyword-only`, `semantic-only`. Overrides live in `$MEMO_HOME/profiles.json`.
 - `memo-mcp version` — print the build version, the MCP protocol version, the Go version and the model directory
 - `memo-mcp model redownload` — force a fresh model download, discarding any cached copy, and exit
 
@@ -97,6 +104,9 @@ The old spellings `--stats` and `--redownload-model` still work for one release 
 | `MEMO_KB` | no | Selects the database to open; the file is `$MEMO_HOME/kb/<name>.db`. Letters, digits, `.`, `_`, `-` only. Default `default`. |
 | `MEMO_HOME` | no | Base directory (default `~/.memo-mcp`) |
 | `MEMO_QUERY_LOG` | no | `1` keeps an opt-in log of searches (arguments, result addresses, scores, trace; never passage text) in the same file |
+| `MEMO_MODEL` | no | Embedding model id from `memo-mcp model ls` (default `minilm`). Queries use that model's vectors; run `memo-mcp reindex` after switching |
+| `MEMO_PROFILE` | no | Ranking profile (default `default`); see `memo-mcp profiles show` |
+| `MEMO_RERANK` | no | `1` loads the cross-encoder reranker (`cross-encoder/ms-marco-MiniLM-L6-v2`, Apache-2.0, ~91 MB); only profiles with rerank on (`precise`) use it |
 | `JOURNAL_TOKEN` | deprecated | Old name selector: opens `<JOURNAL_PATH or ~/.memo-mcp>/<token>.db` exactly as before, with a warning. Honoured for one release. |
 | `JOURNAL_PATH` | deprecated | Old base directory override, only with `JOURNAL_TOKEN` |
 
