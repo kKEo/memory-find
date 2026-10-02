@@ -649,7 +649,10 @@ less and shipped two phases in a month, so treat these as ranges, not promises.
 > (`internal/rerank`, ms-marco-MiniLM) attached by `MEMO_RERANK=1` and used by `precise`; eval
 > v2: a second corpus (300-page library namespace, 5-note namespace, two versions of one page,
 > tail-only long documents, aged notes), categories, cost columns, the agent-iterating proxy, a
-> paired per-query gate, `memo-mcp eval`. Remaining before the tag: commit, CI green,
+> paired per-query gate, `memo-mcp eval`. Bake-off outcome: **granite-small-r2 is the new
+> default** (OD-6), the reranker failed its gate (OD-7), potion is the instant tier, minmax fusion
+> is one flag away (+0.03 on the KB corpus, a wash on notes; RRF stays default), per-model
+> similarity bands fixed abstention for granite. Remaining before the tag: commit, CI green,
 > `git tag -a v0.7.0`.
 
 
@@ -741,6 +744,19 @@ less and shipped two phases in a month, so treat these as ranges, not promises.
 - **Effort.** 6–7 days.
 
 ### P4 — Provenance, trust and time · 4–5 days · `v0.8.0`
+
+> **Status (2026-10-02): built.** `kb.Remember` (add-only, supersession chains), `Forget`
+> (tombstones that leave every index and stay hidden under `as_of`; `redact` clears text),
+> `SetTrust` (promote/demote, CLI or elicitation only), `History`, `ListFacts --as-of`; a
+> trust-transition rule enforced in code: a tool call may retire or supersede only `agent`
+> records and never raise trust (`ErrNeedsHuman` carries the CLI command). Retrieval: the fact
+> arm ("facts as extra keys"), `granularity=fact` with trust-first conflict ordering, `as_of`
+> for documents and facts, stopwords dropped from keyword queries. Tools `remember`, `forget`,
+> `promote` (seven in total) and `search.as_of`; CLI `remember | forget | facts ls | trust |
+> read --history`. Eval slices: knowledge-update, temporal, fact-key, conflict, revocation,
+> write-loss, poisoning (`docs/eval/v0.8.0.md`). Spike S7 (elicitation in a real client) is
+> deferred to P5 where `promote` is wired to it. Remaining: commit, CI, `git tag -a v0.8.0`.
+
 
 - **Story.** (a) `remember`; (b) correctness of cited answers.
 - **Goal.** An agent can record an atomic fact with its evidence, replace it later without losing
@@ -1143,13 +1159,13 @@ recommendation; if a different option is chosen, the affected phase is named.
   eight). *C:* a separate `explain` tool (raises the tool count). *D:* a third `response_format`
   value. **Recommend D: `response_format: concise|detailed|explain`**; the CLI `explain` command
   uses the same path. One word everywhere.
-- **OD-6 Which embedding model is the default?** It cannot be decided until spike S4 and P3.
+- **OD-6 Which embedding model is the default?** *Resolved by the owner on 2026-10-02 from the P3 bake-off: **granite-small-r2** (Apache-2.0, +0.05 nDCG@10 on the knowledge-base corpus, the only candidate that answers paraphrase queries, 1.6× MiniLM query latency, 2.5× ingestion cost; see `docs/eval/v0.7.0.md`). The rule itself was recalibrated: no ONNX model meets 150 ms on the pure-Go backend, so the latency bar is relative to MiniLM.* It cannot be decided until spike S4 and P3.
   **Recommend a rule, not a name:** Apache or MIT licence, loads under GoMLX, beats MiniLM on eval
   v2 nDCG@10, p50 at most 150 ms for 256 tokens on the development laptop; otherwise MiniLM stays
   and potion is the instant tier. Provisional favourite: granite-embedding-small-english-r2
   (384-d per its model card; the research document flags the figure as assumed). EmbeddingGemma
   opt-in only.
-- **OD-7 When does the reranker ship?** A reranker re-scores the top few candidates with a
+- **OD-7 When does the reranker ship?** *Resolved 2026-10-02: it does not. ms-marco-MiniLM through hugot loses ~0.2 nDCG and costs 0.7–4 s per query because the pipeline cannot pass sentence-pair segment ids (`docs/spikes/S8-reranker.md`). It stays opt-in behind `MEMO_RERANK=1`.* A reranker re-scores the top few candidates with a
   slower, more accurate model. **Recommend** inside `precise` only, promoted only if nDCG@10
   gains at least 0.02 on eval v2 at p50 under 300 ms for a 30-pair rerank under GoMLX; otherwise
   `precise` ships without it and the article says why.

@@ -13,13 +13,16 @@ It started as a Go rewrite of [obra/private-journal-mcp](https://github.com/obra
 
 ## What it does
 
-Claude (or any MCP client) gets four tools over one knowledge base:
+Claude (or any MCP client) gets seven tools over one knowledge base:
 
 | Tool | Purpose |
 |---|---|
 | `ingest` | Store a document the agent fetched or wrote, as markdown; identical content is a no-op, changed content or a new version becomes a new revision |
 | `search` | Find passages by words, exact identifiers and meaning, fused into one list; `response_format: explain` says why each result ranked |
 | `read` | Dereference a `memo://` address: a passage, its section, or the whole document under a token budget |
+| `remember` | Record one atomic fact with evidence and validity dates; to correct a fact, pass `supersedes` and the old one is kept as history |
+| `forget` | Retire a document or fact with a reason; it leaves every index and its address resolves to "forgotten on … because …". Tool calls may only retire records written by tools |
+| `promote` | Ask to raise a record's trust; tool calls cannot do it themselves, so the result carries the command a human runs |
 | `status` | Namespaces, the embedding model, pending vectors, background jobs |
 
 Everything is stored locally. There is exactly one outbound network call in the whole system: downloading the ~90MB embedding model from Hugging Face on first start. After that, nothing leaves the machine. The server never fetches URLs; the agent fetches and passes the text.
@@ -34,7 +37,7 @@ Everything is stored locally. There is exactly one outbound network call in the 
 
 The three ranked lists are combined with reciprocal rank fusion at equal weights (a keyword-only hit at rank 1 ties a vector hit at rank 1, so the keyword arm can add results rather than only reorder them), passages are aggregated to documents by their best passage, notes and conversations get a bounded recency boost (×0.8 to ×1.0, halving every 90 days; versioned docs do not age), the list is cut at the first large score gap, and results are packed to the requested token budget. A passage whose only evidence is a semantic similarity below the weak band (0.30) is dropped, so a question about nothing in the corpus returns zero results with a reason and a hint instead of a page of noise.
 
-Scope filters (namespaces, kinds, sources, library, version, tags, dates, minimum trust) are applied inside every arm's query, before ranking, so a filtered search never loses a result. Each result carries its provenance and a relevance band; with `response_format: explain` it also carries the per-arm ranks and contributions, the recency factor, and a per-query trace (which arms ran and why, what the scope excluded, where the list was cut). The terminal shows the same numbers: `memo-mcp search "<q>" --explain` and `memo-mcp explain "<q>" memo://chunk/<n>`.
+A fourth arm matches **facts** recorded with `remember` and votes for their evidence passage ("facts as extra keys"); `granularity: fact` returns the facts themselves. `as_of` answers with what the knowledge base believed at a date: superseded revisions and replaced facts that were current then. Forgotten records are never returned, not even under `as_of`. Scope filters (namespaces, kinds, sources, library, version, tags, dates, minimum trust) are applied inside every arm's query, before ranking, so a filtered search never loses a result. Each result carries its provenance and a relevance band; with `response_format: explain` it also carries the per-arm ranks and contributions, the recency factor, and a per-query trace (which arms ran and why, what the scope excluded, where the list was cut). The terminal shows the same numbers: `memo-mcp search "<q>" --explain` and `memo-mcp explain "<q>" memo://chunk/<n>`.
 
 ## Storage
 
@@ -79,7 +82,11 @@ Running the binary with no arguments starts the MCP server on stdio. From the te
 - `memo-mcp search "<query>" [--mode auto|hybrid|keyword|exact|semantic --ns --library --version --kind --limit --format table|json|md --explain --no-model]` — search; `--explain` adds why each result ranked
 - `memo-mcp explain "<query>" <memo://chunk/n>` — the full explanation for one result
 - `memo-mcp log tail|show <id>|prune` — the opt-in query log (`MEMO_QUERY_LOG=1`)
-- `memo-mcp read <memo://doc/...>` — print a document, chunk or source with its provenance
+- `memo-mcp remember "<fact>" [--ns --about --valid-from --valid-to --supersedes --evidence --trust user|curated]` — record a fact (CLI writes are trust `user`; `curated` must be typed)
+- `memo-mcp forget <memo://...> --reason "<why>" [--redact]` — retire a document or fact; the reason is kept and shown
+- `memo-mcp facts ls [--ns --as-of YYYY-MM-DD --history]` — list facts, or what was believed on a date
+- `memo-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user` — the human channel for trust; every change is audited
+- `memo-mcp read <memo://doc/...> [--history]` — print a document, chunk, source or fact with its provenance, or its revision chain
 - `memo-mcp ls [--ns --kind --since --json]` — list live documents, newest first
 - `memo-mcp export --md <dir> [--ns]` — write markdown files with front-matter provenance (opens in Obsidian; re-importing yields no new revisions)
 - `memo-mcp verify [--repair]` — check chunks, vectors and indexes

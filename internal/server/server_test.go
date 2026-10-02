@@ -124,7 +124,7 @@ func TestListToolsGolden(t *testing.T) {
 	}
 }
 
-func TestToolSurfaceIsExactlyFourTools(t *testing.T) {
+func TestToolSurfaceIsExactlySevenTools(t *testing.T) {
 	cs, _ := newTestSession(t)
 	res, err := cs.ListTools(context.Background(), nil)
 	if err != nil {
@@ -134,7 +134,7 @@ func TestToolSurfaceIsExactlyFourTools(t *testing.T) {
 	for _, tool := range res.Tools {
 		names = append(names, tool.Name)
 	}
-	if strings.Join(names, ",") != "ingest,read,search,status" {
+	if strings.Join(names, ",") != "forget,ingest,promote,read,remember,search,status" {
 		t.Fatalf("tools = %v", names)
 	}
 }
@@ -178,7 +178,7 @@ func TestAnnotations(t *testing.T) {
 		if a.OpenWorldHint == nil || *a.OpenWorldHint {
 			t.Errorf("tool %q must declare a closed world", tool.Name)
 		}
-		wantReadOnly := tool.Name != "ingest"
+		wantReadOnly := tool.Name != "ingest" && tool.Name != "remember" && tool.Name != "forget"
 		if a.ReadOnlyHint != wantReadOnly {
 			t.Errorf("tool %q readOnlyHint = %v", tool.Name, a.ReadOnlyHint)
 		}
@@ -291,5 +291,45 @@ func TestNegotiatesCurrentProtocolVersion(t *testing.T) {
 	}
 	if ProtocolVersion != got {
 		t.Fatalf("server.ProtocolVersion = %q but the SDK negotiated %q; update the constant", ProtocolVersion, got)
+	}
+}
+
+func TestRememberForgetPromoteRoundTrip(t *testing.T) {
+	cs, _ := newTestSession(t)
+	ingestDoc(t, cs)
+	sr := structured[SearchOut](t, callTool(t, cs, "search", map[string]any{"query": "ERR_CONN_RESET", "mode": "exact"}))
+	evidence := sr.Results[0].ChunkURI
+
+	rem := structured[RememberOut](t, callTool(t, cs, "remember", map[string]any{"statement": "A reset connection surfaces as codes.Unavailable.", "namespace": "grpc", "about": []string{"codes.Unavailable"}, "evidence_uri": evidence}))
+	if !strings.HasPrefix(rem.URI, "memo://fact/") || rem.Trust != "agent" {
+		t.Fatalf("remember: %+v", rem)
+	}
+	facts := structured[SearchOut](t, callTool(t, cs, "search", map[string]any{"query": "reset connection Unavailable", "granularity": "fact", "response_format": "detailed"}))
+	if len(facts.Results) != 1 || facts.Results[0].URI != rem.URI || !strings.Contains(facts.Results[0].Content, "Evidence:") {
+		t.Fatalf("fact search: %+v", facts.Results)
+	}
+	// Supersede, then look back with as_of.
+	rem2 := structured[RememberOut](t, callTool(t, cs, "remember", map[string]any{"statement": "Since v1.9 a reset connection surfaces as codes.Aborted.", "namespace": "grpc", "supersedes": rem.URI}))
+	live := structured[SearchOut](t, callTool(t, cs, "search", map[string]any{"query": "reset connection surfaces", "granularity": "fact"}))
+	if len(live.Results) != 1 || live.Results[0].URI != rem2.URI {
+		t.Fatalf("live fact after supersede: %+v", live.Results)
+	}
+	// Promote needs a human: the tool returns the command.
+	pr := structured[PromoteOut](t, callTool(t, cs, "promote", map[string]any{"uri": rem2.URI, "to": "curated"}))
+	if pr.Applied || !strings.Contains(pr.Command, "memo-mcp trust promote") {
+		t.Fatalf("promote: %+v", pr)
+	}
+	// Forget an agent fact works; the tombstone is explained on read.
+	fo := structured[ForgetOut](t, callTool(t, cs, "forget", map[string]any{"uri": rem2.URI, "reason": "wrong library"}))
+	if !fo.Forgotten {
+		t.Fatalf("forget: %+v", fo)
+	}
+	res := callTool(t, cs, "forget", map[string]any{"uri": "memo://fact/nope", "reason": "x"})
+	if !res.IsError {
+		t.Fatal("forgetting a missing fact should be a tool error")
+	}
+	gone := structured[SearchOut](t, callTool(t, cs, "search", map[string]any{"query": "reset connection surfaces", "granularity": "fact", "as_of": "2030-01-01"}))
+	if len(gone.Results) != 0 {
+		t.Fatalf("forgotten fact served: %+v", gone.Results)
 	}
 }

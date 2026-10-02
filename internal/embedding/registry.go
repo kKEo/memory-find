@@ -47,6 +47,19 @@ var Known = []ModelInfo{
 	},
 }
 
+// DefaultModelID is the model a fresh install downloads and queries with.
+// Chosen by the owner on 2026-10-02 from the P3 bake-off (docs/eval/v0.7.0.md):
+// granite-small-r2 passed the OD-6 rule (Apache-2.0, loads, +0.05 nDCG@10 on
+// the knowledge-base corpus, 1.6× MiniLM query latency) and is the only
+// candidate that answers paraphrase queries. MEMO_MODEL overrides it.
+const DefaultModelID = "granite-small-r2"
+
+// DefaultModel returns the registry entry for DefaultModelID.
+func DefaultModel() ModelInfo {
+	m, _ := LookupModel(DefaultModelID)
+	return m
+}
+
 // LookupModel finds a registry entry by id.
 func LookupModel(id string) (ModelInfo, error) {
 	for _, m := range Known {

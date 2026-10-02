@@ -139,6 +139,14 @@ func Main(ctx context.Context, version string, args []string, stdout, stderr io.
 		err = runProfiles(rest, stdout, stderr)
 	case "eval":
 		err = runEval(ctx, rest, stdout, stderr)
+	case "remember":
+		err = runRemember(ctx, rest, stdout, stderr)
+	case "forget":
+		err = runForget(ctx, rest, stdout, stderr)
+	case "facts":
+		err = runFacts(ctx, rest, stdout, stderr)
+	case "trust":
+		err = runTrust(ctx, rest, stdout, stderr)
 	case "help", "-h", "--help":
 		usage(stdout)
 	default:
@@ -164,7 +172,11 @@ Usage:
   memo-mcp search "<q>" [--mode --ns --library --version --kind --limit --format table|json|md --explain]
   memo-mcp explain "<q>" [<memo://...>]   ranking table for every hit, or the full why for one
   memo-mcp log tail|show <id>|prune       inspect the opt-in query log
-  memo-mcp read <memo://...>       print a document, chunk or source with its provenance
+  memo-mcp remember "<fact>" [--ns --about a,b --valid-from --valid-to --supersedes <memo://fact/..> --evidence <memo://chunk/n> --trust user|curated]
+  memo-mcp forget <memo://doc/..|memo://fact/..> --reason "<why>" [--redact]
+  memo-mcp facts ls [--ns --as-of YYYY-MM-DD --history --json]
+  memo-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user
+  memo-mcp read <memo://...> [--history]   print a record with its provenance, or its revision chain
   memo-mcp ls [--ns --kind --since 2026-01-01 --json]   list live documents, newest first
   memo-mcp export --md <dir> [--ns <name>]              write markdown files with front matter
   memo-mcp verify [--repair]       check integrity (chunks, vectors, indexes)
@@ -180,7 +192,7 @@ Environment:
   MEMO_KB        knowledge-base name (default "default"); file is $MEMO_HOME/kb/<name>.db
   MEMO_HOME      base directory (default ~/.memo-mcp)
   MEMO_QUERY_LOG=1               keep an opt-in log of searches in the same file
-  MEMO_MODEL     embedding model id from 'memo-mcp model ls' (default minilm)
+  MEMO_MODEL     embedding model id from 'memo-mcp model ls' (default granite-small-r2)
   MEMO_PROFILE   ranking profile (default "default"); overrides in $MEMO_HOME/profiles.json
   MEMO_RERANK=1  attach the cross-encoder reranker (used by the precise profile)
   JOURNAL_TOKEN, JOURNAL_PATH    deprecated aliases of MEMO_KB / MEMO_HOME (old journal files are not opened)
@@ -281,13 +293,20 @@ func runServe(ctx context.Context, stderr io.Writer) error {
 	defer db.Close()
 	store := kb.NewStore(db, embedder)
 
-	// Drain queued vectors in the background; the server answers meanwhile.
+	// In the background: drain queued vectors, then embed any passage that
+	// has no vector for THIS model yet (a store built with another model
+	// keeps working by keyword meanwhile and reports degraded until done).
 	if embedder != nil {
 		go func() {
 			if n, err := store.Backfill(ctx); err != nil {
 				fmt.Fprintf(stderr, "warning: backfill: %v\n", err)
 			} else if n > 0 {
 				fmt.Fprintf(stderr, "backfilled %d chunk vector(s)\n", n)
+			}
+			if n, err := store.Reindex(ctx, nil); err != nil {
+				fmt.Fprintf(stderr, "warning: reindex for %s: %v\n", embedder.Info().ID, err)
+			} else if n > 0 {
+				fmt.Fprintf(stderr, "embedded %d passage(s) with %s\n", n, embedder.Info().ID)
 			}
 		}()
 	}
@@ -334,11 +353,12 @@ func buildEmbedder(ctx context.Context) (embedding.Embedder, func(), error) {
 	return e, cleanup, nil
 }
 
-// selectedModel resolves MEMO_MODEL against the registry.
+// selectedModel resolves MEMO_MODEL against the registry; unset means the
+// registry default (granite-small-r2 since v0.7.0).
 func selectedModel() (embedding.ModelInfo, error) {
 	id := os.Getenv("MEMO_MODEL")
 	if id == "" {
-		return embedding.MiniLM, nil
+		return embedding.DefaultModel(), nil
 	}
 	return embedding.LookupModel(id)
 }

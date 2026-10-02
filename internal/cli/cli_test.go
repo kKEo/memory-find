@@ -236,3 +236,59 @@ func TestSearchAndExplainCommands(t *testing.T) {
 		t.Fatalf("abstention: %s", out)
 	}
 }
+
+// Facts, forgetting and trust from the terminal: the CLI is the human channel,
+// so it may do what tool calls cannot, and everything it does is audited.
+func TestFactsForgetTrustCommands(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("MEMO_HOME", home)
+	t.Setenv("MEMO_KB", "demo")
+	t.Setenv("JOURNAL_TOKEN", "")
+	run := func(args ...string) (string, string, int) {
+		var out, errOut bytes.Buffer
+		code := Main(context.Background(), "dev", args, &out, &errOut)
+		return out.String(), errOut.String(), code
+	}
+	doc := filepath.Join(t.TempDir(), "i.md")
+	if err := os.WriteFile(doc, []byte("# gRPC Interceptors\n\nInterceptors run in registration order.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, errOut, code := run("ingest", doc, "--ns", "grpc", "--embed=false"); code != 0 {
+		t.Fatalf("ingest: %s %s", out, errOut)
+	}
+	out, errOut, code := run("remember", "Interceptors run in the order they were registered.", "--ns", "grpc", "--about", "interceptors", "--evidence", "memo://chunk/1", "--no-model")
+	if code != 0 || !strings.Contains(out, "recorded memo://fact/") {
+		t.Fatalf("remember: %d %s %s", code, out, errOut)
+	}
+	factURI := "memo://" + strings.Fields(strings.SplitN(out, "memo://", 2)[1])[0]
+	out, _, _ = run("facts", "ls", "--ns", "grpc")
+	if !strings.Contains(out, "live") || !strings.Contains(out, "evidence memo://chunk/1") {
+		t.Fatalf("facts ls: %s", out)
+	}
+	out, _, code = run("remember", "Interceptors run in reverse order since v2.", "--ns", "grpc", "--supersedes", factURI, "--no-model")
+	if code != 0 || !strings.Contains(out, "is now history") {
+		t.Fatalf("supersede: %s", out)
+	}
+	out, _, _ = run("read", factURI, "--history")
+	if !strings.Contains(out, "LIVE") || !strings.Contains(out, "history") {
+		t.Fatalf("history: %s", out)
+	}
+	out, _, code = run("trust", "promote", factURI, "--to", "curated")
+	if code != 0 || !strings.Contains(out, "trust is now curated") {
+		t.Fatalf("promote: %s", out)
+	}
+	out, _, _ = run("trust", "ls")
+	if !strings.Contains(out, "curated") {
+		t.Fatalf("trust ls: %s", out)
+	}
+	out, _, code = run("forget", factURI, "--reason", "wrong library")
+	if code != 0 || !strings.Contains(out, "forgot") {
+		t.Fatalf("forget: %s", out)
+	}
+	if _, errOut, code := run("read", factURI); code != 1 || !strings.Contains(errOut, "forgotten on") {
+		t.Fatalf("tombstone read: %d %s", code, errOut)
+	}
+	if _, errOut, code := run("forget", "memo://doc/x", "--reason", ""); code != 1 || !strings.Contains(errOut, "usage") {
+		t.Fatalf("forget without reason: %d %s", code, errOut)
+	}
+}

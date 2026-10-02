@@ -82,7 +82,7 @@ type Profile struct {
 // of noise; P3 calibrates the bands and the floor per model.
 var Default = Profile{
 	Name:          "default",
-	Derivation:    "RRF k=60 (the RRF paper's value). Equal semantic/keyword weights so a keyword-only rank-1 hit ties a vector rank-1 hit and can reach the first page (audit H2); exact=0.3 so an identifier match ranks like a strong keyword match without dominating prose queries. Fetch depth 100 keeps keyword-only hits in the fused list. Recency floor 0.8 with a 90-day half-life, notes and conversations only (OD-4). Gap cut at a halving, never below 3 results. Semantic-only floor 0.30 = the weak band, so no-match queries abstain. All of these are starting points for the P3 eval, not measurements.",
+	Derivation:    "RRF k=60 (the RRF paper's value). Equal semantic/keyword weights so a keyword-only rank-1 hit ties a vector rank-1 hit and can reach the first page (audit H2); exact=0.3 so an identifier match ranks like a strong keyword match without dominating prose queries. Fetch depth 100 keeps keyword-only hits in the fused list. Recency floor 0.8 with a 90-day half-life, notes and conversations only (OD-4). Gap cut at a halving, never below 3 results. Semantic-only floor 0.30 = the weak band, so no-match queries abstain. fact=0.4: a stored fact that matches votes for its evidence passage almost as strongly as a keyword hit, because a human or agent deliberately recorded it. All of these are starting points the eval measures, not truths.",
 	RRFK:          60,
 	Weights:       map[string]float64{ArmSemantic: 0.5, ArmKeyword: 0.5, ArmExact: 0.3},
 	FetchDepth:    100,
@@ -104,6 +104,9 @@ const (
 	ArmSemantic = "semantic"
 	ArmKeyword  = "keyword"
 	ArmExact    = "exact"
+	// ArmFact matches stored facts (keyword and meaning) and votes for their
+	// evidence chunk: "facts as extra keys" (research D-C, §6.1).
+	ArmFact = "fact"
 )
 
 // Modes.
@@ -119,6 +122,7 @@ const (
 const (
 	GranularityChunk    = "chunk"
 	GranularityDocument = "document"
+	GranularityFact     = "fact"
 )
 
 // Response formats.
