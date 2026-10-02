@@ -176,7 +176,7 @@
       "openWorldHint": false,
       "readOnlyHint": true
     },
-    "description": "Request that a document, source or fact be trusted more (user or curated). Trust cannot be raised by a tool call alone; this returns the command a human runs (or, on clients that support it, asks the human directly).",
+    "description": "Request that a document, source or fact be trusted more (user or curated). Trust cannot be raised by a tool call alone: on clients that can show a dialog the human is asked directly, with the excerpt and where it came from; otherwise the result carries the command the human runs. Example: promote(uri: \"memo://fact/01a0...\", to: \"user\").",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -540,6 +540,10 @@
         },
         "hint": {
           "description": "What to try next when results are missing or truncated",
+          "type": "string"
+        },
+        "narrow_hint": {
+          "description": "How to narrow the query when results were truncated, e.g. scope.version",
           "type": "string"
         },
         "reason": {
@@ -1067,6 +1071,10 @@
             "null",
             "object"
           ]
+        },
+        "truncated": {
+          "description": "How many ranked results the token budget left out",
+          "type": "integer"
         }
       },
       "required": [
@@ -1083,7 +1091,7 @@
       "openWorldHint": false,
       "readOnlyHint": true
     },
-    "description": "Counts per namespace, the embedding model in use, pending vectors and background jobs. degraded=true means search is keyword-only right now.",
+    "description": "Counts per namespace, the embedding model in use, pending vectors and background jobs. degraded=true means search is keyword-only right now. Example: status() before the first search of a session, to learn which namespaces exist.",
     "inputSchema": {
       "additionalProperties": false,
       "type": "object"

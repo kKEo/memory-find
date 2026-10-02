@@ -33,9 +33,138 @@ type Server struct {
 // New builds the MCP server. version is the build's git tag.
 func New(store *kb.Store, search *retrieve.Service, version string) *Server {
 	srv := &Server{store: store, search: search, actor: "mcp"}
-	srv.mcp = mcp.NewServer(&mcp.Implementation{Name: "memo-mcp", Version: version}, nil)
+	srv.mcp = mcp.NewServer(&mcp.Implementation{Name: "memo-mcp", Version: version}, &mcp.ServerOptions{
+		// Cache hints (2026-07-28 ttlMs): the tool list is stable for an
+		// hour; resource reads are stable for a minute, long enough for an
+		// agent's turn, short enough that a revision shows up soon.
+		SetCacheable: func(_ context.Context, req mcp.Request, c *mcp.Cacheable) {
+			switch req.(type) {
+			case *mcp.ReadResourceRequest:
+				c.TTLMs = 60_000
+			default:
+				c.TTLMs = 3_600_000
+			}
+		},
+	})
 	srv.registerTools()
+	srv.registerResources()
 	return srv
+}
+
+// registerResources mirrors the read tools as MCP resources so a client can
+// pivot from a search result's address to its content without a tool call,
+// and exposes a per-namespace index an agent can load at session start.
+func (s *Server) registerResources() {
+	for _, kind := range []struct{ name, desc string }{
+		{"doc", "A document's full text with provenance"},
+		{"chunk", "One passage with its provenance"},
+		{"source", "The latest document of a source"},
+		{"fact", "One recorded fact with its evidence address"},
+	} {
+		s.mcp.AddResourceTemplate(&mcp.ResourceTemplate{
+			URITemplate: "memo://" + kind.name + "/{id}",
+			Name:        "memo-" + kind.name,
+			Title:       kind.desc,
+			Description: kind.desc + ". Addresses come from search results.",
+			MIMEType:    "text/markdown",
+		}, s.readResource)
+	}
+	s.mcp.AddResourceTemplate(&mcp.ResourceTemplate{
+		URITemplate: "memo://ns/{namespace}/index",
+		Name:        "memo-namespace-index",
+		Title:       "Namespace index",
+		Description: "One line per document and fact in a namespace, under 8 KB, for loading at session start.",
+		MIMEType:    "text/markdown",
+	}, s.readResource)
+	s.mcp.AddResource(&mcp.Resource{
+		URI:         "memo://index",
+		Name:        "memo-index",
+		Title:       "Knowledge base index",
+		Description: "One line per document and fact across all namespaces, under 8 KB.",
+		MIMEType:    "text/markdown",
+	}, s.readResource)
+}
+
+func (s *Server) readResource(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+	uri := req.Params.URI
+	text := ""
+	switch {
+	case uri == "memo://index":
+		idx, err := s.store.ExportIndex(ctx, kb.IndexOptions{})
+		if err != nil {
+			return nil, err
+		}
+		text = idx
+	case strings.HasPrefix(uri, "memo://ns/") && strings.HasSuffix(uri, "/index"):
+		ns := strings.TrimSuffix(strings.TrimPrefix(uri, "memo://ns/"), "/index")
+		idx, err := s.store.ExportIndex(ctx, kb.IndexOptions{Namespace: ns})
+		if err != nil {
+			return nil, err
+		}
+		text = idx
+	default:
+		kind, id, err := kb.ParseURI(uri)
+		if err != nil {
+			return nil, mcp.ResourceNotFoundError(uri)
+		}
+		if kind == "fact" {
+			f, err := s.store.ReadFact(ctx, id)
+			if err != nil {
+				return nil, resourceErr(uri, err)
+			}
+			text = renderFact(f)
+		} else {
+			body, prov, err := s.store.Read(ctx, uri)
+			if err != nil {
+				return nil, resourceErr(uri, err)
+			}
+			text = renderProvHeader(prov) + "\n---\n" + body
+		}
+	}
+	return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{URI: uri, MIMEType: "text/markdown", Text: text}}}, nil
+}
+
+func resourceErr(uri string, err error) error {
+	if errors.Is(err, kb.ErrNotFound) {
+		return mcp.ResourceNotFoundError(uri)
+	}
+	return err
+}
+
+func renderFact(f *kb.Fact) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "fact %s (%s/%s, trust %s, origin %s)\n", f.URI, f.Namespace, "fact", f.Trust, f.Origin)
+	fmt.Fprintf(&sb, "recorded: %s", f.RecordedAt.Format("2006-01-02"))
+	if f.ValidFrom != nil || f.ValidTo != nil {
+		sb.WriteString("; valid ")
+		if f.ValidFrom != nil {
+			sb.WriteString(f.ValidFrom.Format("2006-01-02"))
+		}
+		sb.WriteString(" → ")
+		if f.ValidTo != nil {
+			sb.WriteString(f.ValidTo.Format("2006-01-02"))
+		}
+	}
+	if f.InvalidatedAt != nil {
+		fmt.Fprintf(&sb, "; replaced %s by %s", f.InvalidatedAt.Format("2006-01-02"), f.SupersededBy)
+	}
+	if f.EvidenceURI != "" {
+		fmt.Fprintf(&sb, "\nevidence: %s", f.EvidenceURI)
+	}
+	sb.WriteString("\n---\n" + f.Statement + "\n")
+	return sb.String()
+}
+
+func renderProvHeader(prov kb.Provenance) string {
+	h := fmt.Sprintf("%s (%s/%s, trust %s, origin %s, revision %d", prov.Title, prov.Namespace, prov.Kind, prov.Trust, prov.Origin, prov.Revision)
+	if prov.Version != "" {
+		h += ", " + prov.Version
+	}
+	h += ")"
+	if prov.SourceURI != "" {
+		h += "\nsource: " + prov.SourceURI + " fetched " + prov.FetchedAt.Format("2006-01-02")
+	}
+	return h
 }
 
 // Run serves on stdio until ctx is cancelled or the client disconnects.
@@ -109,7 +238,11 @@ type SearchOut struct {
 	Degraded bool              `json:"degraded" jsonschema:"True when a capability was missing (e.g. no embedding model); results may be keyword-only"`
 	Reason   string            `json:"reason,omitempty" jsonschema:"Why no results were returned"`
 	Hint     string            `json:"hint,omitempty" jsonschema:"What to try next when results are missing or truncated"`
-	Trace    *retrieve.Trace   `json:"trace,omitempty"`
+	// Truncated and NarrowHint are the token-budget footer: how many ranked
+	// results were left out and how to narrow the query.
+	Truncated  int             `json:"truncated,omitempty" jsonschema:"How many ranked results the token budget left out"`
+	NarrowHint string          `json:"narrow_hint,omitempty" jsonschema:"How to narrow the query when results were truncated, e.g. scope.version"`
+	Trace      *retrieve.Trace `json:"trace,omitempty"`
 }
 
 // --- read ---
@@ -239,14 +372,14 @@ func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "promote",
 		Title:       "Ask to raise a record's trust",
-		Description: "Request that a document, source or fact be trusted more (user or curated). Trust cannot be raised by a tool call alone; this returns the command a human runs (or, on clients that support it, asks the human directly).",
+		Description: "Request that a document, source or fact be trusted more (user or curated). Trust cannot be raised by a tool call alone: on clients that can show a dialog the human is asked directly, with the excerpt and where it came from; otherwise the result carries the command the human runs. Example: promote(uri: \"memo://fact/01a0...\", to: \"user\").",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: closed},
 	}, s.handlePromote)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "status",
 		Title:       "Knowledge base status",
-		Description: "Counts per namespace, the embedding model in use, pending vectors and background jobs. degraded=true means search is keyword-only right now.",
+		Description: "Counts per namespace, the embedding model in use, pending vectors and background jobs. degraded=true means search is keyword-only right now. Example: status() before the first search of a session, to learn which namespaces exist.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: closed},
 	}, s.handleStatus)
 }
@@ -318,7 +451,7 @@ func (s *Server) handleSearch(ctx context.Context, _ *mcp.CallToolRequest, args 
 	if err != nil {
 		return nil, SearchOut{}, err
 	}
-	out := SearchOut{Results: resp.Results, Degraded: resp.Degraded, Reason: resp.Reason, Hint: resp.Hint, Trace: resp.Trace}
+	out := SearchOut{Results: resp.Results, Degraded: resp.Degraded, Reason: resp.Reason, Hint: resp.Hint, Truncated: resp.Truncated, NarrowHint: resp.NarrowHint, Trace: resp.Trace}
 	if out.Results == nil {
 		out.Results = []retrieve.Result{}
 	}
@@ -373,6 +506,9 @@ func renderSearch(resp *retrieve.Response) string {
 			sb.WriteString("\n")
 		}
 		sb.WriteString("\n")
+	}
+	if resp.Truncated > 0 && resp.Trace == nil {
+		fmt.Fprintf(&sb, "%d more result(s) did not fit the token budget; %s, or raise max_tokens.\n", resp.Truncated, resp.NarrowHint)
 	}
 	if resp.Trace != nil {
 		t := resp.Trace
@@ -486,17 +622,75 @@ func (s *Server) handlePromote(ctx context.Context, req *mcp.CallToolRequest, ar
 	if args.To != kb.TrustUser && args.To != kb.TrustCurated {
 		return nil, PromoteOut{}, fmt.Errorf("to must be user or curated")
 	}
-	// P4: no elicitation yet; the tool returns the command (P5 asks the human).
-	err := s.store.SetTrust(ctx, args.URI, args.To, clientName(req, s.actor), kb.ChannelTool)
-	var needs *kb.ErrNeedsHuman
-	if errors.As(err, &needs) {
-		out := PromoteOut{URI: args.URI, Applied: false, Command: needs.Command, Reason: "raising trust needs a human; tool calls cannot do it"}
-		return textResult("Not applied: raising trust needs a human. Ask them to run: " + needs.Command), out, nil
+	command := fmt.Sprintf("memo-mcp trust promote %s --to %s", args.URI, args.To)
+	// Raising trust needs a human. If the client can show a dialog
+	// (elicitation), ask them with what is being promoted. On protocol
+	// 2026-07-28 this is a multi round-trip request (SEP-2322): the first
+	// call returns the question, the client shows it and retries the call
+	// with the answer; the model never sees or answers the dialog. Clients
+	// that cannot ask get the CLI command instead.
+	if req == nil || req.Session == nil || !supportsElicitation(req.Session) {
+		out := PromoteOut{URI: args.URI, Applied: false, Command: command, Reason: "raising trust needs a human and this client cannot ask one; run the command"}
+		return textResult("Not applied: raising trust needs a human. Ask them to run: " + command), out, nil
 	}
-	if err != nil {
+	answer, asked := req.Params.InputResponses[promoteConfirmID].(*mcp.ElicitResult)
+	if !asked || req.Params.RequestState != promoteState(args) {
+		excerpt, from, err := s.promotionPreview(ctx, args.URI)
+		if err != nil {
+			return nil, PromoteOut{}, err
+		}
+		return &mcp.CallToolResult{
+			RequestState: promoteState(args),
+			InputRequests: mcp.InputRequestMap{promoteConfirmID: &mcp.ElicitParams{
+				Mode:            "form",
+				Message:         fmt.Sprintf("memo-mcp: raise trust of %s from %s to %s?\n\n%s\n\nAccept only if you vouch for this content yourself.", args.URI, from, args.To, excerpt),
+				RequestedSchema: map[string]any{"type": "object", "properties": map[string]any{"confirm": map[string]any{"type": "boolean", "title": "Raise trust", "description": "Confirm the promotion"}}, "required": []string{"confirm"}},
+			}},
+		}, PromoteOut{}, nil
+	}
+	if answer.Action != "accept" || answer.Content["confirm"] != true {
+		out := PromoteOut{URI: args.URI, Applied: false, Command: command, Reason: "the human declined (" + answer.Action + ")"}
+		return textResult("Not applied: the human declined to raise trust of " + args.URI), out, nil
+	}
+	if err := s.store.SetTrust(ctx, args.URI, args.To, clientName(req, s.actor), kb.ChannelElicitation); err != nil {
 		return nil, PromoteOut{}, err
 	}
-	return textResult("Trust of " + args.URI + " is now " + args.To), PromoteOut{URI: args.URI, Applied: true}, nil
+	return textResult("Trust of " + args.URI + " is now " + args.To + " (confirmed by the human)"), PromoteOut{URI: args.URI, Applied: true}, nil
+}
+
+// promoteConfirmID names the one input request promote makes.
+const promoteConfirmID = "confirm"
+
+// promoteState ties the answer to the exact promotion asked about, so an
+// answer echoed back with different arguments does not apply to them. The
+// server runs on stdio for one local user, so the state is plain text.
+func promoteState(a promoteArgs) string { return "promote:" + a.URI + ":" + a.To }
+
+func supportsElicitation(ss *mcp.ServerSession) bool {
+	p := ss.InitializeParams()
+	return p != nil && p.Capabilities != nil && p.Capabilities.Elicitation != nil
+}
+
+// promotionPreview is what the human sees before accepting: the record's
+// first lines, where it came from, and its current trust.
+func (s *Server) promotionPreview(ctx context.Context, uri string) (excerpt, from string, err error) {
+	kind, id, err := kb.ParseURI(uri)
+	if err != nil {
+		return "", "", err
+	}
+	if kind == "fact" {
+		f, err := s.store.ReadFact(ctx, id)
+		if err != nil {
+			return "", "", err
+		}
+		return fmt.Sprintf("fact: %s\n(origin %s, evidence %s)", f.Statement, f.Origin, f.EvidenceURI), f.Trust, nil
+	}
+	text, prov, err := s.store.Read(ctx, uri)
+	if err != nil {
+		return "", "", err
+	}
+	head, _ := cutTokens(text, 60)
+	return fmt.Sprintf("%s\n(source %s, origin %s)\n\n%s", prov.Title, prov.SourceURI, prov.Origin, head), prov.Trust, nil
 }
 
 func (s *Server) handleStatus(ctx context.Context, _ *mcp.CallToolRequest, _ statusArgs) (*mcp.CallToolResult, StatusOut, error) {

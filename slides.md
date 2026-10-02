@@ -411,6 +411,28 @@ Or for Claude Code, add to `.mcp.json`:
 
 ---
 
+# What an Agent Sees
+
+Seven tools, each with an example in its description. One search result, `concise`:
+
+```
+1. [strong] gRPC Interceptors › Errors   memo://chunk/812
+   A handler returning ERR_CONN_RESET surfaces as codes.Unavailable…
+   (grpc/grpc-go v1.8.0 · web · trust agent)
+3 more result(s) did not fit the token budget; narrow with scope.version, or raise max_tokens.
+```
+
+<v-clicks>
+
+- The address is a **resource** too: `memo://chunk/812` reads without a tool call
+- `response_format: explain` adds *why*: per-arm ranks, fused score, recency, the cut
+- `promote` opens a dialog **for the human**: excerpt, source, origin, target trust
+- `memo://index` and `export --index` fit the whole shelf map in 8 KB for `AGENTS.md`
+
+</v-clicks>
+
+---
+
 # Privacy & Security
 
 <v-clicks>

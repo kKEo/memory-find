@@ -22,8 +22,10 @@ Claude (or any MCP client) gets seven tools over one knowledge base:
 | `read` | Dereference a `memo://` address: a passage, its section, or the whole document under a token budget |
 | `remember` | Record one atomic fact with evidence and validity dates; to correct a fact, pass `supersedes` and the old one is kept as history |
 | `forget` | Retire a document or fact with a reason; it leaves every index and its address resolves to "forgotten on … because …". Tool calls may only retire records written by tools |
-| `promote` | Ask to raise a record's trust; tool calls cannot do it themselves, so the result carries the command a human runs |
+| `promote` | Ask to raise a record's trust; tool calls cannot do it themselves. Clients that can show a dialog ask the human directly (excerpt, source, target level); others get the command a human runs |
 | `status` | Namespaces, the embedding model, pending vectors, background jobs |
+
+The same addresses are readable as MCP resources (`memo://doc/{id}`, `memo://chunk/{id}`, `memo://source/{id}`, `memo://fact/{id}`), and `memo://index` or `memo://ns/{namespace}/index` give a one-line-per-document view under 8 KB for the start of a session. [`SKILL.md`](SKILL.md) tells an agent how to use the tools well; `memo-mcp export --index` prints the same index for an `AGENTS.md` or `CLAUDE.md` file.
 
 Everything is stored locally. There is exactly one outbound network call in the whole system: downloading the ~90MB embedding model from Hugging Face on first start. After that, nothing leaves the machine. The server never fetches URLs; the agent fetches and passes the text.
 
@@ -81,7 +83,7 @@ Running the binary with no arguments starts the MCP server on stdio. From the te
 - `memo-mcp ingest <file|dir|-> [--ns --kind --uri --title --library --version --trust --context --embed=false]` — add markdown documents; identical content is a no-op, changed content becomes a new revision
 - `memo-mcp search "<query>" [--mode auto|hybrid|keyword|exact|semantic --ns --library --version --kind --limit --format table|json|md --explain --no-model]` — search; `--explain` adds why each result ranked
 - `memo-mcp explain "<query>" <memo://chunk/n>` — the full explanation for one result
-- `memo-mcp log tail|show <id>|prune` — the opt-in query log (`MEMO_QUERY_LOG=1`)
+- `memo-mcp log tail|show <id>|replay|prune` — the opt-in query log (`MEMO_QUERY_LOG=1`); `replay` prints logged searches as unlabelled eval candidates (one JSON object per line) ready to be labelled and added to a corpus
 - `memo-mcp remember "<fact>" [--ns --about --valid-from --valid-to --supersedes --evidence --trust user|curated]` — record a fact (CLI writes are trust `user`; `curated` must be typed)
 - `memo-mcp forget <memo://...> --reason "<why>" [--redact]` — retire a document or fact; the reason is kept and shown
 - `memo-mcp facts ls [--ns --as-of YYYY-MM-DD --history]` — list facts, or what was believed on a date
@@ -89,6 +91,7 @@ Running the binary with no arguments starts the MCP server on stdio. From the te
 - `memo-mcp read <memo://doc/...> [--history]` — print a document, chunk, source or fact with its provenance, or its revision chain
 - `memo-mcp ls [--ns --kind --since --json]` — list live documents, newest first
 - `memo-mcp export --md <dir> [--ns]` — write markdown files with front-matter provenance (opens in Obsidian; re-importing yields no new revisions)
+- `memo-mcp export --index [--ns --library x@v --max-bytes 8192]` — print a compact index (title, address, kind, version, trust per document; facts summarised) sized for `AGENTS.md`/`CLAUDE.md`; lines that do not fit are counted in a footer
 - `memo-mcp verify [--repair]` — check chunks, vectors and indexes
 - `memo-mcp backfill` — embed chunks whose vectors are pending
 - `memo-mcp status` — print knowledge-base statistics (read-only; never creates a file)
@@ -111,7 +114,7 @@ The old spellings `--stats` and `--redownload-model` still work for one release 
 | `MEMO_KB` | no | Selects the database to open; the file is `$MEMO_HOME/kb/<name>.db`. Letters, digits, `.`, `_`, `-` only. Default `default`. |
 | `MEMO_HOME` | no | Base directory (default `~/.memo-mcp`) |
 | `MEMO_QUERY_LOG` | no | `1` keeps an opt-in log of searches (arguments, result addresses, scores, trace; never passage text) in the same file |
-| `MEMO_MODEL` | no | Embedding model id from `memo-mcp model ls` (default `minilm`). Queries use that model's vectors; run `memo-mcp reindex` after switching |
+| `MEMO_MODEL` | no | Embedding model id from `memo-mcp model ls` (default `granite-small-r2`). Queries use that model's vectors; run `memo-mcp reindex` after switching |
 | `MEMO_PROFILE` | no | Ranking profile (default `default`); see `memo-mcp profiles show` |
 | `MEMO_RERANK` | no | `1` loads the cross-encoder reranker (`cross-encoder/ms-marco-MiniLM-L6-v2`, Apache-2.0, ~91 MB); only profiles with rerank on (`precise`) use it |
 | `JOURNAL_TOKEN` | deprecated | Old name selector: opens `<JOURNAL_PATH or ~/.memo-mcp>/<token>.db` exactly as before, with a warning. Honoured for one release. |
@@ -129,6 +132,7 @@ memo-mcp exists as something different: a small, fully local, fully readable ret
 - No network calls after the one-time model download.
 - No telemetry, no analytics, no external logging.
 - Source is small enough to read in full; nothing is obfuscated or minified.
+- Raising trust needs a human. `promote` uses MCP elicitation: the client shows a dialog with the excerpt, source and target level, and only an accepted dialog applies the change. A hook or setting that auto-accepts elicitation dialogs removes that protection; if you configure one, treat `user` and `curated` records as no more trusted than `agent` ones.
 - Two things to know: the knowledge base is a plaintext SQLite file that anyone with access to your home directory can read, and everything the model writes or searches passes through the MCP host as tool input, so it is as private as that host. If the embedding model is unavailable, search runs keyword-only and says so (`degraded`), and documents written in that state get their vectors when `memo-mcp backfill` or the next server start runs.
 
 ## Project status
