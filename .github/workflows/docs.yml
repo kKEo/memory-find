@@ -1,6 +1,9 @@
 # Documentation site: the user guide and the operator guide (docs/guide/,
 # GitBook-compatible markdown) rendered with mdBook and deployed to GitHub
 # Pages. One-time repository setting: Settings → Pages → Source: GitHub Actions.
+# Deploys run from master only: the github-pages environment's default
+# protection rule refuses tags, and a release tag's docs are already live
+# from the push to master that preceded it.
 name: docs
 on:
   push:
@@ -10,7 +13,6 @@ on:
       - "scripts/docs-check.sh"
       - "internal/cli/cli.go"
       - ".github/workflows/docs.yml"
-    tags: ["v*"]
   pull_request:
     paths:
       - "docs/guide/**"
