@@ -1,0 +1,3 @@
+# The search pipeline
+
+> Draft.

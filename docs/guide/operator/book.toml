@@ -1,0 +1,19 @@
+# Read by mdBook in CI (make docs); GitBook ignores this file.
+[book]
+title = "memo-mcp operator guide"
+description = "Install, configure, tune, monitor and operate memo-mcp."
+authors = ["memo-mcp contributors"]
+language = "en"
+src = "."
+
+[build]
+build-dir = "../../../site/operator"
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/kKEo/memory-find"
+edit-url-template = "https://github.com/kKEo/memory-find/edit/master/docs/guide/operator/{path}"
+site-url = "/memory-find/operator/"
+
+[output.html.search]
+enable = true

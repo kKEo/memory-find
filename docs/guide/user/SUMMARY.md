@@ -1,0 +1,19 @@
+# Summary
+
+[Welcome](README.md)
+
+- [Why it matters](why.md)
+- [Quick start](quick-start.md)
+- [Everyday use](everyday/README.md)
+  - [Saving documents and notes](everyday/saving.md)
+  - [Asking questions](everyday/asking.md)
+  - [Facts and corrections](everyday/facts.md)
+  - [Forgetting things](everyday/forgetting.md)
+  - [Keeping work separate](everyday/separate.md)
+- [Trust: who vouched for what](trust.md)
+- [Looking inside](looking-inside.md)
+- [Keeping it tidy](keeping-tidy.md)
+- [Use cases](use-cases.md)
+- [Privacy and safety](privacy.md)
+- [Questions and troubleshooting](faq.md)
+- [Words we use](glossary.md)

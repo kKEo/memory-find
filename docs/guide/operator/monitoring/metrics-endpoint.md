@@ -1,0 +1,3 @@
+# The metrics endpoint
+
+> Draft.
