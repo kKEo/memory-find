@@ -1,0 +1,3 @@
+# Air-gapped installs
+
+> Draft.

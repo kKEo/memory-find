@@ -22,3 +22,6 @@ coverage.out
 
 # Release artefacts (GoReleaser).
 /dist/
+
+# Built documentation (make docs).
+/site/

@@ -1,0 +1,56 @@
+# Documentation site: the user guide and the operator guide (docs/guide/,
+# GitBook-compatible markdown) rendered with mdBook and deployed to GitHub
+# Pages. One-time repository setting: Settings → Pages → Source: GitHub Actions.
+name: docs
+on:
+  push:
+    branches: [master]
+    paths:
+      - "docs/guide/**"
+      - "scripts/docs-check.sh"
+      - "internal/cli/cli.go"
+      - ".github/workflows/docs.yml"
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "docs/guide/**"
+      - "scripts/docs-check.sh"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
+env:
+  MDBOOK_VERSION: v0.5.4
+  MDBOOK_SHA256: 5222beabd3e37dc5be0d18ff99b79058469354db5c220153a1b92db5ba12be89
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install mdBook (pinned, checksum verified)
+        run: |
+          curl -sSLo mdbook.tgz "https://github.com/rust-lang/mdBook/releases/download/${MDBOOK_VERSION}/mdbook-${MDBOOK_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          echo "${MDBOOK_SHA256}  mdbook.tgz" | sha256sum -c -
+          tar xzf mdbook.tgz -C /usr/local/bin mdbook
+          mdbook --version
+      - name: build both guides (runs docs-check first)
+        run: make docs
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: site
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

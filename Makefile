@@ -2,7 +2,7 @@ BINARY = memo-mcp
 PKG = ./cmd/memo-mcp/
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: build snapshot test test-verbose test-race cover fmt vet lint check clean eval golden-update baseline-update spike
+.PHONY: build snapshot test test-verbose test-race cover fmt vet lint check clean eval golden-update baseline-update spike docs docs-check docs-serve
 
 build:
 	CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(VERSION)" -o $(BINARY) $(PKG)
@@ -31,6 +31,31 @@ golden-update:
 # binary or of PR CI). Usage: make spike NAME=s2-vectors
 spike:
 	go run -tags spike ./spikes/$(NAME)
+
+# docs builds the user and operator guides (docs/guide/, GitBook-compatible
+# markdown) into site/ with mdBook, the same way the Pages workflow does.
+# mdBook is a single static binary: https://github.com/rust-lang/mdBook/releases
+MDBOOK ?= mdbook
+BOOK ?= user
+
+docs: docs-check
+	@command -v $(MDBOOK) >/dev/null || { echo "mdbook not found; install it (brew install mdbook, or a release binary) or pass MDBOOK=/path/to/mdbook"; exit 1; }
+	rm -rf site
+	$(MDBOOK) build docs/guide/user
+	$(MDBOOK) build docs/guide/operator
+	rm -f site/*/book.toml site/*/.gitbook.yaml
+	cp docs/guide/index.html site/index.html
+	touch site/.nojekyll
+	@echo "site/index.html: open it, or run 'make docs-serve BOOK=user|operator'"
+
+# docs-check fails when an env var, command or metric in the code is missing
+# from the operator guide, or a relative link in either guide is broken.
+docs-check:
+	./scripts/docs-check.sh
+
+# docs-serve previews one book with live reload (BOOK=user or BOOK=operator).
+docs-serve:
+	$(MDBOOK) serve docs/guide/$(BOOK) --open
 
 test:
 	go test ./... -count=1
@@ -70,3 +95,4 @@ check: fmt vet lint test-race
 
 clean:
 	rm -f $(BINARY) coverage.out
+	rm -rf site
