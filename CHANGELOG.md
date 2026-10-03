@@ -3,6 +3,21 @@
 All notable changes. Tags follow semantic versioning; each tag has an eval report in
 `docs/eval/` from `v0.6.0` on.
 
+## [1.2.0] — 2026-10-03 — compaction and pages (P8)
+
+- Migration 3: `pages`, `page_sources`, `page_vecs`, `pages_fts`, `work_items`.
+- Pages are written only by the calling agent: `compact` proposes work items (page, stale,
+  conflict, merge, duplicate) with full payloads; `submit` stores pages as derived
+  (`is_inference`) with their sources, resolves conflicts under the trust rule, records merge
+  decisions; `dry_run` shows the diff, the omission check and the corruption check.
+- Staleness: a revised or forgotten source marks dependent pages stale with the reason.
+- `lint`: contradictions, orphan entities, missing pages, stale pages, expired facts.
+- `search granularity=page`; `read` and the `memo://page/{id}` resource; `status.pages`.
+- CLI `compact`, `submit`, `lint`, `pages ls`; `export --md` writes `<ns>/pages/`.
+- Optional `compact --executor ollama` (loopback, constrained JSON); nothing else depends on it.
+- Eval: lint recall on five planted defect kinds, omission and corruption checks, raw-row
+  checksum. Ten tools.
+
 ## [1.1.0] — 2026-10-03 — entities and graph, as an index (P7)
 
 - Migration 2: `entities`, `entity_aliases`, `mentions`, `merge_candidates`, `edges`.

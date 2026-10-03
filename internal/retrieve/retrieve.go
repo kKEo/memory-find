@@ -180,6 +180,9 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 	if req.Granularity == GranularityFact {
 		return s.searchFacts(ctx, req, queries, limit, tr, start)
 	}
+	if req.Granularity == GranularityPage {
+		return s.searchPages(ctx, req, queries, limit, tr, start)
+	}
 
 	// Resolve arms. Entities the query names are looked up once, for the
 	// routing rule and for the entity/graph arms.
@@ -966,7 +969,7 @@ func (s *Service) logQuery(ctx context.Context, req Request, queries []string, t
 func validateEnum(field, got string) error {
 	allowed := map[string][]string{
 		"mode":            {ModeAuto, ModeHybrid, ModeKeyword, ModeExact, ModeSemantic, ModeGraph},
-		"granularity":     {GranularityChunk, GranularityDocument, GranularityFact},
+		"granularity":     {GranularityChunk, GranularityDocument, GranularityFact, GranularityPage},
 		"response_format": {FormatConcise, FormatDetailed, FormatExplain},
 	}[field]
 	for _, a := range allowed {

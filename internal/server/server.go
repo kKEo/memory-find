@@ -6,6 +6,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/kKEo/memory-find/internal/compact"
 	"github.com/kKEo/memory-find/internal/kb"
 	"github.com/kKEo/memory-find/internal/retrieve"
 )
@@ -61,6 +63,7 @@ func (s *Server) registerResources() {
 		{"source", "The latest document of a source"},
 		{"fact", "One recorded fact with its evidence address"},
 		{"entity", "One entity: its aliases, passages and neighbours"},
+		{"page", "One curated page with the passages it was built from"},
 	} {
 		s.mcp.AddResourceTemplate(&mcp.ResourceTemplate{
 			URITemplate: "memo://" + kind.name + "/{id}",
@@ -121,6 +124,12 @@ func (s *Server) readResource(ctx context.Context, req *mcp.ReadResourceRequest)
 				return nil, resourceErr(uri, err)
 			}
 			text = resultTextOf(res)
+		case "page":
+			p, err := s.store.ReadPage(ctx, id)
+			if err != nil {
+				return nil, resourceErr(uri, err)
+			}
+			text = renderPage(p)
 		default:
 			body, prov, err := s.store.Read(ctx, uri)
 			if err != nil {
@@ -334,7 +343,57 @@ type StatusOut struct {
 	JobsFailed        int                `json:"jobs_failed"`
 	Degraded          bool               `json:"degraded" jsonschema:"True when search is keyword-only because no vectors are stored or the model is unavailable"`
 	Graph             kb.GraphStats      `json:"graph" jsonschema:"Entities, mention links, typed edges and open merge candidates (the graph index)"`
+	Pages             kb.PageStats       `json:"pages" jsonschema:"Curated pages, stale pages and open compaction work items"`
 }
+
+// --- compact / submit ---
+
+type compactArgs struct {
+	Namespace string   `json:"namespace,omitempty" jsonschema:"Scan this namespace (default: every namespace)."`
+	Kinds     []string `json:"kinds,omitempty" jsonschema:"Which work to propose: page, stale, conflict, merge, duplicate. Default: all."`
+	Limit     int      `json:"limit,omitempty" jsonschema:"At most this many items (default 10, max 50)."`
+	Lint      bool     `json:"lint,omitempty" jsonschema:"Also return the lint findings (contradictions, orphans, missing or stale pages, expired facts)."`
+}
+
+// WorkItemOut is a work item with its payload as an object (the kb type
+// carries raw JSON, which has no schema type).
+type WorkItemOut struct {
+	ID        string    `json:"id"`
+	Namespace string    `json:"namespace"`
+	Kind      string    `json:"kind" jsonschema:"page | stale | conflict | merge | duplicate"`
+	Subject   string    `json:"subject"`
+	Payload   any       `json:"payload" jsonschema:"Everything needed to do the work: for page/stale items the entity, its passages, the facts to cover (must_cover) and the previous page; for conflict items the two facts and the rule; for merge items the two names"`
+	State     string    `json:"state"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func toWorkItemOut(w kb.WorkItem) WorkItemOut {
+	var payload any
+	_ = json.Unmarshal(w.Payload, &payload)
+	return WorkItemOut{ID: w.ID, Namespace: w.Namespace, Kind: w.Kind, Subject: w.Subject, Payload: payload, State: w.State, CreatedAt: w.CreatedAt}
+}
+
+// CompactOut lists work the agent can do now.
+type CompactOut struct {
+	Items    []WorkItemOut     `json:"items" jsonschema:"Open work items; each payload holds everything needed to do the work without another call"`
+	Open     int               `json:"open" jsonschema:"Open items in total after this scan"`
+	Findings []compact.Finding `json:"findings,omitempty"`
+	Hint     string            `json:"hint"`
+}
+
+type submitArgs struct {
+	ItemID  string `json:"item_id" jsonschema:"The work item id from compact."`
+	Title   string `json:"title,omitempty" jsonschema:"page/stale items: the page title (default: the entity name)."`
+	Content string `json:"content,omitempty" jsonschema:"page/stale items: the page in markdown. Cite sources as memo://chunk/<n>; cover every statement in the item's must_cover."`
+	Keep    string `json:"keep,omitempty" jsonschema:"conflict items: the memo://fact address to keep; the other is invalidated (kept as history)."`
+	Accept  *bool  `json:"accept,omitempty" jsonschema:"merge items: true merges the names, false keeps them apart."`
+	Reason  string `json:"reason,omitempty" jsonschema:"Why, in one sentence; stored in the audit log."`
+	Skip    bool   `json:"skip,omitempty" jsonschema:"Close the item without doing anything."`
+	DryRun  bool   `json:"dry_run,omitempty" jsonschema:"Show the diff and the omission check without writing."`
+}
+
+// SubmitOut is the report for one submission.
+type SubmitOut = compact.Report
 
 // --- explore ---
 
@@ -407,6 +466,20 @@ func (s *Server) registerTools() {
 		Description: "Walk the graph index from one named thing: the passages that mention it and the other things those passages mention, each with evidence addresses to read. Use it after a search names something you want the context of, or to see how two things connect. Example: explore(entity: \"Ledger Store\", hops: 1).",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: closed},
 	}, s.handleExplore)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "compact",
+		Title:       "Propose compaction work",
+		Description: "Scan the knowledge base for tidying work you can do: entities with several passages and no page (write one), stale pages (rebuild), two live facts that disagree (pick one), near-duplicate names (merge or keep apart), near-duplicate passages. Each item carries the passages and facts you need. The server never writes a page itself. Example: compact(namespace: \"platform\", kinds: [\"page\", \"conflict\"], lint: true).",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false, IdempotentHint: true, OpenWorldHint: closed},
+	}, s.handleCompact)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "submit",
+		Title:       "Submit the result of a work item",
+		Description: "Hand back a page you wrote, a conflict decision or a merge decision. Pages are stored as derived (is_inference) with the passages they cite; the omission check reports facts the page left out. dry_run shows the diff first. Example: submit(item_id: \"01a1…\", content: \"# Ledger Store\\n\\nAppend-only … (memo://chunk/812)\", dry_run: true).",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false, IdempotentHint: false, OpenWorldHint: closed},
+	}, s.handleSubmit)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "status",
@@ -778,6 +851,151 @@ func (s *Server) handleExplore(ctx context.Context, _ *mcp.CallToolRequest, args
 	return textResult(sb.String()), out, nil
 }
 
+func (s *Server) handleCompact(ctx context.Context, req *mcp.CallToolRequest, args compactArgs) (*mcp.CallToolResult, CompactOut, error) {
+	limit := args.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	for _, k := range args.Kinds {
+		switch k {
+		case compact.KindPage, compact.KindStale, compact.KindConflict, compact.KindMerge, compact.KindDuplicate:
+		default:
+			return nil, CompactOut{}, fmt.Errorf("kinds must be among page, stale, conflict, merge, duplicate; got %q", k)
+		}
+	}
+	namespaces := []string{args.Namespace}
+	if args.Namespace == "" {
+		ns, err := s.store.Namespaces(ctx)
+		if err != nil {
+			return nil, CompactOut{}, err
+		}
+		namespaces = ns
+	}
+	out := CompactOut{Items: []WorkItemOut{}}
+	for _, ns := range namespaces {
+		if _, err := compact.Generate(ctx, s.store, ns, args.Kinds); err != nil {
+			return nil, CompactOut{}, err
+		}
+		if args.Lint {
+			f, err := compact.Lint(ctx, s.store, ns, time.Now())
+			if err != nil {
+				return nil, CompactOut{}, err
+			}
+			out.Findings = append(out.Findings, f...)
+		}
+	}
+	for _, ns := range namespaces {
+		items, err := s.store.ListWorkItems(ctx, ns, "", "open", 0)
+		if err != nil {
+			return nil, CompactOut{}, err
+		}
+		for _, w := range items {
+			if len(args.Kinds) > 0 && !containsStr(args.Kinds, w.Kind) {
+				continue
+			}
+			out.Open++
+			if len(out.Items) < limit {
+				out.Items = append(out.Items, toWorkItemOut(w))
+			}
+		}
+	}
+	out.Hint = "do an item, then submit(item_id, …); dry_run first to see the diff and the omission check"
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%d open work item(s)", out.Open)
+	if len(out.Items) < out.Open {
+		fmt.Fprintf(&sb, ", showing %d", len(out.Items))
+	}
+	sb.WriteString(":\n")
+	for _, w := range out.Items {
+		raw, _ := json.Marshal(w.Payload)
+		fmt.Fprintf(&sb, "  %s  %-9s %s\n", w.ID, w.Kind, oneLineReason(raw))
+	}
+	for _, f := range out.Findings {
+		fmt.Fprintf(&sb, "lint %-13s %s  %s\n", f.Kind, f.URI, f.Message)
+	}
+	if out.Open == 0 && len(out.Findings) == 0 {
+		sb.WriteString("nothing to do\n")
+	}
+	return textResult(sb.String()), out, nil
+}
+
+func oneLineReason(payload []byte) string {
+	var v struct {
+		Reason string `json:"reason"`
+		Entity struct {
+			Canonical string `json:"canonical"`
+		} `json:"entity"`
+		Candidate struct {
+			A, B struct {
+				Canonical string `json:"canonical"`
+			}
+		} `json:"candidate"`
+		Jaccard float64 `json:"jaccard"`
+	}
+	_ = json.Unmarshal(payload, &v)
+	switch {
+	case v.Reason != "":
+		return v.Reason
+	case v.Candidate.A.Canonical != "":
+		return fmt.Sprintf("are %q and %q the same thing?", v.Candidate.A.Canonical, v.Candidate.B.Canonical)
+	case v.Jaccard > 0:
+		return fmt.Sprintf("two near-identical passages (Jaccard %.2f)", v.Jaccard)
+	}
+	return cutString(string(payload), 100)
+}
+
+func cutString(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
+}
+
+func containsStr(list []string, v string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) handleSubmit(ctx context.Context, req *mcp.CallToolRequest, args submitArgs) (*mcp.CallToolResult, SubmitOut, error) {
+	if args.ItemID == "" {
+		return nil, SubmitOut{}, fmt.Errorf("item_id is required")
+	}
+	rep, err := compact.Submit(ctx, s.store, args.ItemID, compact.Result{Title: args.Title, Content: args.Content, Keep: args.Keep, Accept: args.Accept, Reason: args.Reason, Skip: args.Skip}, args.DryRun, clientName(req, s.actor), kb.ChannelTool)
+	if err != nil {
+		return nil, SubmitOut{}, err
+	}
+	var sb strings.Builder
+	switch {
+	case rep.DryRun:
+		fmt.Fprintf(&sb, "Dry run for %s item %s. ", rep.Kind, rep.ItemID)
+	case rep.Applied:
+		fmt.Fprintf(&sb, "Applied %s item %s. ", rep.Kind, rep.ItemID)
+	}
+	if rep.PageURI != "" {
+		fmt.Fprintf(&sb, "Page: %s (derived, is_inference=1). ", rep.PageURI)
+	}
+	if rep.Note != "" {
+		sb.WriteString(rep.Note + ". ")
+	}
+	for _, w := range rep.Warnings {
+		sb.WriteString("\nwarning: " + w)
+	}
+	for _, o := range rep.Omitted {
+		sb.WriteString("\nomitted: " + o)
+	}
+	if rep.Diff != "" {
+		sb.WriteString("\n" + rep.Diff)
+	}
+	return textResult(sb.String()), *rep, nil
+}
+
 func (s *Server) handleStatus(ctx context.Context, _ *mcp.CallToolRequest, _ statusArgs) (*mcp.CallToolResult, StatusOut, error) {
 	st, err := s.store.Status(ctx)
 	if err != nil {
@@ -785,7 +1003,7 @@ func (s *Server) handleStatus(ctx context.Context, _ *mcp.CallToolRequest, _ sta
 	}
 	out := StatusOut{SchemaVersion: st.SchemaVersion, Namespaces: st.Namespaces, Sources: st.Sources, LiveDocuments: st.LiveDocuments, Chunks: st.Chunks, Facts: st.Facts,
 		DefaultModel: st.DefaultModel, PendingEmbeddings: st.PendingEmbeddings, JobsQueued: st.JobsQueued, JobsFailed: st.JobsFailed,
-		Degraded: s.store.Embedder() == nil || st.DefaultModel == "", Graph: st.Graph}
+		Degraded: s.store.Embedder() == nil || st.DefaultModel == "", Graph: st.Graph, Pages: st.Pages}
 	if out.Namespaces == nil {
 		out.Namespaces = []kb.NamespaceStat{}
 	}
@@ -885,5 +1103,15 @@ func resultTextOf(res *mcp.CallToolResult) string {
 			sb.WriteString(tc.Text)
 		}
 	}
+	return sb.String()
+}
+
+func renderPage(p *kb.Page) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%s (%s page, %s, trust %s, derived by %s, built %s rev %d", p.Title, p.Kind, p.Namespace, p.Trust, p.Actor, p.BuiltAt.Format("2006-01-02"), p.BuiltFromRev)
+	if p.Stale {
+		fmt.Fprintf(&sb, "; STALE: %s", p.StaleReason)
+	}
+	sb.WriteString(")\nbuilt from: " + strings.Join(p.Sources, ", ") + "\n---\n" + p.Content)
 	return sb.String()
 }

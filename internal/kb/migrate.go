@@ -12,6 +12,7 @@ import (
 var migrations = []migration{
 	{1, "knowledge_base_v1", migrateV1},
 	{2, "graph_v2", migrateV2},
+	{3, "pages_v3", migrateV3},
 }
 
 type migration struct {

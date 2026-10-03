@@ -228,8 +228,10 @@ func (s *Store) Forget(ctx context.Context, in ForgetInput) error {
 		err = tx.QueryRowContext(ctx, `SELECT s.trust, d.deleted_at FROM documents d JOIN sources s ON s.id = d.source_id WHERE d.id = ?`, id).Scan(&trust, &deleted)
 	case "fact":
 		err = tx.QueryRowContext(ctx, `SELECT trust, deleted_at FROM facts WHERE id = ?`, id).Scan(&trust, &deleted)
+	case "page":
+		err = tx.QueryRowContext(ctx, `SELECT trust, deleted_at FROM pages WHERE id = ?`, id).Scan(&trust, &deleted)
 	default:
-		return fmt.Errorf("forget supports memo://doc and memo://fact addresses, not %q", kind)
+		return fmt.Errorf("forget supports memo://doc, memo://fact and memo://page addresses, not %q", kind)
 	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("%s: %w", in.URI, ErrNotFound)
@@ -249,6 +251,10 @@ func (s *Store) Forget(ctx context.Context, in ForgetInput) error {
 	}
 	switch kind {
 	case "doc":
+		// Pages built from this document lose a source: stale, with the reason.
+		if _, err := tx.ExecContext(ctx, `UPDATE pages SET stale = 1, stale_reason = ? WHERE deleted_at IS NULL AND stale = 0 AND id IN (SELECT ps.page_id FROM page_sources ps JOIN chunks c ON c.id = ps.chunk_id WHERE c.document_id = ?)`, "source forgotten: "+in.URI, id); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM chunks WHERE document_id = ?`, id); err != nil {
 			return err
 		}
@@ -266,6 +272,14 @@ func (s *Store) Forget(ctx context.Context, in ForgetInput) error {
 		q := `UPDATE facts SET deleted_at = COALESCE(deleted_at, ?), deleted_reason = ? WHERE id = ?`
 		if in.Redact {
 			q = `UPDATE facts SET deleted_at = COALESCE(deleted_at, ?), deleted_reason = ?, statement = '[redacted]' WHERE id = ?`
+		}
+		if _, err := tx.ExecContext(ctx, q, nowMs, in.Reason, id); err != nil {
+			return err
+		}
+	case "page":
+		q := `UPDATE pages SET deleted_at = COALESCE(deleted_at, ?), deleted_reason = ? WHERE id = ?`
+		if in.Redact {
+			q = `UPDATE pages SET deleted_at = COALESCE(deleted_at, ?), deleted_reason = ?, content = '[redacted]' WHERE id = ?`
 		}
 		if _, err := tx.ExecContext(ctx, q, nowMs, in.Reason, id); err != nil {
 			return err

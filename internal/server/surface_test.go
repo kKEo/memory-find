@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -55,7 +56,7 @@ func TestResourcesMirrorReadTools(t *testing.T) {
 	for _, r := range tpl.ResourceTemplates {
 		names = append(names, r.URITemplate)
 	}
-	want := []string{"memo://doc/{id}", "memo://chunk/{id}", "memo://source/{id}", "memo://fact/{id}", "memo://entity/{id}", "memo://ns/{namespace}/index"}
+	want := []string{"memo://doc/{id}", "memo://chunk/{id}", "memo://source/{id}", "memo://fact/{id}", "memo://entity/{id}", "memo://page/{id}", "memo://ns/{namespace}/index"}
 	for _, w := range want {
 		if !containsString(names, w) {
 			t.Errorf("template %s missing from %v", w, names)
@@ -255,5 +256,76 @@ func TestExploreAndEntityResource(t *testing.T) {
 	sr := structured[SearchOut](t, callTool(t, cs, "search", map[string]any{"query": "how does ERR_CONN_RESET relate to the Retry Policy", "response_format": "explain"}))
 	if sr.Trace == nil || !strings.Contains(sr.Trace.RoutingReason, "entity and graph arms added") {
 		t.Fatalf("routing: %+v", sr.Trace)
+	}
+}
+
+// compact → submit (dry run, then real) → the page is a resource and a
+// search result at granularity=page, marked derived; revising a source
+// marks it stale and compact proposes a rebuild.
+func TestCompactSubmitRoundTrip(t *testing.T) {
+	cs, _ := newTestSession(t)
+	for i, body := range []string{
+		"The Ledger Store is an append-only table of money movements.",
+		"Durability of the Ledger Store comes from Quorum Replication across three regions.",
+		"The Billing Service writes every invoice line to the Ledger Store.",
+	} {
+		callTool(t, cs, "ingest", map[string]any{"content": fmt.Sprintf("# Page %d\n\n%s\n", i, body), "namespace": "platform",
+			"source": map[string]any{"uri": fmt.Sprintf("https://plat.example/%d", i), "title": fmt.Sprintf("Page %d", i), "kind": "doc", "origin": "web"}})
+	}
+	callTool(t, cs, "remember", map[string]any{"statement": "The Ledger Store keeps seven years of history.", "namespace": "platform", "about": []string{"Ledger Store"}})
+	out := structured[CompactOut](t, callTool(t, cs, "compact", map[string]any{"namespace": "platform", "kinds": []string{"page"}, "lint": true}))
+	var item *WorkItemOut
+	for i := range out.Items {
+		if raw, _ := json.Marshal(out.Items[i].Payload); strings.Contains(string(raw), "Ledger Store") {
+			item = &out.Items[i]
+		}
+	}
+	if item == nil {
+		t.Fatalf("no page item: %+v", out)
+	}
+	var sawMissing bool
+	for _, f := range out.Findings {
+		if f.Kind == "missing-page" {
+			sawMissing = true
+		}
+	}
+	if !sawMissing {
+		t.Fatalf("lint should flag the missing page: %+v", out.Findings)
+	}
+	dry := structured[SubmitOut](t, callTool(t, cs, "submit", map[string]any{"item_id": item.ID, "content": "# Ledger Store\n\nAppend-only table of money movements (memo://chunk/1).\n", "dry_run": true}))
+	if dry.Applied || len(dry.Omitted) != 1 || dry.Diff == "" {
+		t.Fatalf("dry run: %+v", dry)
+	}
+	page := "# Ledger Store\n\nAppend-only table of money movements (memo://chunk/1), replicated by Quorum Replication across three regions (memo://chunk/2). The Billing Service writes invoice lines to it (memo://chunk/3). It keeps seven years of history.\n"
+	real := structured[SubmitOut](t, callTool(t, cs, "submit", map[string]any{"item_id": item.ID, "content": page}))
+	if !real.Applied || real.PageURI == "" || len(real.Omitted) != 0 {
+		t.Fatalf("submit: %+v", real)
+	}
+	rr, err := cs.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: real.PageURI})
+	if err != nil || !strings.Contains(rr.Contents[0].Text, "derived by") || !strings.Contains(rr.Contents[0].Text, "memo://chunk/1") {
+		t.Fatalf("page resource: %v %+v", err, rr)
+	}
+	sr := structured[SearchOut](t, callTool(t, cs, "search", map[string]any{"query": "money movements replicated regions", "granularity": "page"}))
+	if len(sr.Results) != 1 || sr.Results[0].URI != real.PageURI || !sr.Results[0].Provenance.IsInference || sr.Results[0].Provenance.Stale {
+		t.Fatalf("page search: %+v", sr.Results)
+	}
+	rd := structured[ReadOut](t, callTool(t, cs, "read", map[string]any{"uri": real.PageURI}))
+	if rd.Provenance.Kind != "page" || rd.Provenance.Origin != "agent-derived" {
+		t.Fatalf("read page: %+v", rd.Provenance)
+	}
+	// Revise a source: the page goes stale, search says so, compact proposes a rebuild.
+	callTool(t, cs, "ingest", map[string]any{"content": "# Page 0\n\nThe Ledger Store is an append-only, partitioned table of money movements.\n", "namespace": "platform",
+		"source": map[string]any{"uri": "https://plat.example/0", "title": "Page 0", "kind": "doc", "origin": "web"}})
+	sr = structured[SearchOut](t, callTool(t, cs, "search", map[string]any{"query": "money movements", "granularity": "page"}))
+	if len(sr.Results) != 1 || !sr.Results[0].Provenance.Stale {
+		t.Fatalf("stale not reported: %+v", sr.Results)
+	}
+	out = structured[CompactOut](t, callTool(t, cs, "compact", map[string]any{"namespace": "platform", "kinds": []string{"stale"}}))
+	if len(out.Items) != 1 || out.Items[0].Kind != "stale" {
+		t.Fatalf("stale item: %+v", out)
+	}
+	st := structured[StatusOut](t, callTool(t, cs, "status", map[string]any{}))
+	if st.Pages.Pages != 1 || st.Pages.StalePages != 1 || st.Pages.OpenWorkItems < 1 {
+		t.Fatalf("status pages: %+v", st.Pages)
 	}
 }

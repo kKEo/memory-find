@@ -281,10 +281,22 @@ edges once into an in-memory compressed adjacency and rebuilds it when the menti
 
 ### 5.7 L5 — pages (migration 3, P8)
 
-`pages(id, kind entity|topic|overview, subject_id, namespace, content, built_at,
-built_from_rev, stale, is_inference, trust)`, `page_sources(page_id, chunk_id)`,
-`page_vecs(page_id, model_id, embedding)`, `work_items(id, job_id, kind, scope, payload_json,
-state, result_json)`.
+Built in P8. A page is curated markdown the calling agent wrote from chunks. The server
+proposes the work, stores what the agent submits, and marks pages stale; it never writes page
+text itself.
+
+| Table | Columns | In plain words |
+|---|---|---|
+| `pages` | `id` (UUIDv7), `namespace`, `kind` (`entity`, `topic`, `overview`), `subject_id`, `title`, `content`, `built_at`, `built_from_rev`, `stale`, `stale_reason`, `is_inference` (always 1), `trust`, `actor`, `deleted_at`, `deleted_reason` | One derived page. An entity has at most one live page per namespace (unique index); a rebuild bumps `built_from_rev`. `trust` follows the submitting channel (tool → `agent`). Forgetting a page tombstones it like a document. |
+| `page_sources` | `page_id`, `chunk_id` | The chunks the page was built from: the item's passages plus every `memo://chunk/<n>` the page cites. When one of those chunks' documents gets a new revision or is forgotten, the page becomes `stale` with the reason. |
+| `page_vecs` | `page_id`, `model_id`, `embedding` | One vector per model for `granularity=page` search. Best effort: a failed embedding never fails the write. |
+| `pages_fts` | `title`, `content` (porter) | Keyword index for page search, kept by triggers. |
+| `work_items` | `id`, `namespace`, `kind` (`page`, `stale`, `conflict`, `merge`, `duplicate`), `subject`, `payload_json`, `state` (`open`, `done`, `skipped`), `created_at`, `decided_at`, `result_json`, `actor` | The compaction queue. One open item per kind and subject (unique index); `compact` refreshes the payload rather than duplicating. The payload holds everything the agent needs: passages with addresses, facts to cover, the previous page, or the two facts and the rule. The result records what was decided and by whom. |
+
+Rules the layer enforces: a page must cite at least one existing chunk; `is_inference` is
+always 1; a conflict resolution invalidates the losing fact (`invalidated_at`, `superseded_by`),
+never deletes it, and a channel may not invalidate a fact more trusted than its cap or more
+trusted than the winner; near-duplicate passages are recorded, never deleted (D-A).
 
 ## 6. What is indexed where (P1 and P2)
 

@@ -233,6 +233,12 @@ func (s *Store) Ingest(ctx context.Context, in IngestInput) (*IngestResult, erro
 		if _, err := tx.ExecContext(ctx, `UPDATE documents SET superseded_by = ?, updated_at = ? WHERE id = ?`, docID, nowMs, prevDocID); err != nil {
 			return nil, fmt.Errorf("supersede previous revision: %w", err)
 		}
+		// Pages built from the old revision's chunks are now stale (the
+		// chunks themselves are about to be replaced).
+		if _, err := tx.ExecContext(ctx, `UPDATE pages SET stale = 1, stale_reason = ? WHERE deleted_at IS NULL AND stale = 0 AND id IN (SELECT ps.page_id FROM page_sources ps JOIN chunks c ON c.id = ps.chunk_id WHERE c.document_id = ?)`,
+			"source revised: "+docURI(docID), prevDocID); err != nil {
+			return nil, fmt.Errorf("mark pages stale: %w", err)
+		}
 	}
 
 	title := in.Source.Title

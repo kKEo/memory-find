@@ -1020,6 +1020,25 @@ less and shipped two phases in a month, so treat these as ranges, not promises.
 
 ### P8 — Compaction and pages · 5 days · `v1.2.0`
 
+> **Status (2026-10-03): built.** Migration 3 (`pages`, `page_sources`, `page_vecs`, `pages_fts`,
+> `work_items`). `internal/compact`: generators (page when an entity has ≥ 3 live passages and
+> no page; stale; the recurrence trigger re-proposes only after ≥ 2 new passages; conflict =
+> two live facts about one subject with overlapping validity and different statements, with the
+> trust-then-recency rule stated; merge = open resolver candidates; duplicate = word 3-gram
+> Jaccard ≥ 0.75 across documents), `Submit` (page with sources and `is_inference`, conflict
+> resolution that invalidates under the trust rule, merge decision; line diff; omission check
+> at 75% content-word coverage; corruption check for sentences unsupported by any source),
+> `Lint` (five finding kinds with addresses), optional Ollama executor used only by the CLI.
+> Staleness on revision and on forget. Tools `compact`, `submit` (ten in total),
+> `granularity=page`, `memo://page/{id}`, `status.pages`; CLI `compact | submit | lint | pages
+> ls`, export writes `<ns>/pages/`. Eval (`docs/eval/v1.2.0.md`): lint recall 5/5 planted
+> kinds, omission and corruption checks flag exactly the planted gaps, conflict rule enforced
+> against the tool channel, raw source/document/chunk rows byte-identical across the whole
+> loop. Not built: Louvain topic pages (the eval has no global questions, so the rule says no),
+> topic and overview page kinds beyond the schema. Not verified: the Ollama executor against a
+> live model (none on this machine). Remaining: commit, `git tag -a v1.2.0` (milestone M3).
+
+
 - **Story.** (b) pages; (a) tidy knowledge.
 - **Goal.** Turn piles of chunks into curated pages and resolved conflicts, written by the
   calling agent and never by the server, with every page citing the chunks it came from and

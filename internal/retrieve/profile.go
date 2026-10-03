@@ -140,6 +140,9 @@ const (
 	GranularityChunk    = "chunk"
 	GranularityDocument = "document"
 	GranularityFact     = "fact"
+	// GranularityPage searches the curated pages (L5): derived, cited,
+	// possibly stale; results say so (P8).
+	GranularityPage = "page"
 )
 
 // Response formats.
