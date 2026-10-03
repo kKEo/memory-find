@@ -47,6 +47,13 @@ jobs:
       - uses: golangci/golangci-lint-action@v8
         with:
           version: latest
+      - name: server.json fits the MCP registry limits
+        # The registry rejects a description over 100 characters (HTTP 422 at
+        # publish time); catch it here rather than in the release job.
+        run: |
+          len=$(jq -r '.description | length' server.json)
+          echo "description length: $len"
+          test "$len" -le 100
   release-config:
     # Proves the release pipeline still builds without cutting a release.
     runs-on: ubuntu-latest
