@@ -1,4 +1,9 @@
-{{template "head" .}}<h1>Query log</h1><p class="muted">Opt-in (<code>MEMO_QUERY_LOG=1</code>); never stores passage text. Newest first.</p>
+{{template "head" .}}<h1>Query and call log</h1><p class="muted">Opt-in (<code>MEMO_QUERY_LOG=1</code> on the server): every tool call and every search; never passage text or written content. Newest first.</p>
+{{with .Data}}<h2>Searches</h2>
 <table><tr><th>when</th><th>queries</th><th>mode</th><th>profile</th><th class="num">results</th><th class="num">ms</th></tr>
-{{range .Data}}<tr><td>{{dt .At}}</td><td>{{.Queries}}</td><td>{{.Mode}}</td><td class="muted">{{.Profile}}</td><td class="num">{{.NResults}}</td><td class="num">{{.LatencyMs}}</td></tr>{{end}}</table>
-{{if not .Data}}<p class="muted">The log is empty or disabled.</p>{{end}}{{template "foot" .}}
+{{range .Searches}}<tr><td>{{dt .At}}</td><td>{{.Queries}}</td><td>{{.Mode}}</td><td class="muted">{{.Profile}}</td><td class="num">{{.NResults}}</td><td class="num">{{.LatencyMs}}</td></tr>{{end}}</table>
+{{if not .Searches}}<p class="muted">No searches logged.</p>{{end}}
+<h2>Tool calls</h2>
+<table><tr><th>when</th><th>client</th><th>tool</th><th>outcome</th><th class="num">results</th><th class="num">tokens</th><th class="num">ms</th><th>arguments</th></tr>
+{{range .Calls}}<tr><td>{{dt .At}}</td><td class="muted">{{.Client}}</td><td>{{.Tool}}</td><td>{{if .OK}}<span class="ok">ok</span>{{else}}<span class="warn">{{.ErrorClass}}</span>{{end}}</td><td class="num">{{.NResults}}</td><td class="num">{{.TokensOut}}</td><td class="num">{{.LatencyMs}}</td><td class="muted"><code>{{printf "%s" .Args}}</code></td></tr>{{end}}</table>
+{{if not .Calls}}<p class="muted">No tool calls logged.</p>{{end}}{{end}}{{template "foot" .}}

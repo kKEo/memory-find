@@ -159,3 +159,21 @@ func firstDoc(t *testing.T, store *kb.Store) string {
 	}
 	return list[0].DocumentID
 }
+
+func TestMetricsRoute(t *testing.T) {
+	s, _, _ := newUI(t)
+	h := s.Handler()
+	if code, _ := get(t, h, "/", ""); code != 200 {
+		t.Fatal(code)
+	}
+	code, body := get(t, h, "/metrics", "")
+	if code != 200 || !strings.Contains(body, "# TYPE memo_ui_requests_total counter") || !strings.Contains(body, `memo_ui_requests_total{route="GET /{$}",status="200"}`) {
+		t.Fatalf("metrics: %d\n%s", code, body)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST /metrics: %d", rec.Code)
+	}
+}

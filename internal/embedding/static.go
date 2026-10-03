@@ -292,7 +292,7 @@ func ensureStaticFiles(ctx context.Context, info ModelInfo, modelDir string) (st
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	fmt.Fprintf(os.Stderr, "Downloading embedding model %s (first run only)...\n", info.HFRepo)
+	logger().Info("downloading embedding model (first run only)", "repo", info.HFRepo)
 	client := &http.Client{Timeout: 30 * time.Minute}
 	for _, name := range info.Files {
 		url := fmt.Sprintf("https://huggingface.co/%s/resolve/main/%s", info.HFRepo, name)

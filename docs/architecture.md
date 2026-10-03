@@ -278,6 +278,48 @@ Raw rows are never touched; `docs/eval/v1.2.0.md` holds the checksum proof. An o
 model (`memo-mcp compact --executor ollama`) can write page items from the terminal; no other
 code path knows it exists.
 
+## 11c. Observability (1.4)
+
+Local only, by construction: metrics are pulled from a loopback address, logs go to stderr,
+the call log is a table in the knowledge-base file. None of it is telemetry.
+
+**Metrics** come from a stdlib-only registry (`internal/obs`: counters, gauges, histograms with
+labels, Prometheus text format 0.0.4, a curated `runtime/metrics` subset). Names follow
+Prometheus conventions (`memo_` prefix, `_total` for counters, `_seconds`/`_bytes` units) and
+map onto OpenTelemetry names by replacing `_` with `.`. Labels are bounded enums only.
+
+| Family | Labels | Meaning |
+|---|---|---|
+| `memo_mcp_requests_total`, `memo_mcp_requests_in_flight` | method, outcome | every MCP request |
+| `memo_mcp_tool_calls_total`, `memo_mcp_tool_call_duration_seconds`, `memo_mcp_tool_result_tokens` | tool, outcome (ok, tool_error, input_required, error) | tool calls and their size |
+| `memo_mcp_tool_errors_total` | tool, class (not_found, forgotten, needs_human, canceled, invalid_args, internal) | why tool calls failed |
+| `memo_mcp_elicitations_total` | tool, outcome (asked, accept, decline, cancel, unsupported) | human questions |
+| `memo_mcp_resource_reads_total`, `memo_mcp_sessions_total` | kind, outcome; client | resources and sessions |
+| `memo_search_total`, `memo_search_duration_seconds`, `memo_search_results` | mode_requested, mode_resolved, granularity, outcome | searches |
+| `memo_search_arm_duration_seconds`, `memo_search_arm_candidates` | arm | each retrieval arm |
+| `memo_search_cutoff_total`, `memo_search_truncated_results_total`, `memo_search_abstentions_total`, `memo_search_degraded_total` | kind; reason | how lists ended and why nothing came back |
+| `memo_search_entities_matched`, `memo_search_rerank_duration_seconds`, `memo_graph_cache_total`, `memo_graph_build_duration_seconds` | model; event | structure and reranking |
+| `memo_store_writes_total` | op, channel | every audited write |
+| `memo_store_ingests_total`, `memo_store_ingest_duration_seconds`, `memo_store_chunks_written_total`, `memo_store_document_bytes`, `memo_store_vectors_stored_total`, `memo_store_embed_batches_total`, `memo_store_jobs_total`, `memo_store_mentions_linked_total`, `memo_store_pages_marked_stale_total`, `memo_store_work_items_total` | outcome; model; kind, event | the write path |
+| `memo_embed_duration_seconds`, `memo_embed_texts_total`, `memo_embed_errors_total`, `memo_embed_batch_size`, `memo_embed_model_downloads_total`, `memo_embed_model_load_seconds`, `memo_embed_model_loaded` | model, role (query, doc); outcome; backend | the embedder |
+| `memo_kb_*` gauges (`documents_live`, `chunks`, `facts`, `entities`, `pages`, `pages_stale`, `work_items_open`, `jobs_queued`, `pending_embeddings{model}`, `db_size_bytes`, `namespace_documents{namespace}`, …) | — | table counts, read at scrape time and cached for 5 s |
+| `memo_ui_requests_total`, `memo_ui_request_duration_seconds` | route, status | the web UI |
+| `go_*`, `process_start_time_seconds`, `memo_build_info{version, go_version, mcp_protocol, goos, goarch}` | — | runtime and build |
+
+Metrics are per process. The serving process is the scrape target
+(`memo-mcp serve --metrics-addr 127.0.0.1:PORT`, loopback only, GET `/metrics` only, Host
+header checked); the UI serves its own `/metrics`; `memo-mcp metrics` prints a file-backed
+snapshot (the gauges plus call-log statistics) and says so.
+
+**Logs** are `log/slog` on stderr (`MEMO_LOG_FORMAT`, `MEMO_LOG_LEVEL`): one Info line per
+tool call and per search, Warn for degraded modes, downloads and licence notes. The MCP
+`logging` capability is not advertised (deprecated in 2026-07-28; decision D-O).
+
+**Call log** (migration 4, `call_log`): with `MEMO_QUERY_LOG=1`, one row per tool call with
+client, tool, latency, outcome, error class, result count, tokens out and an allowlisted
+argument summary (never `content`, `statement`, `reason` or `context`). `memo-mcp log calls`,
+`memo-mcp log tail`, UI `/log`; pruned with the search log at 10k rows or 30 days.
+
 ## 12. Not in 1.0
 
 HTTP transport for MCP (OD-11), a server-side LLM, prompts. The graph arm and `explore`

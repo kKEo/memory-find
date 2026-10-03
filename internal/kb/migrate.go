@@ -13,6 +13,7 @@ var migrations = []migration{
 	{1, "knowledge_base_v1", migrateV1},
 	{2, "graph_v2", migrateV2},
 	{3, "pages_v3", migrateV3},
+	{4, "call_log_v4", migrateV4},
 }
 
 type migration struct {

@@ -238,7 +238,8 @@ them; they are not reopened.
   [decision 5]
 - **Trust is assigned by channel, not by claim.** Tool writes are capped at `agent`; raising trust
   needs a human through elicitation or the CLI, and is audited. [decision 6]
-- **Pure Go, `CGO_ENABLED=0`, no cloud, no telemetry.**
+- **Pure Go, `CGO_ENABLED=0`, no cloud, no telemetry.** Local, pull-only metrics on a loopback
+  address and logs on stderr are not telemetry: nothing leaves the machine. [D-P]
 - **Everything is measured with labelled recall/nDCG plus cost, never LLM-judge win rates.**
 - **One explain contract, three faces.** CLI, MCP and the UI render the same `Why` and `Trace`
   Go structs, and tests assert the numbers are identical.
@@ -1134,6 +1135,54 @@ less and shipped two phases in a month, so treat these as ranges, not promises.
 
 ---
 
+### P10 — Observability · 3 days · `v1.4.0`
+
+> **Status (2026-10-03): built.** `internal/obs` (registry with counters, gauges, labelled
+> histograms; Prometheus text 0.0.4 with a golden; `runtime/metrics` subset; loopback-only
+> metrics server with Host check; `SetupLogging` from `MEMO_LOG_FORMAT`/`MEMO_LOG_LEVEL`). MCP
+> receiving middleware counts every request, times and classifies every tool call, writes one
+> log line per call; typed-handler wrapper sees the Go error; elicitation outcomes counted;
+> `logging` capability no longer advertised (D-O resolved). Retrieval `finish()` records every
+> search (mode, arms, candidates, cutoff, degraded, abstention reason) and logs one line;
+> graph-cache hits and builds counted. Store counts every audited write by op and channel, plus
+> ingest outcomes, chunks, vectors, embed batches, jobs, mentions, stale pages, work items; a
+> Status collector exports the table counts as `memo_kb_*` gauges. Embedders are wrapped by
+> `Load` (latency by model and role, downloads, load time). Migration 4 `call_log`; `memo-mcp
+> log calls|tail|prune`; UI `/log` with two tables and `/metrics`. `serve --metrics-addr` /
+> `MEMO_METRICS_ADDR`; `memo-mcp metrics [--json --since]`. Every stderr print replaced by
+> `slog`; a test proves a tool round trip writes nothing to stdout. Retrieval unchanged
+> (`docs/eval/v1.4.0.md`). Not built: OpenTelemetry export (names are bridgeable), traces.
+> Remaining: commit, `git tag -a v1.4.0`.
+
+- **Story.** (d) the researcher measures the server itself; (a) the agent's operator sees what
+  it costs.
+- **Goal.** Answer "what is the server doing and how long does it take" from the machine it
+  runs on, with nothing sent anywhere: a scrape endpoint on loopback, structured logs on stderr,
+  and a per-call log in the file for after-the-fact questions.
+- **Why.** The eval measures retrieval quality on fixtures; nothing measured the running system.
+  Diagnostics were ad-hoc stderr prints; the server advertised an MCP `logging` capability it
+  never used and that the protocol deprecates. The project's promises (pure Go, no telemetry,
+  read every line) rule out the usual dependencies, so the registry is small and in-house.
+- **What gets built.** `internal/obs`; MCP middleware and typed wrapper; `finish()` in
+  retrieval; store counters and the Status collector; the instrumented embedder; migration 4
+  `call_log`; `serve --metrics-addr`; UI `/metrics`; `memo-mcp metrics`; `slog` everywhere;
+  explicit server capabilities.
+- **Concepts you meet.** *counter, gauge, histogram* · *exposition format* (the text a scraper
+  reads) · *pull versus push* (why nothing is sent) · *cardinality* (why labels are bounded
+  enums) · *structured logging* · *DNS rebinding* (why the Host header is checked).
+- **Explainability in this phase.** Every call leaves a row and a line; every search's trace
+  becomes numbers a dashboard can chart; the per-process caveat is printed where it matters.
+- **Exit criteria.** `make check` green; `curl` on `/metrics` returns HELP/TYPE lines and
+  `memo_build_info`; POST gives 405 and a foreign Host 403; `initialize` carries no `logging`;
+  a tool round trip writes nothing to stdout; `memo-mcp log calls` shows rows; `memo-mcp
+  metrics --json` parses; the golden tool list is unchanged.
+- **Rollback.** `--metrics-addr` is off by default; the migration is additive; logs are stderr.
+- **Tag** `v1.4.0`.
+- **Learning artifact.** `articles/measuring-the-server-itself.md` plus `docs/eval/v1.4.0.md`.
+- **Effort.** 3 days.
+
+---
+
 ## 8. Sequencing, milestones, and what to cut
 
 ```
@@ -1184,7 +1233,8 @@ optional).
 | About seven defaulted parameters per tool; numeric knobs in server-side profiles; ten tools at most | D-K, §6.3 |
 | Two faces: typed tools plus a file-shaped face; `export --index` of at most 8 KB | D-M, §6.5 |
 | Provenance and trust in the first migration; revocation is a hard pre-ranking filter | D-N |
-| go-sdk v1.8.0, spec 2026-07-28, stateless; `exclude_ids` and job handles travel as arguments | D-O |
+| go-sdk v1.8.0, spec 2026-07-28, stateless; `exclude_ids` and job handles travel as arguments; the deprecated `logging` capability is not advertised, diagnostics go to stderr (resolved in P10) | D-O |
+| Observability is local only: a stdlib metrics registry in the Prometheus text format on loopback, `slog` on stderr, an opt-in call log in the file; no OpenTelemetry dependency, names bridgeable (owner, 2026-10-03) | D-P |
 | The server never fetches URLs; `ingest` takes content | §8 decision 2 |
 | Rename journal to knowledge; the tool surface of §6.3; `MEMO_KB` selects the file | §8 decision 1 |
 | `scope.namespaces` defaults to all; every result carries `namespace`; writes target one namespace | §8 decision 5 |
@@ -1380,7 +1430,8 @@ One reason each.
 - Any write path in the UI.
 - The six legacy journal tools behind a flag, or a journal importer (owner decision 5).
 - Raw weights (`alpha`, `rrf_k`, half-life) in the LLM-facing schema (D-K).
-- MCP prompts (no use case survives the redesign); cobra or a JavaScript framework; telemetry.
+- MCP prompts (no use case survives the redesign); cobra or a JavaScript framework; telemetry
+  (anything that leaves the machine; local metrics are P10).
 - `VACUUM INTO` migration backups (nothing to migrate).
 
 ---

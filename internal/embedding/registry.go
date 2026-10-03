@@ -3,6 +3,7 @@ package embedding
 import (
 	"context"
 	"fmt"
+	"github.com/kKEo/memory-find/internal/obs"
 	"sort"
 	"strings"
 )
@@ -78,16 +79,22 @@ func LookupModel(id string) (ModelInfo, error) {
 // Load builds the embedder for a registry model, downloading it on first
 // use. The returned cleanup releases the model session.
 func Load(ctx context.Context, info ModelInfo, modelDir string) (Embedder, func(), error) {
+	m := metricsOnce()
+	t := obs.Start()
 	if info.Static {
 		e, err := NewStaticEmbedder(ctx, info, modelDir)
 		if err != nil {
 			return nil, func() {}, err
 		}
-		return e, func() {}, nil
+		m.loadSecs.With(info.ID).Set(t.Seconds())
+		m.loaded.With(info.ID, "static").Set(1)
+		return Instrumented(e), func() { m.loaded.With(info.ID, "static").Set(0) }, nil
 	}
 	e, err := NewHugotEmbedderFor(ctx, info, modelDir)
 	if err != nil {
 		return nil, func() {}, err
 	}
-	return e, e.Destroy, nil
+	m.loadSecs.With(info.ID).Set(t.Seconds())
+	m.loaded.With(info.ID, "hugot").Set(1)
+	return Instrumented(e), func() { m.loaded.With(info.ID, "hugot").Set(0); e.Destroy() }, nil
 }

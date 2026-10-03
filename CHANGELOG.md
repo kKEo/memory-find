@@ -3,6 +3,20 @@
 All notable changes. Tags follow semantic versioning; each tag has an eval report in
 `docs/eval/` from `v0.6.0` on.
 
+## [1.4.0] — 2026-10-03 — measuring the server itself (P10)
+
+- `internal/obs`: stdlib metrics registry, Prometheus text format, runtime subset, loopback
+  metrics server, structured-logging setup.
+- `memo-mcp serve --metrics-addr` / `MEMO_METRICS_ADDR`; UI `/metrics`; `memo-mcp metrics`.
+- Metrics for every MCP request and tool call, every search and arm, every audited write,
+  embeddings, graph cache, and table-count gauges.
+- `log/slog` on stderr with `MEMO_LOG_FORMAT` and `MEMO_LOG_LEVEL`; one line per tool call and
+  per search; all ad-hoc stderr prints replaced.
+- The MCP `logging` capability is no longer advertised (deprecated; decision D-O).
+- Migration 4 `call_log`; `memo-mcp log calls`; `log tail` and the UI `/log` page show tool
+  calls next to searches; pruning covers both.
+- Privacy sentence amended: local metrics and logs are not telemetry.
+
 ## [1.3.0] — 2026-10-03 — a knowledge base you can read (P9)
 
 - `memo-mcp ui`: read-only web face on loopback, server-rendered, no JavaScript. Search with

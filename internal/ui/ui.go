@@ -22,6 +22,7 @@ import (
 
 	"github.com/kKEo/memory-find/internal/compact"
 	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/obs"
 	"github.com/kKEo/memory-find/internal/retrieve"
 )
 
@@ -123,6 +124,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /lint", s.lintPage)
 	mux.HandleFunc("GET /eval", s.evalPage)
 	mux.HandleFunc("GET /style.css", s.css)
+	mux.Handle("GET /metrics", obs.Handler(obs.Default()))
 	return s.guard(mux)
 }
 
@@ -141,7 +143,15 @@ func (s *Server) guard(next http.Handler) http.Handler {
 		w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		next.ServeHTTP(w, r)
+		t := obs.Start()
+		sw := &statusWriter{ResponseWriter: w, status: 200}
+		next.ServeHTTP(sw, r)
+		route := r.Pattern
+		if route == "" {
+			route = "other"
+		}
+		uiRequests.With(route, strconv.Itoa(sw.status)).Inc()
+		uiSeconds.With(route).Observe(t.Seconds())
 	})
 }
 
@@ -475,7 +485,11 @@ func (s *Server) logPage(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal([]byte(e.Args), &v)
 		rows = append(rows, row{e, strings.Join(v.Queries, " | ")})
 	}
-	s.render(w, "log.html", "Query log", rows)
+	calls, _ := s.store.CallLogTail(r.Context(), 100)
+	s.render(w, "log.html", "Query log", struct {
+		Searches []row
+		Calls    []kb.CallLogEntry
+	}{rows, calls})
 }
 
 func (s *Server) lintPage(w http.ResponseWriter, r *http.Request) {
@@ -579,3 +593,18 @@ blockquote { border-left:3px solid var(--line); margin:.4rem 0; padding:.2rem .8
 .timeline li { margin:.3rem 0; } .timeline .dead { color:var(--muted); text-decoration:line-through; }
 footer { color:var(--muted); font-size:.85em; padding:1rem; text-align:center; border-top:1px solid var(--line); margin-top:2rem; }
 `
+
+var (
+	uiRequests = obs.Default().Counter("memo_ui_requests_total", "UI page requests, by route and status.", "route", "status")
+	uiSeconds  = obs.Default().Histogram("memo_ui_request_duration_seconds", "UI page render time.", obs.LatencyBuckets, "route")
+)
+
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
