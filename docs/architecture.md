@@ -32,6 +32,7 @@ leaves the machine except one download of the embedding model.
 ## 2. Layers of knowledge
 
 ```
+L4  graph        entities, aliases, which passage mentions which entity, optional typed edges (1.1)
 L3  facts        one-sentence claims with a validity window and an evidence passage
 L2  chunks       passages of about 200 estimated tokens, indexed three ways
 L1  documents    the text as ingested, one row per revision
@@ -39,8 +40,8 @@ L0  sources      where it came from: URL or file, library, version, hash, trust,
      bookkeeping namespaces, models, jobs, audit, query_log
 ```
 
-L4 (entities and graph) and L5 (pages) are reserved for 1.1 and 1.2 and arrive as additive
-migrations. Every layer points down: a fact points at its evidence chunk, a chunk at its
+L4 arrived in 1.1 as migration 2; L5 (pages) is reserved for 1.2 and arrives as an additive
+migration. Every layer points down: a fact points at its evidence chunk, a chunk at its
 document, a document at its source. L0–L2 are deterministic and can be rebuilt from the sources;
 L3 is additive and is invalidated, never deleted, when what it claims changes.
 
@@ -54,6 +55,7 @@ Full column-by-column schema: `schema.md`.
 | `memo://doc/<id>` | one document revision, with provenance |
 | `memo://chunk/<n>` | one passage; `read` with `granularity: section` adds its neighbours |
 | `memo://fact/<id>` | one fact with its evidence address and its two clocks |
+| `memo://entity/<id>` | one entity: aliases, the passages that mention it, its neighbours with evidence (1.1) |
 | `memo://ns/<namespace>/index`, `memo://index` | one line per document and fact, under 8 KB |
 
 Document and fact ids are UUIDv7 (time-ordered); chunk ids are integers. A forgotten record's
@@ -94,7 +96,9 @@ as_of)`
 | keyword | FTS5, `porter unicode61`, over text and context header | BM25 | always, except `mode: semantic` |
 | exact | FTS5, `unicode61 tokenchars '_.:-/'` (identifiers kept whole) | BM25 | `mode: exact`, or `auto` when the query looks like an identifier |
 | semantic | `chunk_vecs` plain table, `vec_distance_cosine` on unit vectors | cosine similarity | when a model is loaded and the passage has a vector for it |
-| fact | facts matched by keyword or by meaning | BM25 or cosine | always; a matched fact votes for its evidence passage |
+| fact | facts matched by keyword or by meaning | BM25 or cosine | always; a matched fact votes for its evidence passage; a keyword-only fact hit must cover half the query's content words |
+| entity | `mentions` of the entities the query names | mention weight × selectivity | routed: the query names two or more known entities, or one with relational phrasing (1.1) |
+| graph | personalised PageRank over the in-memory mention graph, one walk per named entity | product of per-seed mass | same routing; reports only passages that not every seed mentions directly (1.1) |
 
 Scope filters (namespaces, kinds, sources, library, version, tags, dates, minimum trust) are
 part of every arm's SQL, before top-k, so a filtered search never loses a result. The live
@@ -103,7 +107,7 @@ filter (`deleted_at IS NULL AND superseded_by IS NULL`) is replaced under `as_of
 
 **Fusion.** Weighted *reciprocal rank fusion*: a passage's fused score is the sum over arms of
 `weight / (k + rank)`, with `k = 60` and default weights semantic 0.5, keyword 0.5, exact 0.3,
-fact 0.4. Equal semantic and keyword weights mean a keyword-only hit at rank 1 ties a vector hit
+fact 0.4, entity 0.4, graph 0.5. Equal semantic and keyword weights mean a keyword-only hit at rank 1 ties a vector hit
 at rank 1 and can reach the first page. Worked example, one passage at keyword rank 1 and
 semantic rank 2:
 
@@ -151,7 +155,9 @@ off by default.
 
 A profile is the set of constants above with a one-paragraph derivation each. Shipped:
 `default`, `precise` (deeper fetch, rerank when attached), `recency`, `code` (exact arm 0.6,
-no recency), `keyword-only`, `semantic-only`, `minmax`. Overrides live in
+no recency), `keyword-only`, `semantic-only`, `text-only` (the 1.0 arms), `no-graph` (entity
+arm without the walk), `minmax`. `GraphAuto` (default on) is the routing switch for the
+structural arms. Overrides live in
 `$MEMO_HOME/profiles.json`; `MEMO_PROFILE` selects one for the server. The profile is not an
 MCP parameter in 1.0.
 
@@ -171,6 +177,7 @@ CLI and MCP render the same two structures; a test asserts the numbers are ident
 | `freshness{stale, ttl_expired}` | whether the source has a newer revision or an expired TTL |
 | `time{valid_from, valid_to, recorded_at, invalidated_at, superseded_by, as_of_applied}` | the two clocks, for facts |
 | `rerank{model, score, before_rank}` | only when a reranker ran |
+| `graph{seeds[], ppr_score, hops, hub_penalised}` | only when the graph arm saw the passage: the entities the walks started from, the product score, whether a seed mentions it directly, whether a hub was capped (1.1) |
 
 **`trace`, one per query:**
 
@@ -183,6 +190,7 @@ CLI and MCP render the same two structures; a test asserts the numbers are ident
 | `cutoff{kind: gap|budget|limit|none, position, gap}` | why the list ended where it did |
 | `budget{max_tokens, used, truncated_count, narrow_hint}` | token packing |
 | `degraded{flag, reason}`, `as_of`, `rerank{model, top_n, latency_ms}` | missing capabilities, the time view, the reranker |
+| `entities[]` | the entity names the query matched (1.1) |
 
 ## 8. Facts, trust and time
 
@@ -233,7 +241,18 @@ Current baselines (hash embedder, `default` profile, `docs/eval/v0.9.0.md`):
 | notes | 0.957 | 1.000 | 0.975 | 1.00 |
 | knowledge base | 1.000 | 1.000 | 1.000 | 1.00 |
 
+## 11a. The graph index (1.1)
+
+`explore(entity, hops, as_of)` walks from one entity: its passages, then the entities that
+share passages with it (fixed-depth joins, one or two hops), each with up to three evidence
+addresses and a typed relation when the client supplied one. Extraction is a ladder: heuristics
+(backticked spans, dotted/camel/snake identifiers, headings, capitalised names) on every ingest;
+client-declared `entities[]` and `relations[]`; later rungs only if measured. Resolution is
+deterministic: same key → same entity; near key (3-gram Jaccard ≥ 0.8, not short, not differing
+only in a number) → a merge candidate for a human; otherwise a new entity. Spike S6 and
+`docs/eval/v1.1.0.md` hold the numbers.
+
 ## 12. Not in 1.0
 
-HTTP transport (OD-11), a server-side LLM, prompts, the graph arm (1.1), compaction and pages
-(1.2), the web UI (1.3). The MCP `profile` parameter. Importing v0 journal files.
+HTTP transport (OD-11), a server-side LLM, prompts, compaction and pages (1.2), the web UI
+(1.3). The graph arm and `explore` arrived in 1.1 as additive changes. The MCP `profile` parameter. Importing v0 journal files.

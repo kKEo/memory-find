@@ -460,115 +460,75 @@ Where the current design ends — and where it's headed.
 
 ---
 
-# Where Hybrid Search Still Breaks Down
+# Where Flat Search Stops
 
-Today: vector KNN + BM25 keyword search, fused by rank and filtered in-query. That combination fixes a lot — but it's still fundamentally flat. Every entry is scored against the query in isolation; nothing connects entries to each other.
+Four text arms (meaning, words, exact identifiers, stored facts) fused by rank find the passage that *matches the question*. They cannot find the passage that *answers* it when the answer never names what you asked about.
 
 <v-clicks>
 
-- **Precision still decays with scale** — hybrid narrows the problem, doesn't remove it; at 10k+ entries, "relevant" still gets crowded.
-- **No sense of relationships** — can't answer *"show me everything connected to this project."*
-- **No emergent themes** — can't surface a pattern you didn't already know to search for.
-- **Each journal is an island** — `JOURNAL_TOKEN` isolation means no cross-project insight.
+- "How does the **Billing Service** relate to **Quorum Replication**?" The answer is the Ledger Store page, which names only one of them.
+- "What node count does the storage behind the Billing Service depend on?" Two links away.
+- Measured, not assumed: on the planted multi-hop slice the text arms score **nDCG 0.43**.
 
 </v-clicks>
 
 <v-click>
 
-The fix isn't a bigger model or a better fusion formula — it's adding **structure** on top of retrieval.
+The fix is not a bigger model. It is an **index over what the text talks about**.
 
 </v-click>
 
 ---
 
-# The Road Ahead — GraphRAG
+# The Graph Is an Index, Not an Oracle
 
-Combine vector similarity with a **graph of entities** extracted from your entries.
-
-```mermaid
-flowchart LR
-    Q["Query"] --> V["Hybrid retrieval<br/>(top matches)"]
-    V --> X["Extract entities<br/>from results"]
-    X --> G["Graph expansion<br/>(related concepts)"]
-    G --> R["Rerank<br/>(combined score)"]
-    R --> Out["Results that flat<br/>retrieval would miss"]
-```
-
-<v-clicks>
-
-- **Hybrid retrieval** (today's vector + keyword fusion) finds entries that match your query, by meaning or by exact words.
-- **Graph expansion** pulls in entries connected by shared people, projects, concepts.
-- **Additive, not a rewrite** — existing tools keep working; today's hybrid search stays as-is underneath.
-
-</v-clicks>
-
----
-
-# Entities & Relationships
-
-Each entry is mined (in the background) for **entities**, then linked by **relationships**.
+Every passage is scanned for the **things** it mentions (identifiers, headings, capitalised names). Each thing is an **entity**; each entity-to-passage link is a **mention**. No relation types are required.
 
 ```mermaid
 flowchart LR
-    E1(["TypeScript"]) ---|co-occurs| E2(["type errors"])
-    E1 ---|similar| E3(["ESLint"])
-    E2 ---|precedes| E4(["debugging"])
+    B(["Billing Service"]) --- P1["Billing page"]
+    P1 --- L(["Ledger Store"])
+    L --- P2["Ledger page"]
+    P2 --- Q(["Quorum Replication"])
+    Q --- P3["Replication page"]
 ```
 
 <v-clicks>
 
-- **Entity types:** person · project · concept · technology · company · location
-- **Relationship types:** co-occurrence · similarity · temporal ("precedes") · explicit mention
-- Stored as ordinary SQLite tables — entities, `entry_entities`, `entity_relationships`.
-- Extraction starts **keyword-based** (fast, offline), upgradeable to **LLM-based** later.
+- Stored as ordinary SQLite tables: `entities`, `entity_aliases`, `mentions`, `merge_candidates`, optional `edges`.
+- Rebuildable from the passages at any time; nothing in it is the only copy of anything.
+- Extraction is a ladder: heuristics now, client-supplied names and relations on `ingest`, a small NER model later only if it earns its place.
 
 </v-clicks>
 
 ---
 
-# Hybrid Scoring
-
-One tunable formula blends three signals into a final ranking:
-
-<div class="text-2xl my-6 text-center">
-
-`score = α · vector + β · graph + γ · recency`
-
-</div>
+# Two Arms, Routed
 
 <v-clicks>
 
-- **α — vector similarity:** does it *mean* the same thing?
-- **β — graph relevance:** is it *connected* to what you asked about?
-- **γ — recency:** exponential decay (≈30-day half-life) so fresh notes float up.
-
-Weights are **per-query parameters** — relevance-focused research vs. recency-focused
-journaling vs. discovery-focused "second brain" each want a different mix.
+- **Entity arm.** The query names a known entity → the passages that mention it, scaled down for entities mentioned everywhere.
+- **Graph arm.** One personalised PageRank walk per named entity over the mention graph; a passage's score is the **product** of what every walk leaves on it, so a *bridge* page beats a page about one thing. Passages every seed mentions directly are left to the entity arm.
+- **Routed, not default.** Structure helped multi-hop and hurt plain lookups ("Postgres" is an entity too), so both arms join only when the question names two or more known things or asks how things relate.
+- Both vote in the same rank fusion as the text arms. `why.graph` shows the seeds, the score and whether a hub was penalised.
 
 </v-clicks>
 
 ---
 
-# Cross-Project Pattern Detection
+# What It Measured
 
-An **opt-in** global graph connects entities across every `JOURNAL_TOKEN` — metadata only,
-never entry content.
-
-```
-find_patterns(entity_type: "concept")
-
-Pattern: "TypeScript frustration"
-  ├─ appears in 3 projects (frontend-work, personal, learning)
-  ├─ 47 total mentions
-  ├─ related: debugging, type-errors, eslint
-  └─ trend: ↑ increasing over the last 3 months
-```
+| profile | multi-hop nDCG@10 | lookup nDCG@10 | exact | graph ms |
+|---|---|---|---|---|
+| text-only (1.0 arms) | 0.43 | 0.67 | 1.00 | 0 |
+| + entity arm | 0.51 | 0.67 | 1.00 | 0.1 |
+| + graph arm (default) | **0.68** | 0.67 | 1.00 | 0.2 |
 
 <v-clicks>
 
-- Surfaces themes **invisible inside a single project**.
-- Privacy preserved: global graph holds entities + edges, **no journal text**.
-- Off by default — `MEMO_ENABLE_GLOBAL_GRAPH=1` to turn on.
+- Pre-registered gate: the graph arm stays on by default only if it adds **≥ 0.05 nDCG** on multi-hop with no single-hop loss. It added 0.17.
+- The graph tax: a fifth of a millisecond at this size; 42 ms for personalised PageRank at 100k nodes and 1M edges (spike S6).
+- Entity resolution is deterministic and asks before merging: **2 of 2** planted alias pairs queued, **0** false candidates after number-suffixed names were excluded.
 
 </v-clicks>
 
@@ -576,18 +536,17 @@ Pattern: "TypeScript frustration"
 
 # Design Decisions & Tradeoffs
 
-The interesting part isn't *what* — it's *why*.
-
 | Decision | Why | The tradeoff |
 |----------|-----|--------------|
-| **SQLite for the graph** | No new deps; transactional; recursive CTEs | Not Neo4j-fast for deep traversal |
-| **Pure Go, `CGO_ENABLED=0`** | One static binary, trivial deploy | Smaller embedding model than Python land |
-| **Keyword extraction first** | Fast, offline, deterministic | Lower quality than an LLM — for now |
-| **Opt-in global graph** | Privacy by default | A flagship feature is off until enabled |
+| **Mention edges first, typed edges optional** | Most multi-hop gain at zero model cost | No "X depends on Y" answers without client-supplied relations |
+| **In-memory graph per namespace, no recursive CTEs** | 10 ms to build, single-digit ms to walk | Rebuilt when the namespace changes |
+| **Deterministic resolution with a review queue** | Nothing merges silently; precision over recall | A human must look at the queue |
+| **Routed arms** | Simple lookups stay simple | A relational question phrased plainly may miss the route |
+| **Pure Go, `CGO_ENABLED=0`** | One static binary | Slower embedding than native runtimes |
 
 <v-click>
 
-Theme throughout: **local-first and boring-on-purpose** beats clever-but-fragile.
+Theme throughout: **measure before you believe**. Every arm has an ablation profile and a slice that can fail it.
 
 </v-click>
 

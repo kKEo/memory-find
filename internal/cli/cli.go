@@ -147,6 +147,10 @@ func Main(ctx context.Context, version string, args []string, stdout, stderr io.
 		err = runFacts(ctx, rest, stdout, stderr)
 	case "trust":
 		err = runTrust(ctx, rest, stdout, stderr)
+	case "explore":
+		err = runExplore(ctx, rest, stdout, stderr)
+	case "graph":
+		err = runGraph(ctx, rest, stdout, stderr)
 	case "help", "-h", "--help":
 		usage(stdout)
 	default:
@@ -176,6 +180,8 @@ Usage:
   memo-mcp forget <memo://doc/..|memo://fact/..> --reason "<why>" [--redact]
   memo-mcp facts ls [--ns --as-of YYYY-MM-DD --history --json]
   memo-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user
+  memo-mcp explore <name> [--ns --hops 1|2 --as-of --json]   walk the graph index from one entity
+  memo-mcp graph merges [--state] | merge <id> | reject <id>   review near-duplicate entity names
   memo-mcp read <memo://...> [--history]   print a record with its provenance, or its revision chain
   memo-mcp ls [--ns --kind --since 2026-01-01 --json]   list live documents, newest first
   memo-mcp export --md <dir> [--ns <name>]              write markdown files with front matter

@@ -60,6 +60,7 @@ func (s *Server) registerResources() {
 		{"chunk", "One passage with its provenance"},
 		{"source", "The latest document of a source"},
 		{"fact", "One recorded fact with its evidence address"},
+		{"entity", "One entity: its aliases, passages and neighbours"},
 	} {
 		s.mcp.AddResourceTemplate(&mcp.ResourceTemplate{
 			URITemplate: "memo://" + kind.name + "/{id}",
@@ -107,13 +108,20 @@ func (s *Server) readResource(ctx context.Context, req *mcp.ReadResourceRequest)
 		if err != nil {
 			return nil, mcp.ResourceNotFoundError(uri)
 		}
-		if kind == "fact" {
+		switch kind {
+		case "fact":
 			f, err := s.store.ReadFact(ctx, id)
 			if err != nil {
 				return nil, resourceErr(uri, err)
 			}
 			text = renderFact(f)
-		} else {
+		case "entity":
+			res, _, err := s.handleExplore(ctx, nil, exploreArgs{Entity: id})
+			if err != nil {
+				return nil, resourceErr(uri, err)
+			}
+			text = resultTextOf(res)
+		default:
 			body, prov, err := s.store.Read(ctx, uri)
 			if err != nil {
 				return nil, resourceErr(uri, err)
@@ -222,7 +230,7 @@ type searchScope struct {
 type searchArgs struct {
 	Query          string      `json:"query,omitempty" jsonschema:"What you are looking for, in plain words or as an identifier. Example: 'set ttl on a resource' or 'SetCacheable'."`
 	Queries        []string    `json:"queries,omitempty" jsonschema:"Several phrasings of the same question; results are fused. Use instead of or in addition to query."`
-	Mode           string      `json:"mode,omitempty" jsonschema:"auto (default), hybrid, keyword, exact, semantic. auto adds exact-identifier matching when the query looks like code."`
+	Mode           string      `json:"mode,omitempty" jsonschema:"auto (default), hybrid, keyword, exact, semantic, graph. auto adds exact-identifier matching when the query looks like code, and the entity and graph arms when it names two or more known things or asks how things relate; graph runs only those structural arms."`
 	Scope          searchScope `json:"scope,omitempty" jsonschema:"Narrow before ranking; filters never lose results."`
 	Granularity    string      `json:"granularity,omitempty" jsonschema:"chunk (default: passages), document (one result per document) or fact (stored facts with their evidence)."`
 	AsOf           string      `json:"as_of,omitempty" jsonschema:"RFC3339 or YYYY-MM-DD: answer with what the knowledge base believed at that time (superseded revisions and replaced facts that were current then). Forgotten records are never returned."`
@@ -325,6 +333,23 @@ type StatusOut struct {
 	JobsQueued        int                `json:"jobs_queued"`
 	JobsFailed        int                `json:"jobs_failed"`
 	Degraded          bool               `json:"degraded" jsonschema:"True when search is keyword-only because no vectors are stored or the model is unavailable"`
+	Graph             kb.GraphStats      `json:"graph" jsonschema:"Entities, mention links, typed edges and open merge candidates (the graph index)"`
+}
+
+// --- explore ---
+
+type exploreArgs struct {
+	Entity    string `json:"entity" jsonschema:"An entity name as it appears in text (Client.Connect, Ledger Store) or a memo://entity/<id> address."`
+	Namespace string `json:"namespace,omitempty" jsonschema:"Resolve the name in this namespace only."`
+	Hops      int    `json:"hops,omitempty" jsonschema:"1 (default): entities sharing a passage with it; 2: their neighbours too."`
+	AsOf      string `json:"as_of,omitempty" jsonschema:"YYYY-MM-DD: walk only passages that were current on that date."`
+}
+
+// ExploreOut is the structured result of explore.
+type ExploreOut struct {
+	Entity     kb.Entity      `json:"entity"`
+	Chunks     []string       `json:"chunks" jsonschema:"Passage addresses that mention the entity, strongest first"`
+	Neighbours []kb.Neighbour `json:"neighbours" jsonschema:"Entities that share passages with it, with evidence addresses"`
 }
 
 func (s *Server) registerTools() {
@@ -375,6 +400,13 @@ func (s *Server) registerTools() {
 		Description: "Request that a document, source or fact be trusted more (user or curated). Trust cannot be raised by a tool call alone: on clients that can show a dialog the human is asked directly, with the excerpt and where it came from; otherwise the result carries the command the human runs. Example: promote(uri: \"memo://fact/01a0...\", to: \"user\").",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: closed},
 	}, s.handlePromote)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "explore",
+		Title:       "Explore an entity's neighbourhood",
+		Description: "Walk the graph index from one named thing: the passages that mention it and the other things those passages mention, each with evidence addresses to read. Use it after a search names something you want the context of, or to see how two things connect. Example: explore(entity: \"Ledger Store\", hops: 1).",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: closed},
+	}, s.handleExplore)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "status",
@@ -693,6 +725,59 @@ func (s *Server) promotionPreview(ctx context.Context, uri string) (excerpt, fro
 	return fmt.Sprintf("%s\n(source %s, origin %s)\n\n%s", prov.Title, prov.SourceURI, prov.Origin, head), prov.Trust, nil
 }
 
+func (s *Server) handleExplore(ctx context.Context, _ *mcp.CallToolRequest, args exploreArgs) (*mcp.CallToolResult, ExploreOut, error) {
+	if strings.TrimSpace(args.Entity) == "" {
+		return nil, ExploreOut{}, fmt.Errorf("entity is required")
+	}
+	name := args.Entity
+	if kind, id, err := kb.ParseURI(name); err == nil && kind == "entity" {
+		name = id
+	}
+	var asOf *time.Time
+	if args.AsOf != "" {
+		t, err := parseDate(args.AsOf)
+		if err != nil {
+			return nil, ExploreOut{}, fmt.Errorf("as_of: %w", err)
+		}
+		asOf = t
+	}
+	ex, err := s.store.Explore(ctx, name, args.Namespace, args.Hops, asOf)
+	if err != nil {
+		return nil, ExploreOut{}, err
+	}
+	out := ExploreOut{Entity: ex.Entity, Chunks: ex.Chunks, Neighbours: ex.Neighbours}
+	if out.Chunks == nil {
+		out.Chunks = []string{}
+	}
+	if out.Neighbours == nil {
+		out.Neighbours = []kb.Neighbour{}
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%s (%s, %s, %d passage(s))", ex.Entity.Canonical, ex.Entity.Namespace, ex.Entity.Type, ex.Entity.Mentions)
+	if len(ex.Entity.Aliases) > 0 {
+		fmt.Fprintf(&sb, "; also known as %s", strings.Join(ex.Entity.Aliases, ", "))
+	}
+	sb.WriteString("\n")
+	for i, c := range ex.Chunks {
+		if i >= 5 {
+			fmt.Fprintf(&sb, "  … %d more passage(s)\n", len(ex.Chunks)-5)
+			break
+		}
+		fmt.Fprintf(&sb, "  %s\n", c)
+	}
+	for _, n := range ex.Neighbours {
+		rel := ""
+		if n.Rel != "" {
+			rel = " [" + n.Rel + "]"
+		}
+		fmt.Fprintf(&sb, "hop %d: %s%s (%d shared passage(s); read %s)\n", n.Hop, n.Entity.Canonical, rel, n.Shared, strings.Join(n.Evidence, ", "))
+	}
+	if len(ex.Neighbours) == 0 {
+		sb.WriteString("no neighbours: nothing else is mentioned alongside it\n")
+	}
+	return textResult(sb.String()), out, nil
+}
+
 func (s *Server) handleStatus(ctx context.Context, _ *mcp.CallToolRequest, _ statusArgs) (*mcp.CallToolResult, StatusOut, error) {
 	st, err := s.store.Status(ctx)
 	if err != nil {
@@ -700,7 +785,7 @@ func (s *Server) handleStatus(ctx context.Context, _ *mcp.CallToolRequest, _ sta
 	}
 	out := StatusOut{SchemaVersion: st.SchemaVersion, Namespaces: st.Namespaces, Sources: st.Sources, LiveDocuments: st.LiveDocuments, Chunks: st.Chunks, Facts: st.Facts,
 		DefaultModel: st.DefaultModel, PendingEmbeddings: st.PendingEmbeddings, JobsQueued: st.JobsQueued, JobsFailed: st.JobsFailed,
-		Degraded: s.store.Embedder() == nil || st.DefaultModel == ""}
+		Degraded: s.store.Embedder() == nil || st.DefaultModel == "", Graph: st.Graph}
 	if out.Namespaces == nil {
 		out.Namespaces = []kb.NamespaceStat{}
 	}
@@ -791,4 +876,14 @@ func cutTokens(text string, n int) (string, bool) {
 
 func textResult(text string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}
+}
+
+func resultTextOf(res *mcp.CallToolResult) string {
+	var sb strings.Builder
+	for _, c := range res.Content {
+		if tc, ok := c.(*mcp.TextContent); ok {
+			sb.WriteString(tc.Text)
+		}
+	}
+	return sb.String()
 }

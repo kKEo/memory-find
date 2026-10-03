@@ -161,6 +161,9 @@ func (s *Store) Remember(ctx context.Context, in RememberInput) (*Fact, error) {
 	if err != nil {
 		return nil, fmt.Errorf("insert fact: %w", err)
 	}
+	if err := s.linkFactSubject(ctx, tx, f.Namespace, f.ID, in.About, nowMs); err != nil {
+		return nil, err
+	}
 	if oldID != "" {
 		if _, err := tx.ExecContext(ctx, `UPDATE facts SET invalidated_at = ?, superseded_by = ? WHERE id = ?`, nowMs, f.ID, oldID); err != nil {
 			return nil, fmt.Errorf("supersede: %w", err)

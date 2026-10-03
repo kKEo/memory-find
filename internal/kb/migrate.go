@@ -11,6 +11,7 @@ import (
 // slice only ever grows at the end. See docs/schema.md §9.
 var migrations = []migration{
 	{1, "knowledge_base_v1", migrateV1},
+	{2, "graph_v2", migrateV2},
 }
 
 type migration struct {

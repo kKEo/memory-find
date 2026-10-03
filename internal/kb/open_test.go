@@ -28,8 +28,8 @@ func TestOpenCreatesClaimedFileAtVersion1(t *testing.T) {
 		t.Fatalf("application_id = %#x, want %#x", appID, ApplicationID)
 	}
 	v, err := SchemaVersion(context.Background(), db)
-	if err != nil || v != 1 {
-		t.Fatalf("user_version = %d (%v), want 1", v, err)
+	if err != nil || v != 2 {
+		t.Fatalf("user_version = %d (%v), want 2", v, err)
 	}
 	for _, table := range []string{"namespaces", "models", "jobs", "audit", "query_log", "sources", "documents", "chunks", "chunk_vecs", "facts", "fact_vecs", "chunks_fts", "chunks_fts_exact", "facts_fts"} {
 		var n int

@@ -28,6 +28,7 @@ type Service struct {
 	logQueries bool
 	now        func() time.Time
 	reranker   rerank.Reranker
+	graphs     graphCache
 }
 
 // WithReranker attaches a cross-encoder; profiles with Rerank=true use it.
@@ -48,7 +49,7 @@ func New(store *kb.Store, profile Profile, logQueries bool) *Service {
 			}
 		}
 	}
-	return &Service{store: store, db: store.DB(), embedder: store.Embedder(), profile: profile, logQueries: logQueries, now: time.Now}
+	return &Service{store: store, db: store.DB(), embedder: store.Embedder(), profile: profile, logQueries: logQueries, now: time.Now, graphs: graphCache{m: map[string]*nsGraph{}}}
 }
 
 // Scope narrows a search before ranking (docs/schema.md §6).
@@ -180,8 +181,25 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 		return s.searchFacts(ctx, req, queries, limit, tr, start)
 	}
 
-	// Resolve arms.
+	// Resolve arms. Entities the query names are looked up once, for the
+	// routing rule and for the entity/graph arms.
+	ents, err := s.matchEntities(ctx, queries[0], req.Scope)
+	if err != nil {
+		return nil, fmt.Errorf("match entities: %w", err)
+	}
+	for _, e := range ents {
+		tr.Entities = append(tr.Entities, e.Canonical)
+	}
 	arms, reason := resolveArms(req.Mode, queries)
+	if (req.Mode == ModeAuto || req.Mode == ModeHybrid) && p.GraphAuto {
+		// Structure helps relational and multi-entity questions and hurts
+		// plain lookups (a single capitalised word is an entity too), so
+		// both structural arms are routed in by the same rule (D-E, D-F).
+		if ok, why := wantsGraph(queries[0], ents); ok {
+			arms = append(arms, ArmEntity, ArmGraph)
+			reason += "; " + why
+		}
+	}
 	if len(p.Arms) > 0 {
 		var kept []string
 		for _, a := range arms {
@@ -207,6 +225,7 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	graphWhy := map[int64]*GraphWhy{}
 	tr.Filtered.ByScope = describeScope(req.Scope)
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM documents d JOIN sources s ON s.id = d.source_id WHERE `+where, args...).Scan(&tr.Filtered.LiveDocs); err != nil {
 		return nil, fmt.Errorf("count scope: %w", err)
@@ -241,6 +260,16 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 				hits, err = s.keywordArm(ctx, "chunks_fts_exact", ftsQueryExact(q), where, args, p.FetchDepth)
 			case ArmFact:
 				hits, err = s.factArm(ctx, q, req, p.FetchDepth)
+			case ArmEntity:
+				if qi > 0 {
+					continue // entities are matched on the first query only
+				}
+				hits, err = s.entityArm(ctx, ents, where, args, p.FetchDepth)
+			case ArmGraph:
+				if qi > 0 {
+					continue
+				}
+				hits, graphWhy, err = s.graphArm(ctx, ents, req.Scope, req.AsOf, where, args, p.FetchDepth)
 			case ArmSemantic:
 				hits, modelID, err = s.semanticArm(ctx, q, where, args, p.FetchDepth)
 				if err != nil && modelID == "" {
@@ -438,6 +467,9 @@ func (s *Service) Search(ctx context.Context, req Request) (*Response, error) {
 		if h := rerankHits[c.chunkID]; h != nil && r.Why != nil {
 			r.Why.Rerank = h
 		}
+		if g := graphWhy[c.chunkID]; g != nil && r.Why != nil {
+			r.Why.Graph = g
+		}
 		resp.Results = append(resp.Results, r)
 	}
 	tr.Budget.Used = used
@@ -471,7 +503,7 @@ func (s *Service) result(c *candidate, rank int, content string, req Request) Re
 	r := Result{Rank: rank, URI: uri, ChunkURI: chunkURI(c.chunkID), DocumentURI: docURI(c.docID), Title: c.title, SectionPath: section, Content: content, Score: c.final, Relevance: relevance, Band: band, Provenance: prov}
 	if req.ResponseFormat == FormatExplain {
 		arms := make([]ArmHit, 0, len(c.arms))
-		for _, a := range []string{ArmSemantic, ArmKeyword, ArmExact, ArmFact} {
+		for _, a := range []string{ArmSemantic, ArmKeyword, ArmExact, ArmFact, ArmEntity, ArmGraph} {
 			if h := c.arms[a]; h != nil {
 				arms = append(arms, *h)
 			}
@@ -892,6 +924,8 @@ func resolveArms(mode string, queries []string) ([]string, string) {
 		return []string{ArmSemantic}, "mode=semantic"
 	case ModeHybrid:
 		return []string{ArmSemantic, ArmKeyword, ArmFact}, "mode=hybrid"
+	case ModeGraph:
+		return []string{ArmEntity, ArmGraph}, "mode=graph: structural arms only"
 	}
 	for _, q := range queries {
 		if looksLikeIdentifier(q) {
@@ -931,7 +965,7 @@ func (s *Service) logQuery(ctx context.Context, req Request, queries []string, t
 
 func validateEnum(field, got string) error {
 	allowed := map[string][]string{
-		"mode":            {ModeAuto, ModeHybrid, ModeKeyword, ModeExact, ModeSemantic},
+		"mode":            {ModeAuto, ModeHybrid, ModeKeyword, ModeExact, ModeSemantic, ModeGraph},
 		"granularity":     {GranularityChunk, GranularityDocument, GranularityFact},
 		"response_format": {FormatConcise, FormatDetailed, FormatExplain},
 	}[field]
@@ -1136,6 +1170,13 @@ func (s *Service) factArm(ctx context.Context, q string, req Request, depth int)
 		rank int
 	}
 	var list []scored
+	// A keyword-only fact match must cover at least half of the query's
+	// content words: facts are one sentence, so a single shared word
+	// ("context") is coincidence, not a match.
+	need := (len(dropStopwords(strings.Fields(strings.ToLower(q)))) + 1) / 2
+	if need < 1 {
+		need = 1
+	}
 	for _, h := range hits {
 		if !h.evidence.Valid {
 			continue
@@ -1143,6 +1184,9 @@ func (s *Service) factArm(ctx context.Context, q string, req Request, depth int)
 		// The semantic floor applies here too: a fact that merely sits
 		// nearest in vector space is not a match.
 		if !h.hasBM25 && h.cos < s.profile.SemanticFloor {
+			continue
+		}
+		if h.hasBM25 && len(h.terms) < need && !(h.hasCos && h.cos >= s.profile.BandWeak) {
 			continue
 		}
 		r := h.bm25Rank

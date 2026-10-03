@@ -1267,3 +1267,123 @@ func dateOr(t *time.Time, def string) string {
 	}
 	return t.Format("2006-01-02")
 }
+
+// runExplore walks the graph index from one entity (P7).
+func runExplore(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("explore", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	ns := fs.String("ns", "", "resolve the name in this namespace only")
+	hops := fs.Int("hops", 1, "1: entities sharing a passage; 2: their neighbours too")
+	asOf := fs.String("as-of", "", "YYYY-MM-DD: only passages current on that date")
+	asJSON := fs.Bool("json", false, "print JSON")
+	positional, err := parseInterspersed(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(positional) != 1 {
+		return errors.New("usage: memo-mcp explore <name|memo://entity/id> [--ns <name>] [--hops 1|2] [--as-of YYYY-MM-DD] [--json]")
+	}
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	name := positional[0]
+	if kind, id, err := kb.ParseURI(name); err == nil && kind == "entity" {
+		name = id
+	}
+	var at *time.Time
+	if *asOf != "" {
+		t, err := time.Parse("2006-01-02", *asOf)
+		if err != nil {
+			return fmt.Errorf("--as-of: %w", err)
+		}
+		at = &t
+	}
+	ex, err := store.Explore(ctx, name, *ns, *hops, at)
+	if err != nil {
+		return err
+	}
+	if *asJSON {
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(ex)
+	}
+	fmt.Fprintf(stdout, "%s  (%s, %s, %d passage(s))  %s\n", ex.Entity.Canonical, ex.Entity.Namespace, ex.Entity.Type, ex.Entity.Mentions, ex.Entity.URI)
+	if len(ex.Entity.Aliases) > 0 {
+		fmt.Fprintf(stdout, "also known as: %s\n", strings.Join(ex.Entity.Aliases, ", "))
+	}
+	for _, c := range ex.Chunks {
+		fmt.Fprintf(stdout, "  %s\n", c)
+	}
+	if len(ex.Neighbours) == 0 {
+		fmt.Fprintln(stdout, "(no neighbours)")
+	}
+	for _, n := range ex.Neighbours {
+		rel := ""
+		if n.Rel != "" {
+			rel = "  [" + n.Rel + "]"
+		}
+		fmt.Fprintf(stdout, "hop %d  %-30s %2d shared%s  evidence: %s\n", n.Hop, n.Entity.Canonical, n.Shared, rel, strings.Join(n.Evidence, " "))
+	}
+	return nil
+}
+
+// runGraph is the human side of entity resolution: the review queue of
+// near-duplicate names, and the decision to merge or keep apart.
+func runGraph(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return errors.New("usage: memo-mcp graph merges [--state open|merged|rejected] | merge <id> | reject <id>")
+	}
+	sub, rest := args[0], args[1:]
+	switch sub {
+	case "merges":
+		fs := flag.NewFlagSet("graph merges", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		state := fs.String("state", "open", "open|merged|rejected|all")
+		if _, err := parseInterspersed(fs, rest); err != nil {
+			return err
+		}
+		store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
+		if err != nil {
+			return err
+		}
+		defer closeFn()
+		if *state == "all" {
+			*state = ""
+		}
+		list, err := store.MergeCandidates(ctx, *state)
+		if err != nil {
+			return err
+		}
+		if len(list) == 0 {
+			fmt.Fprintln(stdout, "(no merge candidates)")
+			return nil
+		}
+		for _, m := range list {
+			fmt.Fprintf(stdout, "%4d  %.2f  %-9s %q <> %q  (%s; %s)\n", m.ID, m.Score, m.State, m.A.Canonical, m.B.Canonical, m.A.Namespace, m.Reason)
+		}
+		fmt.Fprintln(stdout, "decide with: memo-mcp graph merge <id> | reject <id>")
+		return nil
+	case "merge", "reject":
+		if len(rest) != 1 {
+			return fmt.Errorf("usage: memo-mcp graph %s <id>", sub)
+		}
+		var id int64
+		if _, err := fmt.Sscanf(rest[0], "%d", &id); err != nil {
+			return fmt.Errorf("bad id %q", rest[0])
+		}
+		store, closeFn, err := openStore(ctx, stderr, kb.Options{}, nil)
+		if err != nil {
+			return err
+		}
+		defer closeFn()
+		if err := store.DecideMerge(ctx, id, sub == "merge", "cli", kb.ChannelCLI); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "candidate %d %sd\n", id, sub)
+		return nil
+	default:
+		return fmt.Errorf("unknown graph subcommand %q", sub)
+	}
+}

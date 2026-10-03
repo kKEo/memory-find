@@ -8,7 +8,7 @@ It began as a Go rewrite of [obra/private-journal-mcp](https://github.com/obra/p
 
 ## What it does
 
-Claude (or any MCP client) gets seven tools over one knowledge base:
+Claude (or any MCP client) gets eight tools over one knowledge base:
 
 | Tool | Purpose |
 |---|---|
@@ -18,7 +18,8 @@ Claude (or any MCP client) gets seven tools over one knowledge base:
 | `remember` | Record one atomic fact with evidence and validity dates; to correct a fact, pass `supersedes` and the old one is kept as history |
 | `forget` | Retire a document or fact with a reason; it leaves every index and its address resolves to "forgotten on … because …". Tool calls may only retire records written by tools |
 | `promote` | Ask to raise a record's trust; tool calls cannot do it themselves. Clients that can show a dialog ask the human directly (excerpt, source, target level); others get the command a human runs |
-| `status` | Namespaces, the embedding model, pending vectors, background jobs |
+| `explore` | Walk the graph index from one named thing: the passages that mention it and the things mentioned alongside it, each with evidence addresses |
+| `status` | Namespaces, the embedding model, pending vectors, background jobs, graph counts |
 
 The same addresses are readable as MCP resources (`memo://doc/{id}`, `memo://chunk/{id}`, `memo://source/{id}`, `memo://fact/{id}`), and `memo://index` or `memo://ns/{namespace}/index` give a one-line-per-document view under 8 KB for the start of a session. [`SKILL.md`](SKILL.md) tells an agent how to use the tools well; `memo-mcp export --index` prints the same index for an `AGENTS.md` or `CLAUDE.md` file.
 
@@ -34,7 +35,9 @@ Everything is stored locally. There is exactly one outbound network call in the 
 
 The three ranked lists are combined with reciprocal rank fusion at equal weights (a keyword-only hit at rank 1 ties a vector hit at rank 1, so the keyword arm can add results rather than only reorder them), passages are aggregated to documents by their best passage, notes and conversations get a bounded recency boost (×0.8 to ×1.0, halving every 90 days; versioned docs do not age), the list is cut at the first large score gap, and results are packed to the requested token budget. A passage whose only evidence is a semantic similarity below the weak band (0.30) is dropped, so a question about nothing in the corpus returns zero results with a reason and a hint instead of a page of noise.
 
-A fourth arm matches **facts** recorded with `remember` and votes for their evidence passage ("facts as extra keys"); `granularity: fact` returns the facts themselves. `as_of` answers with what the knowledge base believed at a date: superseded revisions and replaced facts that were current then. Forgotten records are never returned, not even under `as_of`. Scope filters (namespaces, kinds, sources, library, version, tags, dates, minimum trust) are applied inside every arm's query, before ranking, so a filtered search never loses a result. Each result carries its provenance and a relevance band; with `response_format: explain` it also carries the per-arm ranks and contributions, the recency factor, and a per-query trace (which arms ran and why, what the scope excluded, where the list was cut). The terminal shows the same numbers: `memo-mcp search "<q>" --explain` and `memo-mcp explain "<q>" memo://chunk/<n>`.
+Two **structural arms** join when the question names two or more known things or asks how things relate: the entity arm returns the passages that mention the named entities, and the graph arm walks the mention graph with personalised PageRank from each named entity and returns the passages all the walks agree on, which is how a question about the Billing Service finds the replication page that never names it. `explore` walks the same graph by hand. Both are routed rather than always on because an always-on entity arm made plain lookups worse.
+
+A fourth text arm matches **facts** recorded with `remember` and votes for their evidence passage ("facts as extra keys"); `granularity: fact` returns the facts themselves. `as_of` answers with what the knowledge base believed at a date: superseded revisions and replaced facts that were current then. Forgotten records are never returned, not even under `as_of`. Scope filters (namespaces, kinds, sources, library, version, tags, dates, minimum trust) are applied inside every arm's query, before ranking, so a filtered search never loses a result. Each result carries its provenance and a relevance band; with `response_format: explain` it also carries the per-arm ranks and contributions, the recency factor, and a per-query trace (which arms ran and why, what the scope excluded, where the list was cut). The terminal shows the same numbers: `memo-mcp search "<q>" --explain` and `memo-mcp explain "<q>" memo://chunk/<n>`.
 
 ## Storage
 
@@ -91,6 +94,8 @@ Running the binary with no arguments starts the MCP server on stdio. From the te
 - `memo-mcp forget <memo://...> --reason "<why>" [--redact]` — retire a document or fact; the reason is kept and shown
 - `memo-mcp facts ls [--ns --as-of YYYY-MM-DD --history]` — list facts, or what was believed on a date
 - `memo-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user` — the human channel for trust; every change is audited
+- `memo-mcp explore <name> [--ns --hops 1|2 --as-of --json]` — walk the graph index from one entity: its passages and the entities mentioned alongside it, with evidence addresses
+- `memo-mcp graph merges [--state open|merged|rejected|all] | merge <id> | reject <id>` — the review queue of near-duplicate entity names; nothing is merged without a human decision
 - `memo-mcp read <memo://doc/...> [--history]` — print a document, chunk, source or fact with its provenance, or its revision chain
 - `memo-mcp ls [--ns --kind --since --json]` — list live documents, newest first
 - `memo-mcp export --md <dir> [--ns]` — write markdown files with front-matter provenance (opens in Obsidian; re-importing yields no new revisions)
@@ -134,7 +139,7 @@ memo-mcp exists as something different: a small, fully local, fully readable ret
 - [`docs/architecture.md`](docs/architecture.md): layers, the write and read paths, the formulas, profiles, the explain contract, the address scheme.
 - [`docs/schema.md`](docs/schema.md): every table and column in plain words; trust transitions; what `as_of` can see.
 - [`docs/eval/`](docs/eval/): one measured report per tag.
-- [`articles/`](articles/): one article per phase, written for beginners: [why rebuild instead of migrate](articles/why-rebuild-instead-of-migrate.md), [designing the knowledge schema](articles/designing-the-knowledge-schema.md), [search that explains itself](articles/search-that-explains-itself.md), [the embedder is the biggest lever](articles/the-embedder-is-the-biggest-lever.md), [provenance, trust and time](articles/provenance-trust-and-time.md), [designing tools for agents](articles/designing-tools-for-agents.md), [shipping a pure-Go MCP server](articles/shipping-a-pure-go-mcp-server.md).
+- [`articles/`](articles/): one article per phase, written for beginners: [why rebuild instead of migrate](articles/why-rebuild-instead-of-migrate.md), [designing the knowledge schema](articles/designing-the-knowledge-schema.md), [search that explains itself](articles/search-that-explains-itself.md), [the embedder is the biggest lever](articles/the-embedder-is-the-biggest-lever.md), [provenance, trust and time](articles/provenance-trust-and-time.md), [designing tools for agents](articles/designing-tools-for-agents.md), [shipping a pure-Go MCP server](articles/shipping-a-pure-go-mcp-server.md), [graph as an index, not an oracle](articles/graph-as-an-index-not-an-oracle.md).
 - [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Privacy

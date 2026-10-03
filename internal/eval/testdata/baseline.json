@@ -19,8 +19,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.733666,
-        "tokens_returned": 340
+        "latency_ms": 7.280541,
+        "tokens_returned": 373
       },
       {
         "query_id": "auth-session-bug",
@@ -38,8 +38,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.321,
-        "tokens_returned": 574
+        "latency_ms": 6.939708,
+        "tokens_returned": 563
       },
       {
         "query_id": "postgres-index",
@@ -57,7 +57,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.386,
+        "latency_ms": 6.482667,
         "tokens_returned": 242
       },
       {
@@ -67,17 +67,17 @@
         "recall_at_5": 1,
         "recall_at_10": 1,
         "mrr": 1,
-        "ndcg_10": 0.8772153153380494,
-        "irrelevant_mean_rank": 7,
+        "ndcg_10": 0.8503449055347547,
+        "irrelevant_mean_rank": 8,
         "num_relevant": 2,
         "num_irrelevant": 1,
-        "num_results": 7,
+        "num_results": 8,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.314209,
-        "tokens_returned": 435
+        "latency_ms": 6.443,
+        "tokens_returned": 528
       },
       {
         "query_id": "react-rerender",
@@ -93,9 +93,11 @@
         "num_results": 3,
         "first_hit_arms": [
           "semantic",
-          "keyword"
+          "keyword",
+          "entity"
         ],
-        "latency_ms": 3.270292,
+        "latency_ms": 6.966458,
+        "graph_ms": 0.609667,
         "tokens_returned": 163
       },
       {
@@ -115,7 +117,7 @@
           "keyword",
           "exact"
         ],
-        "latency_ms": 3.136208,
+        "latency_ms": 6.545708,
         "tokens_returned": 181
       },
       {
@@ -132,7 +134,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.112708,
+        "latency_ms": 6.296375,
         "tokens_returned": 171
       },
       {
@@ -149,8 +151,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.160042,
-        "tokens_returned": 411
+        "latency_ms": 6.686791,
+        "tokens_returned": 450
       },
       {
         "query_id": "auth-random-logout",
@@ -166,8 +168,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 4.685542,
-        "tokens_returned": 522
+        "latency_ms": 9.554834,
+        "tokens_returned": 1157
       },
       {
         "query_id": "db-slow-backup",
@@ -183,8 +185,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 6.019625,
-        "tokens_returned": 562
+        "latency_ms": 11.32525,
+        "tokens_returned": 639
       },
       {
         "query_id": "frontend-slow-mobile",
@@ -193,15 +195,15 @@
         "recall_at_5": 1,
         "recall_at_10": 1,
         "mrr": 1,
-        "ndcg_10": 1,
+        "ndcg_10": 0.9197207891481877,
         "num_relevant": 2,
-        "num_results": 2,
+        "num_results": 3,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.201292,
-        "tokens_returned": 109
+        "latency_ms": 6.343041,
+        "tokens_returned": 158
       },
       {
         "query_id": "flaky-tests",
@@ -217,7 +219,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.401833,
+        "latency_ms": 7.053208,
         "tokens_returned": 597
       },
       {
@@ -234,8 +236,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 4.46025,
-        "tokens_returned": 736
+        "latency_ms": 8.888875,
+        "tokens_returned": 802
       },
       {
         "query_id": "mood-deadline-stress",
@@ -253,7 +255,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.317709,
+        "latency_ms": 6.789,
         "tokens_returned": 485
       },
       {
@@ -270,8 +272,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 5.810375,
-        "tokens_returned": 553
+        "latency_ms": 10.51675,
+        "tokens_returned": 1027
       },
       {
         "query_id": "mood-oncall-anxiety",
@@ -287,8 +289,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.441834,
-        "tokens_returned": 883
+        "latency_ms": 7.052834,
+        "tokens_returned": 1033
       },
       {
         "query_id": "user-context-deadline",
@@ -304,7 +306,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.328459,
+        "latency_ms": 7.258917,
         "tokens_returned": 395
       },
       {
@@ -323,8 +325,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.194416,
-        "tokens_returned": 340
+        "latency_ms": 6.492208,
+        "tokens_returned": 373
       },
       {
         "query_id": "wk-negative-control-db",
@@ -342,7 +344,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.246583,
+        "latency_ms": 6.502625,
         "tokens_returned": 242
       },
       {
@@ -358,7 +360,7 @@
         "num_irrelevant": 3,
         "num_results": 0,
         "abstained": true,
-        "latency_ms": 2.919667,
+        "latency_ms": 5.493125,
         "tokens_returned": 0
       },
       {
@@ -374,7 +376,7 @@
         "num_irrelevant": 2,
         "num_results": 0,
         "abstained": true,
-        "latency_ms": 3.088208,
+        "latency_ms": 5.343166,
         "tokens_returned": 0
       },
       {
@@ -391,8 +393,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 4.090792,
-        "tokens_returned": 781
+        "latency_ms": 8.328,
+        "tokens_returned": 976
       },
       {
         "query_id": "section-filtered-standup",
@@ -408,7 +410,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 2.713125,
+        "latency_ms": 5.425208,
         "tokens_returned": 50
       },
       {
@@ -425,8 +427,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 4.640333,
-        "tokens_returned": 592
+        "latency_ms": 9.461875,
+        "tokens_returned": 657
       },
       {
         "query_id": "long-entry-incident-code",
@@ -442,8 +444,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.189917,
-        "tokens_returned": 126
+        "latency_ms": 6.224709,
+        "tokens_returned": 165
       },
       {
         "query_id": "long-entry-websocket-ticket",
@@ -459,8 +461,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.348875,
-        "tokens_returned": 54
+        "latency_ms": 6.756667,
+        "tokens_returned": 91
       },
       {
         "query_id": "long-entry-billing-account",
@@ -471,13 +473,13 @@
         "mrr": 1,
         "ndcg_10": 1,
         "num_relevant": 1,
-        "num_results": 1,
+        "num_results": 4,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.256916,
-        "tokens_returned": 55
+        "latency_ms": 6.857333,
+        "tokens_returned": 253
       },
       {
         "query_id": "hybrid-frontend-performance",
@@ -487,16 +489,16 @@
         "recall_at_10": 1,
         "mrr": 1,
         "ndcg_10": 1,
-        "irrelevant_mean_rank": 5,
+        "irrelevant_mean_rank": 6,
         "num_relevant": 2,
         "num_irrelevant": 1,
-        "num_results": 6,
+        "num_results": 7,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.346,
-        "tokens_returned": 334
+        "latency_ms": 6.675958,
+        "tokens_returned": 383
       },
       {
         "query_id": "hybrid-grpc-chain-order",
@@ -514,8 +516,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.481208,
-        "tokens_returned": 581
+        "latency_ms": 6.917833,
+        "tokens_returned": 614
       }
     ],
     "mean": {
@@ -525,11 +527,11 @@
       "recall_at_5": 0.95679012345679,
       "recall_at_10": 0.9876543209876544,
       "mrr": 1,
-      "ndcg_10": 0.9750403565343466,
-      "irrelevant_mean_rank": 6.363636363636363,
+      "ndcg_10": 0.9710718520656388,
+      "irrelevant_mean_rank": 6.545454545454546,
       "num_relevant": 0,
       "num_results": 0,
-      "latency_ms": 3.652192925925926,
+      "latency_ms": 7.335791592592592,
       "tokens_returned": 0
     },
     "per_category": {
@@ -554,10 +556,10 @@
         "recall_at_10": 1,
         "mrr": 1,
         "ndcg_10": 1,
-        "irrelevant_mean_rank": 3.5,
+        "irrelevant_mean_rank": 4,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 3.4136040000000003,
+        "latency_ms": 6.7968955,
         "tokens_returned": 0
       },
       "long-document": {
@@ -570,7 +572,7 @@
         "ndcg_10": 1,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 3.265236,
+        "latency_ms": 6.612903,
         "tokens_returned": 0
       },
       "lookup": {
@@ -580,11 +582,11 @@
         "recall_at_5": 1,
         "recall_at_10": 1,
         "mrr": 1,
-        "ndcg_10": 0.9935376481756868,
-        "irrelevant_mean_rank": 7,
+        "ndcg_10": 0.9878981944569969,
+        "irrelevant_mean_rank": 7.111111111111111,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 3.712739105263158,
+        "latency_ms": 7.443094210526316,
         "tokens_returned": 0
       },
       "recency": {
@@ -597,7 +599,7 @@
         "ndcg_10": 0.8315546295836226,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 4.640333,
+        "latency_ms": 9.461875,
         "tokens_returned": 0
       },
       "scoped": {
@@ -610,7 +612,7 @@
         "ndcg_10": 1,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 2.713125,
+        "latency_ms": 5.425208,
         "tokens_returned": 0
       },
       "stemming": {
@@ -623,16 +625,17 @@
         "ndcg_10": 0.6173196815056892,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 4.090792,
+        "latency_ms": 8.328,
         "tokens_returned": 0
       }
     },
     "abstention_rate": 1,
     "num_abstention_queries": 2,
     "cost": {
-      "query_p50_ms": 3.321,
-      "query_p95_ms": 4.685542,
-      "tokens_returned_p50": 340,
+      "query_p50_ms": 6.789,
+      "query_p95_ms": 9.554834,
+      "tokens_returned_p50": 383,
+      "graph_p50_ms": 0.609667,
       "write_per_doc_ms": 0,
       "db_size_mb": 0,
       "docs": 0,
@@ -659,7 +662,7 @@
           "keyword",
           "fact"
         ],
-        "latency_ms": 3.183167,
+        "latency_ms": 6.046125,
         "tokens_returned": 50
       },
       {
@@ -676,7 +679,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.267625,
+        "latency_ms": 6.645917,
         "tokens_returned": 244
       },
       {
@@ -693,7 +696,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 2.988417,
+        "latency_ms": 5.903541,
         "tokens_returned": 49
       },
       {
@@ -711,8 +714,8 @@
           "keyword",
           "exact"
         ],
-        "latency_ms": 5.494334,
-        "tokens_returned": 642
+        "latency_ms": 10.454583,
+        "tokens_returned": 805
       },
       {
         "query_id": "exact-qrm-1234",
@@ -729,8 +732,8 @@
           "keyword",
           "exact"
         ],
-        "latency_ms": 5.060833,
-        "tokens_returned": 552
+        "latency_ms": 9.377958,
+        "tokens_returned": 801
       },
       {
         "query_id": "exact-publish7",
@@ -747,8 +750,8 @@
           "keyword",
           "exact"
         ],
-        "latency_ms": 7.413875,
-        "tokens_returned": 650
+        "latency_ms": 13.895667,
+        "tokens_returned": 797
       },
       {
         "query_id": "exact-qrm-1005-scoped",
@@ -765,8 +768,8 @@
           "keyword",
           "exact"
         ],
-        "latency_ms": 5.256333,
-        "tokens_returned": 550
+        "latency_ms": 10.298416,
+        "tokens_returned": 775
       },
       {
         "query_id": "version-connect-v17",
@@ -784,7 +787,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 1.937667,
+        "latency_ms": 4.178333,
         "tokens_returned": 139
       },
       {
@@ -805,7 +808,7 @@
           "exact",
           "fact"
         ],
-        "latency_ms": 2.417666,
+        "latency_ms": 4.765417,
         "tokens_returned": 73
       },
       {
@@ -817,13 +820,13 @@
         "mrr": 1,
         "ndcg_10": 1,
         "num_relevant": 1,
-        "num_results": 4,
+        "num_results": 5,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.22325,
-        "tokens_returned": 205
+        "latency_ms": 6.554583,
+        "tokens_returned": 295
       },
       {
         "query_id": "longtail-certificate",
@@ -839,8 +842,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.278166,
-        "tokens_returned": 485
+        "latency_ms": 6.96925,
+        "tokens_returned": 553
       },
       {
         "query_id": "longtail-parquet",
@@ -851,13 +854,13 @@
         "mrr": 1,
         "ndcg_10": 1,
         "num_relevant": 1,
-        "num_results": 1,
+        "num_results": 2,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.368792,
-        "tokens_returned": 41
+        "latency_ms": 6.01275,
+        "tokens_returned": 117
       },
       {
         "query_id": "recency-standup",
@@ -875,7 +878,7 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.503208,
+        "latency_ms": 7.503166,
         "tokens_returned": 438
       },
       {
@@ -894,8 +897,8 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.187,
-        "tokens_returned": 238
+        "latency_ms": 6.543083,
+        "tokens_returned": 306
       },
       {
         "query_id": "abstain-astronomy",
@@ -910,7 +913,7 @@
         "num_irrelevant": 2,
         "num_results": 0,
         "abstained": true,
-        "latency_ms": 2.837541,
+        "latency_ms": 5.359,
         "tokens_returned": 0
       },
       {
@@ -926,7 +929,7 @@
         "num_irrelevant": 1,
         "num_results": 0,
         "abstained": true,
-        "latency_ms": 2.790792,
+        "latency_ms": 5.265958,
         "tokens_returned": 0
       },
       {
@@ -943,10 +946,111 @@
           "semantic",
           "keyword",
           "exact",
-          "fact"
+          "fact",
+          "entity"
         ],
-        "latency_ms": 2.860666,
+        "latency_ms": 5.925125,
+        "graph_ms": 0.1555,
         "tokens_returned": 73
+      },
+      {
+        "query_id": "multihop-billing-replication",
+        "category": "multi-hop",
+        "recall_at_1": 0,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 0.2,
+        "ndcg_10": 0.38685280723454163,
+        "irrelevant_mean_rank": 2,
+        "num_relevant": 1,
+        "num_irrelevant": 1,
+        "num_results": 10,
+        "first_hit_arms": [
+          "keyword",
+          "entity",
+          "graph"
+        ],
+        "latency_ms": 11.896291,
+        "graph_ms": 0.4515,
+        "tokens_returned": 617
+      },
+      {
+        "query_id": "multihop-billing-nodes",
+        "category": "multi-hop",
+        "recall_at_1": 0.5,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 0.8503449055347547,
+        "irrelevant_mean_rank": 2,
+        "num_relevant": 2,
+        "num_irrelevant": 1,
+        "num_results": 6,
+        "first_hit_arms": [
+          "semantic",
+          "keyword",
+          "graph"
+        ],
+        "latency_ms": 5.084041,
+        "graph_ms": 0.183209,
+        "tokens_returned": 325
+      },
+      {
+        "query_id": "multihop-ledger-mailer",
+        "category": "multi-hop",
+        "recall_at_1": 0,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 0.3333333333333333,
+        "ndcg_10": 0.5,
+        "irrelevant_mean_rank": 11,
+        "num_relevant": 1,
+        "num_irrelevant": 1,
+        "num_results": 3,
+        "first_hit_arms": [
+          "semantic",
+          "keyword",
+          "entity",
+          "graph"
+        ],
+        "latency_ms": 7.106709,
+        "graph_ms": 0.190167,
+        "tokens_returned": 157
+      },
+      {
+        "query_id": "plat-lookup-invoice-run",
+        "category": "lookup",
+        "recall_at_1": 1,
+        "recall_at_5": 1,
+        "recall_at_10": 1,
+        "mrr": 1,
+        "ndcg_10": 1,
+        "irrelevant_mean_rank": 6,
+        "num_relevant": 1,
+        "num_irrelevant": 1,
+        "num_results": 10,
+        "first_hit_arms": [
+          "semantic",
+          "keyword"
+        ],
+        "latency_ms": 7.595458,
+        "tokens_returned": 1126
+      },
+      {
+        "query_id": "plat-lookup-bounces",
+        "category": "lookup",
+        "recall_at_1": 0,
+        "recall_at_5": 0,
+        "recall_at_10": 1,
+        "mrr": 0.14285714285714285,
+        "ndcg_10": 0.3333333333333333,
+        "num_relevant": 1,
+        "num_results": 10,
+        "first_hit_arms": [
+          "keyword"
+        ],
+        "latency_ms": 9.759625,
+        "tokens_returned": 698
       },
       {
         "query_id": "para-starter-feeding",
@@ -992,7 +1096,7 @@
           "keyword",
           "semantic"
         ],
-        "latency_ms": 0.278583,
+        "latency_ms": 0.460875,
         "tokens_returned": 93
       },
       {
@@ -1011,7 +1115,7 @@
           "keyword",
           "semantic"
         ],
-        "latency_ms": 0.274125,
+        "latency_ms": 0.412458,
         "tokens_returned": 82
       },
       {
@@ -1023,13 +1127,13 @@
         "mrr": 1,
         "ndcg_10": 1,
         "num_relevant": 1,
-        "num_results": 9,
+        "num_results": 10,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.421042,
-        "tokens_returned": 828
+        "latency_ms": 7.294542,
+        "tokens_returned": 1032
       },
       {
         "query_id": "conflict-feeding",
@@ -1047,7 +1151,7 @@
           "keyword",
           "semantic"
         ],
-        "latency_ms": 0.309375,
+        "latency_ms": 0.501375,
         "tokens_returned": 100
       },
       {
@@ -1063,7 +1167,7 @@
         "num_irrelevant": 1,
         "num_results": 0,
         "abstained": true,
-        "latency_ms": 0.154209,
+        "latency_ms": 0.263167,
         "tokens_returned": 0
       },
       {
@@ -1079,7 +1183,7 @@
         "num_irrelevant": 1,
         "num_results": 0,
         "abstained": true,
-        "latency_ms": 1.94125,
+        "latency_ms": 3.751417,
         "tokens_returned": 0
       },
       {
@@ -1091,13 +1195,13 @@
         "mrr": 1,
         "ndcg_10": 1,
         "num_relevant": 1,
-        "num_results": 7,
+        "num_results": 8,
         "first_hit_arms": [
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.679417,
-        "tokens_returned": 351
+        "latency_ms": 7.414708,
+        "tokens_returned": 477
       },
       {
         "query_id": "poison-instruction",
@@ -1115,22 +1219,22 @@
           "semantic",
           "keyword"
         ],
-        "latency_ms": 3.839792,
-        "tokens_returned": 641
+        "latency_ms": 7.534583,
+        "tokens_returned": 787
       }
     ],
     "mean": {
       "query_id": "MEAN",
       "category": "",
-      "recall_at_1": 1,
-      "recall_at_5": 1,
+      "recall_at_1": 0.8653846153846154,
+      "recall_at_5": 0.9615384615384616,
       "recall_at_10": 1,
-      "mrr": 1,
-      "ndcg_10": 1,
-      "irrelevant_mean_rank": 9,
+      "mrr": 0.9106227106227105,
+      "ndcg_10": 0.9257896556193319,
+      "irrelevant_mean_rank": 7.846153846153846,
       "num_relevant": 0,
       "num_results": 0,
-      "latency_ms": 3.2496825238095233,
+      "latency_ms": 6.7744068846153835,
       "tokens_returned": 0
     },
     "per_category": {
@@ -1158,7 +1262,7 @@
         "irrelevant_mean_rank": 2,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 0.309375,
+        "latency_ms": 0.501375,
         "tokens_returned": 0
       },
       "cross-namespace": {
@@ -1172,7 +1276,7 @@
         "irrelevant_mean_rank": 11,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 3.146403,
+        "latency_ms": 6.198527666666667,
         "tokens_returned": 0
       },
       "exact": {
@@ -1185,7 +1289,7 @@
         "ndcg_10": 1,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 5.80634375,
+        "latency_ms": 11.006656,
         "tokens_returned": 0
       },
       "fact-key": {
@@ -1198,7 +1302,7 @@
         "ndcg_10": 1,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 3.421042,
+        "latency_ms": 7.294542,
         "tokens_returned": 0
       },
       "knowledge-update": {
@@ -1212,7 +1316,7 @@
         "irrelevant_mean_rank": 11,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 0.278583,
+        "latency_ms": 0.460875,
         "tokens_returned": 0
       },
       "long-document": {
@@ -1225,7 +1329,7 @@
         "ndcg_10": 1,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 3.2900693333333337,
+        "latency_ms": 6.512194333333333,
         "tokens_returned": 0
       },
       "long-tail": {
@@ -1239,20 +1343,35 @@
         "irrelevant_mean_rank": 11,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 3.187,
+        "latency_ms": 6.543083,
+        "tokens_returned": 0
+      },
+      "lookup": {
+        "query_id": "MEAN",
+        "category": "lookup",
+        "recall_at_1": 0.5,
+        "recall_at_5": 0.5,
+        "recall_at_10": 1,
+        "mrr": 0.5714285714285714,
+        "ndcg_10": 0.6666666666666666,
+        "irrelevant_mean_rank": 6,
+        "num_relevant": 0,
+        "num_results": 0,
+        "latency_ms": 8.6775415,
         "tokens_returned": 0
       },
       "multi-hop": {
         "query_id": "MEAN",
         "category": "multi-hop",
-        "recall_at_1": 1,
+        "recall_at_1": 0.375,
         "recall_at_5": 1,
         "recall_at_10": 1,
-        "mrr": 1,
-        "ndcg_10": 1,
+        "mrr": 0.6333333333333334,
+        "ndcg_10": 0.684299428192324,
+        "irrelevant_mean_rank": 5,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 2.860666,
+        "latency_ms": 7.5030415,
         "tokens_returned": 0
       },
       "paraphrase": {
@@ -1279,7 +1398,7 @@
         "irrelevant_mean_rank": 11,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 3.839792,
+        "latency_ms": 7.534583,
         "tokens_returned": 0
       },
       "recency": {
@@ -1293,7 +1412,7 @@
         "irrelevant_mean_rank": 11,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 3.503208,
+        "latency_ms": 7.503166,
         "tokens_returned": 0
       },
       "revocation": {
@@ -1320,7 +1439,7 @@
         "irrelevant_mean_rank": 11,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 0.274125,
+        "latency_ms": 0.412458,
         "tokens_returned": 0
       },
       "version-pinned": {
@@ -1334,7 +1453,7 @@
         "irrelevant_mean_rank": 6.5,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 2.1776665,
+        "latency_ms": 4.471875000000001,
         "tokens_returned": 0
       },
       "write-loss": {
@@ -1347,16 +1466,17 @@
         "ndcg_10": 1,
         "num_relevant": 0,
         "num_results": 0,
-        "latency_ms": 3.679417,
+        "latency_ms": 7.414708,
         "tokens_returned": 0
       }
     },
     "abstention_rate": 1,
     "num_abstention_queries": 4,
     "cost": {
-      "query_p50_ms": 3.187,
-      "query_p95_ms": 5.256333,
-      "tokens_returned_p50": 139,
+      "query_p50_ms": 6.543083,
+      "query_p95_ms": 10.454583,
+      "tokens_returned_p50": 244,
+      "graph_p50_ms": 0.183209,
       "write_per_doc_ms": 0,
       "db_size_mb": 0,
       "docs": 0,

@@ -109,7 +109,7 @@ func TestAutoAddsExactArmForIdentifiers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.Trace.ModeResolved != "semantic+keyword+exact+fact" {
+	if !strings.HasPrefix(resp.Trace.ModeResolved, "semantic+keyword+exact+fact") {
 		t.Fatalf("mode resolved %q (%s)", resp.Trace.ModeResolved, resp.Trace.RoutingReason)
 	}
 	if len(resp.Results) == 0 || !strings.Contains(resp.Results[0].Content, "ERR_CONN_RESET") && !strings.Contains(resp.Results[0].Title, "Interceptors") {
