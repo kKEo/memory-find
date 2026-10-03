@@ -167,6 +167,8 @@ memo-mcp exists as something different: a small, fully local, fully readable ret
 
 ## Reading further
 
+- **[User guide](docs/guide/user/README.md)**: what memo-mcp is for, a ten-minute quick start and everyday use, in plain English.
+- **[Operator guide](docs/guide/operator/README.md)**: install, configuration reference, retrieval tuning, monitoring with Prometheus, backup and troubleshooting. Both guides are published to GitHub Pages by `.github/workflows/docs.yml`; `make docs` builds them locally.
 - [`docs/architecture.md`](docs/architecture.md): layers, the write and read paths, the formulas, profiles, the explain contract, the address scheme.
 - [`docs/schema.md`](docs/schema.md): every table and column in plain words; trust transitions; what `as_of` can see.
 - [`docs/eval/`](docs/eval/): one measured report per tag.
