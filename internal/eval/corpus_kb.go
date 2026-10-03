@@ -69,6 +69,27 @@ func CorpusKB() []FixtureDoc {
 		FixtureDoc{Key: "widgets-connect-v18", Namespace: "widgets", Kind: kb.KindDoc, Title: "Client.Connect", URI: "https://widgets.example/docs/client-connect", Library: "example/widgets", Version: "v1.8.0",
 			Content: "# Client.Connect\n\n`Connect(ctx context.Context, addr string) (*Client, error)` dials the widgets server at addr; the context controls the dial timeout. The fixed ten-second timeout from v1.7 is gone.\n"},
 	)
+	// --- platform: a chain of services for the multi-hop slice (P7) ---
+	// Billing Service → Ledger Store → Quorum Replication → odd node count.
+	// Each page names its neighbours; no page names the whole chain, so a
+	// question that spans two links needs the mention graph. A decoy page
+	// mentions the first entity only.
+	docs = append(docs,
+		FixtureDoc{Key: "plat-billing", Namespace: "platform", Kind: kb.KindDoc, Title: "Billing Service", URI: "https://plat.example/billing",
+			Content: "# Billing Service\n\nThe Billing Service issues invoices once a day. It persists every invoice line in the Ledger Store and never writes to disk itself.\n"},
+		FixtureDoc{Key: "plat-ledger", Namespace: "platform", Kind: kb.KindDoc, Title: "Ledger Store", URI: "https://plat.example/ledger",
+			Content: "# Ledger Store\n\nThe Ledger Store is an append-only table of money movements. Durability comes from Quorum Replication across three regions.\n"},
+		FixtureDoc{Key: "plat-quorum", Namespace: "platform", Kind: kb.KindDoc, Title: "Quorum Replication", URI: "https://plat.example/replication",
+			Content: "# Quorum Replication\n\nQuorum Replication acknowledges a write when a majority of replicas have it. It requires an odd number of nodes; five is the production setting.\n"},
+		FixtureDoc{Key: "plat-billing-decoy", Namespace: "platform", Kind: kb.KindDoc, Title: "Billing Service on-call", URI: "https://plat.example/billing-oncall",
+			Content: "# Billing Service on-call\n\nThe Billing Service pages the finance engineer on duty when the daily invoice run is late. Escalation goes to the team lead.\n"},
+		FixtureDoc{Key: "plat-mailer", Namespace: "platform", Kind: kb.KindDoc, Title: "Mailer", URI: "https://plat.example/mailer",
+			Content: "# Mailer\n\nThe Mailer sends invoice emails for the Billing Service and retries bounces for two days.\n"},
+		// alias pairs for the merge-precision slice: the same thing under two spellings,
+		// plus near names that are different things
+		FixtureDoc{Key: "plat-alias-1", Namespace: "platform", Kind: kb.KindNote, Title: "Scheduler notes", Content: "# Scheduler notes\n\nThe Pipeline Scheduler restarts stuck jobs. The Pipeline Schedulers team owns it.\n"},
+		FixtureDoc{Key: "plat-alias-2", Namespace: "platform", Kind: kb.KindNote, Title: "Replication notes", Content: "# Replication notes\n\nQuorum Replications across regions were slow last quarter; Quorum Replica Count is a separate dashboard metric.\n"},
+	)
 	// --- long documents: generic filler, unique marker only in the tail ---
 	for i, marker := range []string{"The pager escalation policy pages the secondary after nine minutes of silence.", "Nightly certificate rotation renews the signing key before the token expiry window.", "The archival job compacts cold partitions into parquet files every Sunday."} {
 		var sb strings.Builder
@@ -119,8 +140,15 @@ func QueriesKB() []Query {
 		// abstention
 		{ID: "abstain-astronomy", Category: "abstention", Query: "exoplanet atmospheric spectroscopy telescope", Irrelevant: []string{"biglib-000", "tiny-ramen"}},
 		{ID: "abstain-opera", Category: "abstention", Query: "baritone aria libretto overture", Irrelevant: []string{"long-tail-1"}},
-		// multi-hop (planted now, honest until P7): both versions of Connect
+		// multi-hop: both versions of Connect
 		{ID: "multihop-connect-change", Category: "multi-hop", Query: "how did Client.Connect change between v1.7 and v1.8", Scope: retrieve.Scope{Library: "example/widgets", Version: ""}, Relevant: []string{"widgets-connect-v18"}},
+		// multi-hop over the platform chain: the answer page does not name the entity in the question
+		{ID: "multihop-billing-replication", Category: "multi-hop", Query: "how does the Billing Service relate to Quorum Replication", Relevant: []string{"plat-ledger"}, Irrelevant: []string{"plat-billing-decoy"}},
+		{ID: "multihop-billing-nodes", Category: "multi-hop", Query: "what node count does the storage behind the Billing Service depend on", Scope: retrieve.Scope{Namespaces: []string{"platform"}}, Relevant: []string{"plat-quorum", "plat-ledger"}, Irrelevant: []string{"plat-billing-decoy"}},
+		{ID: "multihop-ledger-mailer", Category: "multi-hop", Query: "how do the Ledger Store and the Mailer connect to each other", Relevant: []string{"plat-billing"}, Irrelevant: []string{"plat-alias-1"}},
+		// single-hop controls in the same namespace: structure must not hurt these
+		{ID: "plat-lookup-invoice-run", Category: "lookup", Query: "who gets paged when the invoice run is late", Relevant: []string{"plat-billing-decoy"}, Irrelevant: []string{"plat-billing"}},
+		{ID: "plat-lookup-bounces", Category: "lookup", Query: "how long are email bounces retried", Relevant: []string{"plat-mailer"}},
 		// paraphrase: real model only (the hash embedder has no synonymy)
 		{ID: "para-starter-feeding", Category: "paraphrase", RealModelOnly: true, Query: "keeping a bread culture alive", Relevant: []string{"tiny-sourdough"}},
 		{ID: "para-coffee", Category: "paraphrase", RealModelOnly: true, Query: "getting a good shot of coffee", Relevant: []string{"tiny-espresso"}},

@@ -65,9 +65,9 @@ func (r *Report) Markdown(title string) string {
 // table): one row per strategy, quality and cost columns.
 func CompareMarkdown(title string, reports []*Report) string {
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "### %s\n\n| strategy | recall@1 | recall@5 | recall@10 | MRR | nDCG@10 | abstention | p50 ms | tokens p50 |\n|---|---|---|---|---|---|---|---|---|\n", title)
+	fmt.Fprintf(&sb, "### %s\n\n| strategy | recall@1 | recall@5 | recall@10 | MRR | nDCG@10 | abstention | p50 ms | graph ms (when run) | tokens p50 |\n|---|---|---|---|---|---|---|---|---|---|\n", title)
 	for _, r := range reports {
-		fmt.Fprintf(&sb, "| %s | %.3f | %.3f | %.3f | %.3f | %.3f | %.2f | %.1f | %.0f |\n", r.Strategy, r.Mean.RecallAt1, r.Mean.RecallAt5, r.Mean.RecallAt10, r.Mean.MRR, r.Mean.NDCG10, r.AbstentionRate, r.Cost.QueryP50Ms, r.Cost.TokensP50)
+		fmt.Fprintf(&sb, "| %s | %.3f | %.3f | %.3f | %.3f | %.3f | %.2f | %.1f | %.1f | %.0f |\n", r.Strategy, r.Mean.RecallAt1, r.Mean.RecallAt5, r.Mean.RecallAt10, r.Mean.MRR, r.Mean.NDCG10, r.AbstentionRate, r.Cost.QueryP50Ms, r.Cost.GraphP50Ms, r.Cost.TokensP50)
 	}
 	return sb.String()
 }

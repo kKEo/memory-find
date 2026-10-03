@@ -245,6 +245,7 @@ type QueryMetrics struct {
 	// so a report can say whether a hit came through keyword or meaning.
 	FirstHitArms   []string `json:"first_hit_arms,omitempty"`
 	LatencyMs      float64  `json:"latency_ms"`
+	GraphMs        float64  `json:"graph_ms,omitempty"` // time spent in the entity and graph arms (the graph tax)
 	TokensReturned int      `json:"tokens_returned"`
 	Skipped        bool     `json:"skipped,omitempty"` // RealModelOnly query under the hash embedder
 }
@@ -268,6 +269,7 @@ type Cost struct {
 	QueryP50Ms    float64 `json:"query_p50_ms"`
 	QueryP95Ms    float64 `json:"query_p95_ms"`
 	TokensP50     float64 `json:"tokens_returned_p50"`
+	GraphP50Ms    float64 `json:"graph_p50_ms"` // the graph tax: p50 of time in the structural arms, over the queries that ran them
 	WritePerDocMs float64 `json:"write_per_doc_ms"`
 	DBSizeMB      float64 `json:"db_size_mb"`
 	Docs          int     `json:"docs"`
@@ -341,6 +343,9 @@ func Run(ctx context.Context, svc *retrieve.Service, keyToID map[string]string, 
 		for _, r := range resp.Results {
 			m.TokensReturned += chunk.EstimateTokens(r.Content) + 24
 		}
+		if resp.Trace != nil {
+			m.GraphMs = resp.Trace.LatencyMsPerArm[retrieve.ArmEntity] + resp.Trace.LatencyMsPerArm[retrieve.ArmGraph]
+		}
 		if len(relevantIDs) == 0 {
 			abst := len(resultIDs) == 0
 			m.Abstained = &abst
@@ -381,16 +386,20 @@ func Run(ctx context.Context, svc *retrieve.Service, keyToID map[string]string, 
 }
 
 func costOf(all []QueryMetrics) Cost {
-	var lat, tok []float64
+	var lat, tok, gr []float64
 	for _, m := range all {
 		if m.Skipped {
 			continue
 		}
 		lat = append(lat, m.LatencyMs)
 		tok = append(tok, float64(m.TokensReturned))
+		if m.GraphMs > 0 {
+			gr = append(gr, m.GraphMs) // only queries where the structural arms ran
+		}
 	}
 	sort.Float64s(lat)
 	sort.Float64s(tok)
+	sort.Float64s(gr)
 	pct := func(v []float64, p float64) float64 {
 		if len(v) == 0 {
 			return 0
@@ -398,7 +407,7 @@ func costOf(all []QueryMetrics) Cost {
 		i := int(p * float64(len(v)-1))
 		return v[i]
 	}
-	return Cost{QueryP50Ms: pct(lat, 0.5), QueryP95Ms: pct(lat, 0.95), TokensP50: pct(tok, 0.5)}
+	return Cost{QueryP50Ms: pct(lat, 0.5), QueryP95Ms: pct(lat, 0.95), TokensP50: pct(tok, 0.5), GraphP50Ms: pct(gr, 0.5)}
 }
 
 func categoryOf(q Query) string {

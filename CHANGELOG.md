@@ -3,6 +3,20 @@
 All notable changes. Tags follow semantic versioning; each tag has an eval report in
 `docs/eval/` from `v0.6.0` on.
 
+## [1.1.0] — 2026-10-03 — entities and graph, as an index (P7)
+
+- Migration 2: `entities`, `entity_aliases`, `mentions`, `merge_candidates`, `edges`.
+- Heuristic entity extraction on ingest; client-supplied `entities[]`/`relations[]`; fact
+  subjects linked from `about[]`.
+- Deterministic entity resolution with a review queue (`memo-mcp graph merges|merge|reject`).
+- Entity arm and graph arm (personalised PageRank, product scoring), routed into `auto` for
+  multi-entity or relational questions; `mode=graph`; `why.graph`, `trace.entities`.
+- Tool `explore` (eight tools), resource `memo://entity/{id}`, `status.graph`; CLI `explore`.
+- Eval: multi-hop slice, graph-tax column, update-stream and merge-precision tests; ablation
+  profiles `text-only`, `no-graph`.
+- Fixed: the fact arm had no weight in the default profile; a one-word overlap could match a
+  fact.
+
 ## [1.0.0] — 2026-10-02
 
 The 1.0 contract: tool names and parameters, the `memo://` address scheme, the explain field

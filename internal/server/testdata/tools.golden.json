@@ -1,6 +1,181 @@
 [
   {
     "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Walk the graph index from one named thing: the passages that mention it and the other things those passages mention, each with evidence addresses to read. Use it after a search names something you want the context of, or to see how two things connect. Example: explore(entity: \"Ledger Store\", hops: 1).",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "as_of": {
+          "description": "YYYY-MM-DD: walk only passages that were current on that date.",
+          "type": "string"
+        },
+        "entity": {
+          "description": "An entity name as it appears in text (Client.Connect, Ledger Store) or a memo://entity/\u003cid\u003e address.",
+          "type": "string"
+        },
+        "hops": {
+          "description": "1 (default): entities sharing a passage with it; 2: their neighbours too.",
+          "type": "integer"
+        },
+        "namespace": {
+          "description": "Resolve the name in this namespace only.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "entity"
+      ],
+      "type": "object"
+    },
+    "name": "explore",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "chunks": {
+          "description": "Passage addresses that mention the entity, strongest first",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "entity": {
+          "additionalProperties": false,
+          "properties": {
+            "aliases": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "canonical": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "mentions": {
+              "type": "integer"
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "uri": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "uri",
+            "namespace",
+            "canonical",
+            "type",
+            "mentions"
+          ],
+          "type": "object"
+        },
+        "neighbours": {
+          "description": "Entities that share passages with it, with evidence addresses",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "entity": {
+                "additionalProperties": false,
+                "properties": {
+                  "aliases": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": [
+                      "null",
+                      "array"
+                    ]
+                  },
+                  "canonical": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "mentions": {
+                    "type": "integer"
+                  },
+                  "namespace": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "uri": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "uri",
+                  "namespace",
+                  "canonical",
+                  "type",
+                  "mentions"
+                ],
+                "type": "object"
+              },
+              "evidence": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "hop": {
+                "type": "integer"
+              },
+              "rel": {
+                "type": "string"
+              },
+              "shared_chunks": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "entity",
+              "shared_chunks",
+              "evidence",
+              "hop"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "entity",
+        "chunks",
+        "neighbours"
+      ],
+      "type": "object"
+    },
+    "title": "Explore an entity's neighbourhood"
+  },
+  {
+    "annotations": {
       "destructiveHint": true,
       "idempotentHint": true,
       "openWorldHint": false,
@@ -440,7 +615,7 @@
           "type": "integer"
         },
         "mode": {
-          "description": "auto (default), hybrid, keyword, exact, semantic. auto adds exact-identifier matching when the query looks like code.",
+          "description": "auto (default), hybrid, keyword, exact, semantic, graph. auto adds exact-identifier matching when the query looks like code, and the entity and graph arms when it names two or more known things or asks how things relate; graph runs only those structural arms.",
           "type": "string"
         },
         "queries": {
@@ -743,6 +918,39 @@
                   "fused": {
                     "type": "number"
                   },
+                  "graph": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "hops": {
+                        "type": "integer"
+                      },
+                      "hub_penalised": {
+                        "type": "boolean"
+                      },
+                      "ppr_score": {
+                        "type": "number"
+                      },
+                      "seeds": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": [
+                          "null",
+                          "array"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "seeds",
+                      "ppr_score",
+                      "hops",
+                      "hub_penalised"
+                    ],
+                    "type": [
+                      "null",
+                      "object"
+                    ]
+                  },
                   "provenance": {
                     "additionalProperties": false,
                     "properties": {
@@ -981,6 +1189,15 @@
               ],
               "type": "object"
             },
+            "entities": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            },
             "filtered": {
               "additionalProperties": false,
               "properties": {
@@ -1113,6 +1330,31 @@
         "facts": {
           "type": "integer"
         },
+        "graph": {
+          "additionalProperties": false,
+          "description": "Entities, mention links, typed edges and open merge candidates (the graph index)",
+          "properties": {
+            "edges": {
+              "type": "integer"
+            },
+            "entities": {
+              "type": "integer"
+            },
+            "mentions": {
+              "type": "integer"
+            },
+            "open_merge_candidates": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "entities",
+            "mentions",
+            "edges",
+            "open_merge_candidates"
+          ],
+          "type": "object"
+        },
         "jobs_failed": {
           "type": "integer"
         },
@@ -1175,7 +1417,8 @@
         "pending_embeddings",
         "jobs_queued",
         "jobs_failed",
-        "degraded"
+        "degraded",
+        "graph"
       ],
       "type": "object"
     },

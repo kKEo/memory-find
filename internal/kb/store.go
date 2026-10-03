@@ -99,10 +99,27 @@ type IngestInput struct {
 	// DocumentID, when set, revises that document (notes have no URI, so
 	// an update names the document). Empty for new content.
 	DocumentID string
+	// Entities and Relations are rung 2 of the extraction ladder: names
+	// and links the client already knows (from its own parsing or model),
+	// merged with the heuristic rung-1 mentions.
+	Entities  []EntityInput
+	Relations []RelationInput
 	// Trust is set by the caller from its channel, never from client input.
 	Trust   string
 	Actor   string
 	Channel string
+}
+
+// EntityInput names a thing the document is about.
+type EntityInput struct {
+	Name string
+	Type string // identifier | name | heading | library | person | concept …
+}
+
+// RelationInput is a typed link between two named things, with the document
+// as evidence.
+type RelationInput struct {
+	From, To, Rel string
 }
 
 // IngestResult reports what happened.
@@ -114,6 +131,7 @@ type IngestResult struct {
 	Chunks     int
 	Embedded   int
 	Pending    int    // chunks whose vector is queued in a job
+	Entities   int    // distinct entities linked to this revision's chunks
 	JobID      string // the embed job, if any
 	URI        string // memo://doc/<id>
 }
@@ -223,6 +241,10 @@ func (s *Store) Ingest(ctx context.Context, in IngestInput) (*IngestResult, erro
 	if err != nil {
 		return nil, err
 	}
+	linked, err := s.linkMentions(ctx, tx, in.Namespace, title, ids, chunks, in.Entities, in.Relations, nowMs)
+	if err != nil {
+		return nil, err
+	}
 	op := "ingest"
 	if prevDocID != "" {
 		op = "revise"
@@ -234,7 +256,7 @@ func (s *Store) Ingest(ctx context.Context, in IngestInput) (*IngestResult, erro
 		return nil, err
 	}
 
-	res := &IngestResult{SourceID: sourceID, DocumentID: docID, Revision: revision, Chunks: len(ids), URI: docURI(docID)}
+	res := &IngestResult{SourceID: sourceID, DocumentID: docID, Revision: revision, Chunks: len(ids), Entities: linked, URI: docURI(docID)}
 
 	// Vectors: embed outside any transaction, then store. Never swallowed:
 	// a failure or a missing embedder leaves a queued job and a count the

@@ -259,7 +259,7 @@ number and the decision.
 | S3 | FTS5: is the trigram tokenizer present; does an external-content table with triggers round-trip; what does `porter unicode61` do to `net/http`, `useCallback`, `ERR_CONN_RESET`; do `highlight()`, `bm25()` and `integrity-check` work? | P1 schema (OD-2), P2 explain | one SQL proof per question | exact index = `unicode61 tokenchars '_.:-/'` | P0 |
 | S4 | GoMLX op coverage: which candidate ONNX models load and embed sanely under `hugot.NewGoSession` (`sim(a,a') > sim(a,b)`), at what p50 latency for 256 tokens and batch 16? Candidates: MiniLM (control), granite-small-r2, granite-r2, granite-97m-multilingual-r2, arctic-embed-m-v2, Qwen3-Embedding-0.6B, EmbeddingGemma-300M q8, potion-retrieval-32M (no ONNX); rerankers ms-marco-MiniLM-L-6-v2, Ettin-17M/32M | P3 bake-off (D-I, D-J) | table: loads, sane, dims, p50 ms, licence; failures dropped | MiniLM and potion are the floor; the schema never depends on a dimension | P0 (quick), P3 (full) |
 | S5 | Pure-Go tree-sitter (`odvcencio/gotreesitter`, `malivvan/tree-sitter` on wazero): parses Go, TypeScript and Python samples without panics; binary growth under 10 MB? | P1 code chunking (OD-17) | both criteria | heading- and fence-aware splitter plus `go/parser` | P1 |
-| S6 | CSR adjacency and personalised PageRank on a 100k-node power-law graph: build time, power-iteration time, hub-capped fixed-depth joins versus recursive CTEs; is a Go Louvain available? | P7 graph arm | PPR under 50 ms at 100k nodes / 1M edges; adjacency load under 500 ms | cap hops at 1–2, cache per namespace, skip Louvain | P7 |
+| S6 | CSR adjacency and personalised PageRank on a 100k-node power-law graph: build time, power-iteration time, hub-capped fixed-depth joins versus recursive CTEs; is a Go Louvain available? | P7 graph arm | PPR under 50 ms at 100k nodes / 1M edges; adjacency load under 500 ms | cap hops at 1–2, cache per namespace, skip Louvain | P7 (done: `docs/spikes/S6-graph.md`, 10 ms build, 42 ms PPR) |
 | S7 | Does elicitation over stdio work in Claude Code: does the dialog show, are accept and decline respected? | P5 `promote` | manual test recorded | `promote` returns the CLI command | P4/P5 (SDK side done: `docs/spikes/S7-elicitation.md`; live Claude Code check open) |
 
 ---
@@ -943,6 +943,28 @@ less and shipped two phases in a month, so treat these as ranges, not promises.
 - **Effort.** 2–3 days.
 
 ### P7 — Entities and graph, as an index · 6 days · `v1.1.0`
+
+> **Status (2026-10-03): built.** Spike S6 first (`docs/spikes/S6-graph.md`: CSR build 10 ms,
+> PPR 42 ms at 10 rounds for 100k nodes / 1M edges, fixed-depth joins beat the recursive CTE).
+> Migration 2 (`entities`, `entity_aliases`, `mentions`, `merge_candidates`, `edges`;
+> `facts.subject_entity_id` filled). `internal/graph`: rung-1 heuristic extraction, rung-2
+> `entities[]`/`relations[]` on ingest and `about[]` on remember, deterministic resolution
+> (normalise → exact key → 3-gram MinHash/LSH → Jaccard ≥ 0.8 → entropy gate → number-suffix
+> rule → `merge_candidates`), CSR + personalised PageRank. Retrieval: entity arm and graph arm
+> (one walk per named entity, product scoring, passages every seed mentions directly left to the
+> entity arm), both routed by one rule (two or more known entities, or relational phrasing with
+> one) because an always-on entity arm regressed plain lookups ("Postgres"); `mode=graph`;
+> `why.graph`, `trace.entities`; ablation profiles `text-only`, `no-graph`. Tool `explore` (eight
+> tools), resource `memo://entity/{id}`, `status.graph`; CLI `explore`, `graph merges|merge|reject`.
+> Eval: platform multi-hop slice (3 planted chains + 1 version query) and single-hop controls,
+> graph-tax column, update-stream test, merge-precision test (2/2 pairs, 0 false). Gate result:
+> multi-hop nDCG@10 0.43 text-only → 0.51 entity arm → 0.68 with the graph arm; single-hop slices
+> unchanged; so `GraphAuto` is on by default (`docs/eval/v1.1.0.md`). Two side findings fixed
+> on the way: the fact arm's weight was missing from the default profile (it voted with weight
+> 0), and a one-word keyword overlap could make a fact match (now at least half the content
+> words). Not built: rung 3 (GLiNER) and rung 4 (Ollama) extraction, typed edges in ranking
+> (stored and shown by `explore`, not scored). Remaining: commit, `git tag -a v1.1.0`.
+
 
 - **Story.** (a) and (b) for relational and multi-hop questions.
 - **Goal.** Recognise the "things" the knowledge talks about (libraries, functions, people,

@@ -43,7 +43,7 @@ func init() {
 
 	code := Default
 	code.Name = "code"
-	code.Weights = map[string]float64{ArmSemantic: 0.4, ArmKeyword: 0.4, ArmExact: 0.6}
+	code.Weights = map[string]float64{ArmSemantic: 0.4, ArmKeyword: 0.4, ArmExact: 0.6, ArmFact: 0.4, ArmEntity: 0.5, ArmGraph: 0.5}
 	code.RecencyKinds = nil
 	code.Derivation = "For identifier-heavy questions: the exact arm outweighs the others (0.6 vs 0.4/0.4) so a whole-token match on a symbol wins, and recency is off because code and docs do not age by date."
 	register(code)
@@ -61,6 +61,19 @@ func init() {
 	sem.Arms = []string{ArmSemantic}
 	sem.Derivation = "Ablation: vectors alone, so the eval can show what the keyword and exact arms contribute."
 	register(sem)
+
+	ng := Default
+	ng.Name = "no-graph"
+	ng.Arms = []string{ArmSemantic, ArmKeyword, ArmExact, ArmFact, ArmEntity}
+	ng.Derivation = "Ablation for the P7 gate: everything in default except the personalised-PageRank graph arm. The multi-hop slice under default minus this profile is the graph arm's whole contribution; its latency column is the graph tax."
+	register(ng)
+
+	text := Default
+	text.Name = "text-only"
+	text.GraphAuto = false
+	text.Arms = []string{ArmSemantic, ArmKeyword, ArmExact, ArmFact}
+	text.Derivation = "Ablation for the P7 gate: the 1.0 arms with no entity or graph arm, so the entity arm's own contribution is default minus no-graph minus this."
+	register(text)
 
 	mm := Default
 	mm.Name = "minmax"

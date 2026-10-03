@@ -124,7 +124,7 @@ func TestListToolsGolden(t *testing.T) {
 	}
 }
 
-func TestToolSurfaceIsExactlySevenTools(t *testing.T) {
+func TestToolSurfaceIsExactlyEightTools(t *testing.T) {
 	cs, _ := newTestSession(t)
 	res, err := cs.ListTools(context.Background(), nil)
 	if err != nil {
@@ -134,7 +134,7 @@ func TestToolSurfaceIsExactlySevenTools(t *testing.T) {
 	for _, tool := range res.Tools {
 		names = append(names, tool.Name)
 	}
-	if strings.Join(names, ",") != "forget,ingest,promote,read,remember,search,status" {
+	if strings.Join(names, ",") != "explore,forget,ingest,promote,read,remember,search,status" {
 		t.Fatalf("tools = %v", names)
 	}
 }

@@ -55,7 +55,7 @@ func TestResourcesMirrorReadTools(t *testing.T) {
 	for _, r := range tpl.ResourceTemplates {
 		names = append(names, r.URITemplate)
 	}
-	want := []string{"memo://doc/{id}", "memo://chunk/{id}", "memo://source/{id}", "memo://fact/{id}", "memo://ns/{namespace}/index"}
+	want := []string{"memo://doc/{id}", "memo://chunk/{id}", "memo://source/{id}", "memo://fact/{id}", "memo://entity/{id}", "memo://ns/{namespace}/index"}
 	for _, w := range want {
 		if !containsString(names, w) {
 			t.Errorf("template %s missing from %v", w, names)
@@ -214,4 +214,46 @@ func containsString(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// explore walks the graph index (P7): the entity, its passages, and the
+// things mentioned alongside it with evidence; the same text is a resource.
+func TestExploreAndEntityResource(t *testing.T) {
+	cs, _ := newTestSession(t)
+	ingestDoc(t, cs)
+	callTool(t, cs, "ingest", map[string]any{"content": "# Auth interceptor\n\nThe auth interceptor validates tokens before logging. On ERR_CONN_RESET it lets the Retry Policy decide.\n", "namespace": "grpc",
+		"source": map[string]any{"uri": "https://example.com/auth", "title": "Auth interceptor", "kind": "doc", "origin": "web"}})
+	res := callTool(t, cs, "explore", map[string]any{"entity": "ERR_CONN_RESET", "namespace": "grpc"})
+	if res.IsError {
+		t.Fatalf("explore: %s", resultText(res))
+	}
+	out := structured[ExploreOut](t, res)
+	if out.Entity.Canonical != "ERR_CONN_RESET" || len(out.Chunks) < 2 {
+		t.Fatalf("explore entity: %+v", out)
+	}
+	var sawRetry bool
+	for _, n := range out.Neighbours {
+		if n.Entity.Canonical == "Retry Policy" && len(n.Evidence) > 0 {
+			sawRetry = true
+		}
+	}
+	if !sawRetry {
+		t.Fatalf("neighbours lack Retry Policy with evidence: %+v", out.Neighbours)
+	}
+	rr, err := cs.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: out.Entity.URI})
+	if err != nil || !strings.Contains(rr.Contents[0].Text, "Retry Policy") {
+		t.Fatalf("entity resource: %v %+v", err, rr)
+	}
+	if res := callTool(t, cs, "explore", map[string]any{"entity": "nothing-here-at-all"}); !res.IsError {
+		t.Fatal("unknown entity should be a tool error")
+	}
+	st := structured[StatusOut](t, callTool(t, cs, "status", map[string]any{}))
+	if st.Graph.Entities == 0 || st.Graph.Mentions == 0 {
+		t.Fatalf("status graph counts: %+v", st.Graph)
+	}
+	// A relational question routes the structural arms in and explains it.
+	sr := structured[SearchOut](t, callTool(t, cs, "search", map[string]any{"query": "how does ERR_CONN_RESET relate to the Retry Policy", "response_format": "explain"}))
+	if sr.Trace == nil || !strings.Contains(sr.Trace.RoutingReason, "entity and graph arms added") {
+		t.Fatalf("routing: %+v", sr.Trace)
+	}
 }

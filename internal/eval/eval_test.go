@@ -111,7 +111,7 @@ func TestAblations(t *testing.T) {
 	ctx := context.Background()
 	store, _, kbIDs := loadSuite(t)
 	var reports []*Report
-	for _, name := range []string{"keyword-only", "semantic-only", "default", "minmax", "code"} {
+	for _, name := range []string{"keyword-only", "semantic-only", "text-only", "no-graph", "default", "minmax", "code"} {
 		p, err := retrieve.Lookup(name)
 		if err != nil {
 			t.Fatal(err)
@@ -196,4 +196,104 @@ func TestPairedGateCatchesSingleQueryLoss(t *testing.T) {
 	if regs := PairedGate(base, base, 0.02); len(regs) != 0 {
 		t.Fatalf("identical reports regressed: %v", regs)
 	}
+}
+
+// TestMergePrecision: the resolver's review queue over both corpora must be
+// almost all true alias pairs (roadmap P7: precision at least 0.95). The
+// labelled pairs are planted in CorpusKB; anything else queued is a false
+// positive. Near names that are different things (quorum.Publish7 vs
+// quorum.Publish10, Quorum Replica Count vs Quorum Replication) must not
+// appear.
+func TestMergePrecision(t *testing.T) {
+	store, _, _ := loadSuite(t)
+	cands, err := store.MergeCandidates(context.Background(), "open")
+	if err != nil {
+		t.Fatal(err)
+	}
+	truePairs := map[string]bool{"pipeline scheduler|pipeline schedulers": true, "quorum replication|quorum replications": true}
+	correct := 0
+	for _, c := range cands {
+		a, b := strings.ToLower(c.A.Canonical), strings.ToLower(c.B.Canonical)
+		if a > b {
+			a, b = b, a
+		}
+		if truePairs[a+"|"+b] {
+			correct++
+		} else {
+			t.Errorf("false merge candidate: %q <> %q (%.3f)", c.A.Canonical, c.B.Canonical, c.Score)
+		}
+	}
+	if len(cands) == 0 {
+		t.Fatal("expected the planted alias pair to be queued")
+	}
+	if p := float64(correct) / float64(len(cands)); p < 0.95 {
+		t.Fatalf("merge precision %.2f (%d/%d) below 0.95", p, correct, len(cands))
+	}
+	t.Logf("merge precision %d/%d", correct, len(cands))
+}
+
+// TestUpdateStream: index half the knowledge-base corpus, record the
+// queries answerable from that half, add the rest in batches, and check
+// that none of the earlier answers got worse (the graph and the resolver
+// must not degrade as the corpus grows).
+func TestUpdateStream(t *testing.T) {
+	ctx := context.Background()
+	db, err := kb.Open(ctx, t.TempDir(), "stream", kb.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := kb.NewStore(db, embedding.NewHashEmbedder(384))
+	docs := CorpusKB()
+	half := len(docs) / 2
+	ids, _, err := Load(ctx, store, docs[:half])
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded := map[string]bool{}
+	for k := range ids {
+		loaded[k] = true
+	}
+	var early []Query
+	for _, q := range QueriesKB() {
+		ok := len(q.Relevant) > 0 && !q.RealModelOnly
+		for _, k := range append(append([]string{}, q.Relevant...), q.Irrelevant...) {
+			ok = ok && loaded[k]
+		}
+		if ok {
+			early = append(early, q)
+		}
+	}
+	if len(early) < 3 {
+		t.Fatalf("too few early queries (%d); reorder the corpus", len(early))
+	}
+	svc := retrieve.New(store, retrieve.Default, false)
+	before, err := Run(ctx, svc, ids, early, RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for start := half; start < len(docs); start += 40 {
+		end := start + 40
+		if end > len(docs) {
+			end = len(docs)
+		}
+		more, _, err := Load(ctx, store, docs[start:end])
+		if err != nil {
+			t.Fatal(err)
+		}
+		for k, v := range more {
+			ids[k] = v
+		}
+	}
+	after, err := Run(ctx, svc, ids, early, RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, b := range before.PerQuery {
+		a := after.PerQuery[i]
+		if a.NDCG10+0.05 < b.NDCG10 {
+			t.Errorf("%s: nDCG@10 %.3f → %.3f after the corpus grew", b.QueryID, b.NDCG10, a.NDCG10)
+		}
+	}
+	t.Logf("update stream: %d early queries, mean nDCG %.3f → %.3f", len(early), before.Mean.NDCG10, after.Mean.NDCG10)
 }

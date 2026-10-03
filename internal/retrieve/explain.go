@@ -31,6 +31,7 @@ type Why struct {
 	Freshness     Freshness  `json:"freshness"`
 	Time          *TimeInfo  `json:"time,omitempty"`
 	Rerank        *RerankHit `json:"rerank,omitempty"`
+	Graph         *GraphWhy  `json:"graph,omitempty"` // P7: what the graph arm saw
 }
 
 // RerankHit records what the cross-encoder did to one result.
@@ -89,6 +90,7 @@ type Trace struct {
 	Degraded         Degraded           `json:"degraded"`
 	AsOf             *time.Time         `json:"as_of,omitempty"`
 	Rerank           *RerankTrace       `json:"rerank,omitempty"`
+	Entities         []string           `json:"entities,omitempty"` // P7: entity names the query matched
 }
 
 // RerankTrace says what the reranker was applied to.

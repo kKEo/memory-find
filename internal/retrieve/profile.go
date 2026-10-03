@@ -47,6 +47,13 @@ type Profile struct {
 	MaxLimit     int
 	// Fusion is rrf (default) or minmax; see profiles.go.
 	Fusion string
+	// GraphAuto lets mode=auto add the structural arms (entity, graph) when
+	// the query names two or more known entities or asks a relational
+	// question (P7). The pre-registered gate: on by default only if the
+	// eval's multi-hop slice gains at least 0.05 nDCG@10 with no single-hop
+	// category losing more than the baseline tolerance; the no-graph and
+	// text-only profiles are the ablations.
+	GraphAuto bool
 	// Arms restricts which arms may run (nil = all the mode asks for); the
 	// ablation profiles use it.
 	Arms []string
@@ -82,9 +89,10 @@ type Profile struct {
 // of noise; P3 calibrates the bands and the floor per model.
 var Default = Profile{
 	Name:          "default",
-	Derivation:    "RRF k=60 (the RRF paper's value). Equal semantic/keyword weights so a keyword-only rank-1 hit ties a vector rank-1 hit and can reach the first page (audit H2); exact=0.3 so an identifier match ranks like a strong keyword match without dominating prose queries. Fetch depth 100 keeps keyword-only hits in the fused list. Recency floor 0.8 with a 90-day half-life, notes and conversations only (OD-4). Gap cut at a halving, never below 3 results. Semantic-only floor 0.30 = the weak band, so no-match queries abstain. fact=0.4: a stored fact that matches votes for its evidence passage almost as strongly as a keyword hit, because a human or agent deliberately recorded it. All of these are starting points the eval measures, not truths.",
+	Derivation:    "RRF k=60 (the RRF paper's value). Equal semantic/keyword weights so a keyword-only rank-1 hit ties a vector rank-1 hit and can reach the first page (audit H2); exact=0.3 so an identifier match ranks like a strong keyword match without dominating prose queries. Fetch depth 100 keeps keyword-only hits in the fused list. Recency floor 0.8 with a 90-day half-life, notes and conversations only (OD-4). Gap cut at a halving, never below 3 results. Semantic-only floor 0.30 = the weak band, so no-match queries abstain. fact=0.4: a stored fact that matches votes for its evidence passage almost as strongly as a keyword hit, because a human or agent deliberately recorded it. entity=0.4: a passage that mentions a thing the query names is a strong lead, scaled down for entities mentioned everywhere. graph=0.5: a passage the walks from every named entity agree on ties a keyword hit, because the graph arm only reports what one hop cannot see; it is routed in only for relational or multi-entity questions (P7 gate: multi-hop nDCG@10 0.43 text-only, 0.51 with the entity arm, 0.68 with the graph arm at 0.5; single-hop slices unchanged; docs/eval/v1.1.0.md). All of these are starting points the eval measures, not truths.",
 	RRFK:          60,
-	Weights:       map[string]float64{ArmSemantic: 0.5, ArmKeyword: 0.5, ArmExact: 0.3},
+	Weights:       map[string]float64{ArmSemantic: 0.5, ArmKeyword: 0.5, ArmExact: 0.3, ArmFact: 0.4, ArmEntity: 0.4, ArmGraph: 0.5},
+	GraphAuto:     true,
 	FetchDepth:    100,
 	HalfLifeDays:  90,
 	RecencyFloor:  0.8,
@@ -107,6 +115,12 @@ const (
 	// ArmFact matches stored facts (keyword and meaning) and votes for their
 	// evidence chunk: "facts as extra keys" (research D-C, §6.1).
 	ArmFact = "fact"
+	// ArmEntity: chunks mentioning the entities the query names (one hop
+	// over the mention graph; P7).
+	ArmEntity = "entity"
+	// ArmGraph: personalised PageRank from the matched entities over the
+	// mention graph; routed in by wantsGraph or mode=graph (P7).
+	ArmGraph = "graph"
 )
 
 // Modes.
@@ -116,6 +130,9 @@ const (
 	ModeKeyword  = "keyword"
 	ModeExact    = "exact"
 	ModeSemantic = "semantic"
+	// ModeGraph runs only the structural arms (entity + graph): the
+	// ablation that shows what the graph finds on its own.
+	ModeGraph = "graph"
 )
 
 // Granularities.

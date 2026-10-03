@@ -261,11 +261,23 @@ embedding)` index them for the fact arm (P4).
 
 ### 5.6 L4 — graph (migration 2, P7)
 
-`entities(id, namespace, canonical, type, summary_page_id NULL)`,
-`entity_aliases(alias, entity_id)`, `mentions(entity_id, chunk_id, weight)`,
-`merge_candidates(a, b, score, reason, state)`, optional `edges(src, dst, rel, weight,
-valid_from, valid_to, recorded_at, invalidated_at, evidence_chunk_id)`. Mention edges come
-first; typed edges only if they beat the entity arm in eval.
+Built in P7. The graph is an index over the text: every row here can be rebuilt from the
+chunks, and nothing above is the only copy of anything.
+
+| Table | Columns | In plain words |
+|---|---|---|
+| `entities` | `id` (UUIDv7), `namespace`, `canonical`, `key`, `type`, `summary_page_id`, `created_at` | One recognised thing. `canonical` is the name as first seen; `key` is its matching form (lowercase, no spaces or dashes), unique per namespace. `type` is `identifier`, `heading`, `name`, or whatever the client declared. |
+| `entity_aliases` | `alias`, `key`, `entity_id` | Other spellings that resolve to the entity. Created only by an accepted merge. |
+| `mentions` | `entity_id`, `chunk_id`, `weight` | The entity is mentioned in this passage. Weight: heading 1.0, code span 0.8, identifier 0.6, prose name 0.4; client-declared names 1.0 where the text contains them, else 0.3. Deleting a chunk deletes its mentions. |
+| `merge_candidates` | `id`, `a`, `b`, `score`, `reason`, `state` (`open`, `merged`, `rejected`), `created_at`, `decided_at` | The resolver's review queue: two entities whose keys are near (3-gram Jaccard ≥ 0.8, not short or uniform, not differing only in a number). Nothing merges without a decision here (`memo-mcp graph merge|reject`), and the decision is audited. |
+| `edges` | `id`, `src`, `dst`, `rel`, `weight`, `valid_from`, `valid_to`, `recorded_at`, `invalidated_at`, `evidence_chunk_id` | Optional typed links supplied by the client on ingest (`relations[]`). Shown by `explore`; not scored by search until they beat the entity arm in eval. Bi-temporal like facts. |
+
+`facts.subject_entity_id` (present since migration 1) is filled from `remember`'s `about[]`:
+the first name becomes the subject.
+
+The graph arm does not read these tables at query time: it loads a namespace's live mention
+edges once into an in-memory compressed adjacency and rebuilds it when the mention count changes
+(`as_of` queries build a throwaway graph).
 
 ### 5.7 L5 — pages (migration 3, P8)
 

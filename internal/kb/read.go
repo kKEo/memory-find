@@ -284,6 +284,7 @@ type Status struct {
 	JobsQueued        int
 	JobsFailed        int
 	LastWrite         time.Time
+	Graph             GraphStats
 }
 
 // NamespaceStat is a per-namespace row in Status.
@@ -324,6 +325,18 @@ func (s *Store) Status(ctx context.Context) (*Status, error) {
 		return nil, err
 	}
 	if err := one(&st.JobsQueued, `SELECT COUNT(*) FROM jobs WHERE state IN ('queued','running')`); err != nil {
+		return nil, err
+	}
+	if err := one(&st.Graph.Entities, `SELECT COUNT(*) FROM entities`); err != nil {
+		return nil, err
+	}
+	if err := one(&st.Graph.Mentions, `SELECT COUNT(*) FROM mentions`); err != nil {
+		return nil, err
+	}
+	if err := one(&st.Graph.Edges, `SELECT COUNT(*) FROM edges WHERE invalidated_at IS NULL`); err != nil {
+		return nil, err
+	}
+	if err := one(&st.Graph.OpenMergeReview, `SELECT COUNT(*) FROM merge_candidates WHERE state = 'open'`); err != nil {
 		return nil, err
 	}
 	if err := one(&st.JobsFailed, `SELECT COUNT(*) FROM jobs WHERE state = 'failed'`); err != nil {
