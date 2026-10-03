@@ -104,6 +104,7 @@ func (s *Store) linkMentions(ctx context.Context, tx *sql.Tx, ns, title string, 
 	linked := map[string]bool{}
 	add := func(entityID string, chunkID int64, w float64) error {
 		linked[entityID] = true
+		s.metrics.mentions.Inc()
 		_, err := tx.ExecContext(ctx, `INSERT INTO mentions(entity_id, chunk_id, weight) VALUES (?,?,?) ON CONFLICT(entity_id, chunk_id) DO UPDATE SET weight = MAX(weight, excluded.weight)`, entityID, chunkID, w)
 		return err
 	}
@@ -532,7 +533,7 @@ func (s *Store) DecideMerge(ctx context.Context, id int64, accept bool, actor, c
 	if _, err := tx.ExecContext(ctx, `UPDATE merge_candidates SET state = ?, decided_at = ? WHERE id = ?`, newState, nowMs, id); err != nil {
 		return err
 	}
-	if err := writeAudit(ctx, tx, nowMs, actor, channel, "merge_"+newState, "memo://entity/"+a, map[string]any{"other": "memo://entity/" + b, "candidate": id}); err != nil {
+	if err := writeAudit(ctx, tx, s.metrics, nowMs, actor, channel, "merge_"+newState, "memo://entity/"+a, map[string]any{"other": "memo://entity/" + b, "candidate": id}); err != nil {
 		return err
 	}
 	return tx.Commit()

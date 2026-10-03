@@ -17,6 +17,7 @@ import (
 
 	"github.com/kKEo/memory-find/internal/chunk"
 	"github.com/kKEo/memory-find/internal/embedding"
+	"github.com/kKEo/memory-find/internal/obs"
 )
 
 // Trust tiers and origins (docs/schema.md §7). Trust is assigned by the
@@ -55,11 +56,12 @@ type Store struct {
 	embedder embedding.Embedder
 	chunking chunk.Options
 	now      func() time.Time
+	metrics  *storeMetrics
 }
 
 // NewStore wraps an opened database. embedder may be nil.
 func NewStore(db *sql.DB, embedder embedding.Embedder) *Store {
-	s := &Store{db: db, embedder: embedder, chunking: chunk.Options{}, now: time.Now}
+	s := &Store{db: db, embedder: embedder, chunking: chunk.Options{}, now: time.Now, metrics: newStoreMetrics(obs.Default())}
 	if embedder != nil {
 		if max := embedder.Info().MaxTokens; max > 0 && (s.chunking.Max == 0 || s.chunking.Max > max) {
 			// Leave headroom under the model's limit: the token estimate is
@@ -140,6 +142,8 @@ type IngestResult struct {
 // chunk → (triggers index FTS) → embed outside the transaction → vectors →
 // audit. See docs/schema.md.
 func (s *Store) Ingest(ctx context.Context, in IngestInput) (*IngestResult, error) {
+	ingestTimer := obs.Start()
+	defer ingestTimer.ObserveTo(s.metrics.ingestSecs)
 	if err := ValidateName(in.Namespace); err != nil {
 		return nil, fmt.Errorf("namespace: %w", err)
 	}
@@ -200,6 +204,7 @@ func (s *Store) Ingest(ctx context.Context, in IngestInput) (*IngestResult, erro
 	docURI := func(id string) string { return "memo://doc/" + id }
 
 	if sourceID != "" && prevDocID != "" && prevHash.Valid && prevHash.String == hash && nullEq(prevVersion, in.Source.Version) {
+		s.metrics.ingests.With("dedup").Inc()
 		return &IngestResult{SourceID: sourceID, DocumentID: prevDocID, Revision: prevRevision, Dedup: true, URI: docURI(prevDocID)}, nil
 	}
 
@@ -235,9 +240,13 @@ func (s *Store) Ingest(ctx context.Context, in IngestInput) (*IngestResult, erro
 		}
 		// Pages built from the old revision's chunks are now stale (the
 		// chunks themselves are about to be replaced).
-		if _, err := tx.ExecContext(ctx, `UPDATE pages SET stale = 1, stale_reason = ? WHERE deleted_at IS NULL AND stale = 0 AND id IN (SELECT ps.page_id FROM page_sources ps JOIN chunks c ON c.id = ps.chunk_id WHERE c.document_id = ?)`,
-			"source revised: "+docURI(docID), prevDocID); err != nil {
+		staleRes, err := tx.ExecContext(ctx, `UPDATE pages SET stale = 1, stale_reason = ? WHERE deleted_at IS NULL AND stale = 0 AND id IN (SELECT ps.page_id FROM page_sources ps JOIN chunks c ON c.id = ps.chunk_id WHERE c.document_id = ?)`,
+			"source revised: "+docURI(docID), prevDocID)
+		if err != nil {
 			return nil, fmt.Errorf("mark pages stale: %w", err)
+		}
+		if n, _ := staleRes.RowsAffected(); n > 0 {
+			s.metrics.pagesStale.Add(float64(n))
 		}
 	}
 
@@ -255,7 +264,7 @@ func (s *Store) Ingest(ctx context.Context, in IngestInput) (*IngestResult, erro
 	if prevDocID != "" {
 		op = "revise"
 	}
-	if err := writeAudit(ctx, tx, nowMs, in.Actor, in.Channel, op, docURI(docID), map[string]any{"source": sourceID, "revision": revision, "chunks": len(ids), "content_hash": hash, "trust": in.Trust}); err != nil {
+	if err := writeAudit(ctx, tx, s.metrics, nowMs, in.Actor, in.Channel, op, docURI(docID), map[string]any{"source": sourceID, "revision": revision, "chunks": len(ids), "content_hash": hash, "trust": in.Trust}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -263,6 +272,9 @@ func (s *Store) Ingest(ctx context.Context, in IngestInput) (*IngestResult, erro
 	}
 
 	res := &IngestResult{SourceID: sourceID, DocumentID: docID, Revision: revision, Chunks: len(ids), Entities: linked, URI: docURI(docID)}
+	s.metrics.ingests.With(map[bool]string{true: "revision", false: "new"}[prevDocID != ""]).Inc()
+	s.metrics.chunks.Add(float64(len(ids)))
+	s.metrics.docBytes.Observe(float64(len(content)))
 
 	// Vectors: embed outside any transaction, then store. Never swallowed:
 	// a failure or a missing embedder leaves a queued job and a count the
@@ -338,12 +350,14 @@ func (s *Store) embedChunks(ctx context.Context, ids []int64, chunks []chunk.Chu
 		}
 		vecs, err := s.embedder.EmbedBatch(ctx, texts, embedding.RoleDocument)
 		if err != nil {
+			s.metrics.embedBatches.With("error").Inc()
 			jobID, qerr := s.enqueueEmbed(ctx, ids[start:], err.Error())
 			if qerr != nil {
 				return embedded, "", qerr
 			}
 			return embedded, jobID, nil
 		}
+		s.metrics.embedBatches.With("ok").Inc()
 		if err := s.storeVectors(ctx, modelID, ids[start:end], vecs); err != nil {
 			return embedded, "", err
 		}
@@ -367,7 +381,11 @@ func (s *Store) storeVectors(ctx context.Context, modelID string, ids []int64, v
 			return fmt.Errorf("store vector for chunk %d: %w", id, err)
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.metrics.vectors.With(modelID).Add(float64(len(ids)))
+	return nil
 }
 
 // ensureModel upserts the embedder's model row and returns its id.
@@ -398,6 +416,8 @@ func (s *Store) DefaultModelID(ctx context.Context) (string, error) {
 }
 
 func (s *Store) enqueueEmbed(ctx context.Context, ids []int64, reason string) (string, error) {
+	s.metrics.jobs.With("embed", "queued").Inc()
+	s.metrics.embedBatches.With("queued").Inc()
 	items, _ := json.Marshal(ids)
 	jobID := uuid.Must(uuid.NewV7()).String()
 	now := s.now().UnixMilli()
@@ -433,6 +453,7 @@ func (s *Store) Backfill(ctx context.Context) (int, error) {
 		if err != nil {
 			state, msg = "failed", sql.NullString{String: err.Error(), Valid: true}
 		}
+		s.metrics.jobs.With("embed", state).Inc()
 		if _, uerr := s.db.ExecContext(ctx, `UPDATE jobs SET state = ?, error = ?, updated_at = ? WHERE id = ?`, state, msg, s.now().UnixMilli(), j.id); uerr != nil {
 			return total, uerr
 		}
@@ -509,9 +530,12 @@ func (s *Store) embedPending(ctx context.Context, modelID string, ids []int64) (
 	return done, nil
 }
 
-func writeAudit(ctx context.Context, tx *sql.Tx, ts int64, actor, channel, op, target string, detail map[string]any) error {
+func writeAudit(ctx context.Context, tx *sql.Tx, m *storeMetrics, ts int64, actor, channel, op, target string, detail map[string]any) error {
 	if actor == "" {
 		actor = channel
+	}
+	if m != nil {
+		m.writes.With(op, channel).Inc()
 	}
 	d, _ := json.Marshal(detail)
 	if _, err := tx.ExecContext(ctx, `INSERT INTO audit(ts, actor, channel, op, target_uri, detail_json) VALUES (?,?,?,?,?,?)`, ts, actor, channel, op, target, string(d)); err != nil {
@@ -685,7 +709,7 @@ func (s *Store) SetDefaultModel(ctx context.Context, modelID, actor, channel str
 	if _, err := tx.ExecContext(ctx, `UPDATE models SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END`, modelID); err != nil {
 		return err
 	}
-	if err := writeAudit(ctx, tx, s.now().UnixMilli(), actor, channel, "model-use", "memo://model/"+modelID, map[string]any{"model": modelID}); err != nil {
+	if err := writeAudit(ctx, tx, s.metrics, s.now().UnixMilli(), actor, channel, "model-use", "memo://model/"+modelID, map[string]any{"model": modelID}); err != nil {
 		return err
 	}
 	return tx.Commit()

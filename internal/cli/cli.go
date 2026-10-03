@@ -10,9 +10,13 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	// The CLI is what opens databases, so it registers the SQLite driver
 	// (with the sqlite-vec extension) itself.
@@ -21,6 +25,7 @@ import (
 
 	"github.com/kKEo/memory-find/internal/embedding"
 	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/obs"
 	"github.com/kKEo/memory-find/internal/retrieve"
 	"github.com/kKEo/memory-find/internal/server"
 )
@@ -90,13 +95,19 @@ func Main(ctx context.Context, version string, args []string, stdout, stderr io.
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	// Structured logs go to stderr (never stdout: in serve mode stdout is the
+	// MCP stream). MEMO_LOG_FORMAT and MEMO_LOG_LEVEL configure them.
+	obs.SetupLogging(stderr, os.Getenv)
+	obs.BuildInfo(obs.Default(), version, server.ProtocolVersion)
+	obs.Default().AddCollector(obs.RuntimeCollector())
+	obs.Default().AddCollector(obs.ProcessCollector())
 	rest := fs.Args()
 	switch {
 	case *statsFlag:
-		fmt.Fprintln(stderr, "warning: --stats is deprecated; use `memo-mcp status`")
+		slog.Warn("--stats is deprecated; use `memo-mcp status`")
 		rest = []string{"status"}
 	case *redownload:
-		fmt.Fprintln(stderr, "warning: --redownload-model is deprecated; use `memo-mcp model redownload`")
+		slog.Warn("--redownload-model is deprecated; use `memo-mcp model redownload`")
 		rest = []string{"model", "redownload"}
 	}
 
@@ -108,7 +119,7 @@ func Main(ctx context.Context, version string, args []string, stdout, stderr io.
 	var err error
 	switch cmd {
 	case "serve":
-		err = runServe(ctx, stderr)
+		err = runServe(ctx, rest, stderr)
 	case "version":
 		err = runVersion(version, stdout)
 	case "status":
@@ -163,6 +174,8 @@ func Main(ctx context.Context, version string, args []string, stdout, stderr io.
 		err = runUI(ctx, rest, stdout, stderr)
 	case "migrate":
 		err = runMigrate(ctx, stdout, stderr)
+	case "metrics":
+		err = runMetrics(ctx, rest, stdout, stderr)
 	case "help", "-h", "--help":
 		usage(stdout)
 	default:
@@ -181,13 +194,13 @@ func usage(w io.Writer) {
 	fmt.Fprint(w, `memo-mcp — a local, measurable knowledge base for agents (MCP server + CLI)
 
 Usage:
-  memo-mcp [serve]                 start the MCP server on stdio (default)
+  memo-mcp [serve] [--metrics-addr 127.0.0.1:9469]   start the MCP server on stdio (default); the flag exposes /metrics on loopback
   memo-mcp ingest <file|dir|->     add documents to the knowledge base
       --ns <name> --kind doc|note|code|conversation --uri <u> --title <t>
       --library <l> --version <v> --trust user|curated --context <text> --embed=false
   memo-mcp search "<q>" [--mode --ns --library --version --kind --limit --format table|json|md --explain]
   memo-mcp explain "<q>" [<memo://...>]   ranking table for every hit, or the full why for one
-  memo-mcp log tail|show <id>|prune       inspect the opt-in query log
+  memo-mcp log tail|calls|show <id>|replay|prune   inspect the opt-in query and call logs
   memo-mcp remember "<fact>" [--ns --about a,b --valid-from --valid-to --supersedes <memo://fact/..> --evidence <memo://chunk/n> --trust user|curated]
   memo-mcp forget <memo://doc/..|memo://fact/..> --reason "<why>" [--redact]
   memo-mcp facts ls [--ns --as-of YYYY-MM-DD --history --json]
@@ -207,6 +220,7 @@ Usage:
   memo-mcp verify [--repair]       check integrity (chunks, vectors, indexes)
   memo-mcp backfill                embed chunks whose vectors are pending
   memo-mcp status                  print knowledge-base statistics
+  memo-mcp metrics [--json --since 24h]   knowledge-base gauges and per-tool call statistics from the opt-in log
   memo-mcp version                 print version, protocol version, Go version, model dir
   memo-mcp model ls|smoke|pull|use|redownload   the embedding-model registry (MEMO_MODEL picks one)
   memo-mcp reindex [--model <id>]  embed every passage that lacks a vector for the model
@@ -221,6 +235,8 @@ Environment:
   MEMO_PROFILE   ranking profile (default "default"); overrides in $MEMO_HOME/profiles.json
   MEMO_RERANK=1  attach the cross-encoder reranker (used by the precise profile)
   MEMO_OLLAMA_URL, MEMO_OLLAMA_MODEL   optional local model for 'compact --executor ollama' (loopback by default)
+  MEMO_METRICS_ADDR   same as 'serve --metrics-addr' (loopback only)
+  MEMO_LOG_FORMAT     text (default) | json      MEMO_LOG_LEVEL   debug | info (default) | warn | error
   JOURNAL_TOKEN, JOURNAL_PATH    deprecated aliases of MEMO_KB / MEMO_HOME (old journal files are not opened)
 `)
 }
@@ -284,28 +300,46 @@ func runModel(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 			}
 		}
 		modelDir := embedding.DefaultModelDir()
-		fmt.Fprintf(stderr, "Redownloading %s into %s...\n", info.HFRepo, modelDir)
+		slog.Info("redownloading embedding model", "repo", info.HFRepo, "dir", modelDir)
 		if _, err := embedding.RedownloadModelFor(ctx, info, modelDir); err != nil {
 			return fmt.Errorf("redownload model: %w", err)
 		}
-		fmt.Fprintln(stderr, "Done.")
+		slog.Info("model redownloaded", "repo", info.HFRepo)
 		return nil
 	default:
 		return fmt.Errorf("unknown model subcommand %q", sub)
 	}
 }
 
-func runServe(ctx context.Context, stderr io.Writer) error {
+func runServe(ctx context.Context, args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	metricsAddr := fs.String("metrics-addr", os.Getenv("MEMO_METRICS_ADDR"), "expose Prometheus metrics at http://<addr>/metrics (loopback only; off when empty)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
 	cfg, err := ResolveConfig(os.Getenv)
 	if err != nil {
 		return err
 	}
 	for _, d := range cfg.Deprecations {
-		fmt.Fprintln(stderr, "warning:", d)
+		slog.Warn(d)
+	}
+	// Bind the metrics listener before the store is opened so that a bad
+	// address fails fast without touching the database or starting the
+	// background backfill.
+	var ms *obs.MetricsServer
+	var ln net.Listener
+	if *metricsAddr != "" {
+		ms = obs.NewMetricsServer(obs.Default())
+		ln, err = ms.Listen(*metricsAddr)
+		if err != nil {
+			return err
+		}
 	}
 	embedder, cleanup, err := buildEmbedder(ctx)
 	if err != nil {
-		fmt.Fprintf(stderr, "warning: embedding unavailable, search will be keyword-only and new vectors are queued: %v\n", err)
+		slog.Warn("embedding unavailable; search is keyword-only and new vectors are queued", "err", err)
 	}
 	defer cleanup()
 
@@ -325,14 +359,14 @@ func runServe(ctx context.Context, stderr io.Writer) error {
 	if embedder != nil {
 		go func() {
 			if n, err := store.Backfill(ctx); err != nil {
-				fmt.Fprintf(stderr, "warning: backfill: %v\n", err)
+				slog.Warn("backfill failed", "err", err)
 			} else if n > 0 {
-				fmt.Fprintf(stderr, "backfilled %d chunk vector(s)\n", n)
+				slog.Info("backfilled chunk vectors", "n", n)
 			}
 			if n, err := store.Reindex(ctx, nil); err != nil {
-				fmt.Fprintf(stderr, "warning: reindex for %s: %v\n", embedder.Info().ID, err)
+				slog.Warn("reindex failed", "model", embedder.Info().ID, "err", err)
 			} else if n > 0 {
-				fmt.Fprintf(stderr, "embedded %d passage(s) with %s\n", n, embedder.Info().ID)
+				slog.Info("embedded passages for the current model", "n", n, "model", embedder.Info().ID)
 			}
 		}()
 	}
@@ -345,13 +379,29 @@ func runServe(ctx context.Context, stderr io.Writer) error {
 	if os.Getenv("MEMO_RERANK") == "1" {
 		rr, closeRR, err := loadReranker(ctx, stderr)
 		if err != nil {
-			fmt.Fprintf(stderr, "warning: %v; continuing without a reranker\n", err)
+			slog.Warn("reranker unavailable; continuing without it", "err", err)
 		} else {
 			defer closeRR()
 			svc.WithReranker(rr)
 		}
 	}
-	srv := server.New(store, svc, serverVersion)
+	obs.Default().AddCollector(store.MetricsCollector(5 * time.Second))
+	if ln != nil {
+		hs := &http.Server{Handler: ms.Handler(), ReadHeaderTimeout: 10 * time.Second}
+		go func() {
+			<-ctx.Done()
+			shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_ = hs.Shutdown(shutdown)
+		}()
+		go func() {
+			if err := hs.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				slog.Warn("metrics endpoint stopped", "err", err)
+			}
+		}()
+		slog.Info("metrics listening", "url", "http://"+ln.Addr().String()+"/metrics")
+	}
+	srv := server.New(store, svc, serverVersion, server.WithLogger(slog.Default().With("component", "mcp")), server.WithRegistry(obs.Default()), server.WithCallLog(cfg.LogQueries))
 	return srv.Run(ctx)
 }
 

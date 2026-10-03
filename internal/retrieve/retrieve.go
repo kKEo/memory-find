@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"regexp"
 	"sort"
@@ -16,6 +17,7 @@ import (
 	"github.com/kKEo/memory-find/internal/chunk"
 	"github.com/kKEo/memory-find/internal/embedding"
 	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/obs"
 	"github.com/kKEo/memory-find/internal/rerank"
 )
 
@@ -29,6 +31,8 @@ type Service struct {
 	now        func() time.Time
 	reranker   rerank.Reranker
 	graphs     graphCache
+	metrics    *searchMetrics
+	logger     *slog.Logger
 }
 
 // WithReranker attaches a cross-encoder; profiles with Rerank=true use it.
@@ -49,7 +53,7 @@ func New(store *kb.Store, profile Profile, logQueries bool) *Service {
 			}
 		}
 	}
-	return &Service{store: store, db: store.DB(), embedder: store.Embedder(), profile: profile, logQueries: logQueries, now: time.Now, graphs: graphCache{m: map[string]*nsGraph{}}}
+	return &Service{store: store, db: store.DB(), embedder: store.Embedder(), profile: profile, logQueries: logQueries, now: time.Now, graphs: graphCache{m: map[string]*nsGraph{}}, metrics: newSearchMetrics(obs.Default())}
 }
 
 // Scope narrows a search before ranking (docs/schema.md §6).
@@ -952,6 +956,7 @@ func oneLiner(text string) string {
 }
 
 func (s *Service) logQuery(ctx context.Context, req Request, queries []string, tr *Trace, resp *Response, start time.Time) {
+	s.finish(ctx, req, queries, tr, resp, start)
 	if !s.logQueries {
 		return
 	}

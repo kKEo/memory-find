@@ -124,7 +124,7 @@ func (s *Store) WritePage(ctx context.Context, in PageInput) (*Page, error) {
 			return nil, err
 		}
 	}
-	if err := writeAudit(ctx, tx, nowMs, in.Actor, in.Channel, op, "memo://page/"+id, map[string]any{"kind": in.Kind, "subject": in.SubjectID, "sources": len(in.Sources), "rev": rev, "trust": trust}); err != nil {
+	if err := writeAudit(ctx, tx, s.metrics, nowMs, in.Actor, in.Channel, op, "memo://page/"+id, map[string]any{"kind": in.Kind, "subject": in.SubjectID, "sources": len(in.Sources), "rev": rev, "trust": trust}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -262,7 +262,7 @@ func (s *Store) InvalidateFact(ctx context.Context, loserID, winnerID, reason, a
 	if _, err := tx.ExecContext(ctx, `UPDATE facts SET invalidated_at = ?, superseded_by = ? WHERE id = ?`, nowMs, winnerID, loserID); err != nil {
 		return err
 	}
-	if err := writeAudit(ctx, tx, nowMs, actor, channel, "resolve_conflict", "memo://fact/"+loserID, map[string]any{"winner": "memo://fact/" + winnerID, "reason": reason}); err != nil {
+	if err := writeAudit(ctx, tx, s.metrics, nowMs, actor, channel, "resolve_conflict", "memo://fact/"+loserID, map[string]any{"winner": "memo://fact/" + winnerID, "reason": reason}); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -304,6 +304,7 @@ func (s *Store) UpsertWorkItem(ctx context.Context, ns, kind, subject string, pa
 	if _, err := s.db.ExecContext(ctx, `INSERT INTO work_items(id, namespace, kind, subject, payload_json, state, created_at) VALUES (?,?,?,?,?,'open',?)`, id, ns, kind, subject, string(b), s.now().UnixMilli()); err != nil {
 		return nil, false, err
 	}
+	s.metrics.workItems.With(kind, "created").Inc()
 	w, err := s.ReadWorkItem(ctx, id)
 	return w, true, err
 }
@@ -376,6 +377,9 @@ func (s *Store) CloseWorkItem(ctx context.Context, id, state string, result any,
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return fmt.Errorf("work item %s is not open", id)
+	}
+	if w, err := s.ReadWorkItem(ctx, id); err == nil {
+		s.metrics.workItems.With(w.Kind, state).Inc()
 	}
 	return nil
 }
@@ -516,3 +520,22 @@ func (s *Store) idList(ctx context.Context, q string, args ...any) ([]string, er
 	}
 	return ids, rows.Err()
 }
+
+// CallLogEntry is one tool call as the server records it when the opt-in
+// log is on (migration 4 adds the table).
+type CallLogEntry struct {
+	ID         int64           `json:"id"`
+	At         time.Time       `json:"at"`
+	Client     string          `json:"client"`
+	Method     string          `json:"method"`
+	Tool       string          `json:"tool"`
+	LatencyMs  int64           `json:"latency_ms"`
+	OK         bool            `json:"ok"`
+	ErrorClass string          `json:"error_class,omitempty"`
+	NResults   int             `json:"n_results"`
+	TokensOut  int             `json:"tokens_out"`
+	Args       json.RawMessage `json:"args"`
+}
+
+// LogCall appends one row to the opt-in call log (migration 4).
+func (s *Store) LogCall(ctx context.Context, e CallLogEntry) error { return s.logCall(ctx, e) }

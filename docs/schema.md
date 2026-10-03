@@ -298,6 +298,12 @@ always 1; a conflict resolution invalidates the losing fact (`invalidated_at`, `
 never deletes it, and a channel may not invalidate a fact more trusted than its cap or more
 trusted than the winner; near-duplicate passages are recorded, never deleted (D-A).
 
+### 5.8 Bookkeeping added later: `call_log` (migration 4, P10)
+
+| Table | Columns | In plain words |
+|---|---|---|
+| `call_log` | `id`, `ts`, `client`, `method` (`tools/call`), `tool`, `latency_ms`, `ok`, `error_class`, `n_results`, `tokens_out`, `args_summary_json` | One row per MCP tool call, written only when `MEMO_QUERY_LOG=1`. The argument summary is an allowlist per tool (query, scope, addresses, sizes); the content of what was written and the text that came back are never stored. Pruned with `query_log`. |
+
 ## 6. What is indexed where (P1 and P2)
 
 | Question | Answered by |
@@ -348,6 +354,7 @@ by default (recall first); it labels every result and offers `scope.min_trust`.
 | 1 | application id; `namespaces`, `models`, `jobs`, `audit`, `query_log`; `sources`, `documents`, `chunks`, `chunks_fts`, `chunks_fts_exact`, `chunk_vecs`; `facts`, `facts_fts`, `fact_vecs`; all triggers and indexes | P1 |
 | 2 | `entities`, `entity_aliases`, `mentions`, `merge_candidates`, `edges` | P7 |
 | 3 | `pages`, `page_sources`, `page_vecs`, `work_items` | P8 |
+| 4 | `call_log` | P10 |
 
 Migrations run inside `BEGIN IMMEDIATE`, read `user_version` inside the transaction, and refuse
 negative or future versions.

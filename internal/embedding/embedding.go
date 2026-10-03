@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"os"
 	"path/filepath"
@@ -183,7 +184,8 @@ func loadPipelineWithRecovery(ctx context.Context, session *hugot.Session, info 
 
 		lastErr = err
 		if attempt < maxAttempts-1 {
-			fmt.Fprintf(os.Stderr, "warning: model cache appears corrupt (%v); re-downloading...\n", err)
+			metricsOnce().downloads.With(info.ID, "corrupt_retry").Inc()
+			logger().Warn("model cache appears corrupt; re-downloading", "model", info.ID, "err", err)
 		}
 	}
 
@@ -272,15 +274,17 @@ func downloadModel(ctx context.Context, modelDir string, info ModelInfo, force b
 	}
 	defer os.RemoveAll(tmpDir)
 
-	fmt.Fprintf(os.Stderr, "Downloading embedding model %s (first run only)...\n", info.HFRepo)
+	logger().Info("downloading embedding model (first run only)", "repo", info.HFRepo)
 	if info.Licence != "" && info.Licence != "Apache-2.0" && info.Licence != "MIT" {
-		fmt.Fprintf(os.Stderr, "note: %s is distributed under the %s licence; check it fits your use.\n", info.Name, info.Licence)
+		logger().Warn("model licence needs review; check it fits your use", "model", info.Name, "licence", info.Licence)
 	}
 
 	downloadedPath, err := fetch(ctx, info, tmpDir)
 	if err != nil {
+		metricsOnce().downloads.With(info.ID, "error").Inc()
 		return "", err
 	}
+	metricsOnce().downloads.With(info.ID, "ok").Inc()
 
 	if err := os.Rename(downloadedPath, expectedPath); err != nil {
 		return "", fmt.Errorf("move downloaded model into place: %w", err)
@@ -350,4 +354,15 @@ func DefaultModelDir() string {
 // pipelines from it, reusing this package's sentinel, lock and recovery.
 func EnsureModelFiles(ctx context.Context, info ModelInfo, modelDir string) (string, error) {
 	return downloadModel(ctx, modelDir, info, false, fetchFromHuggingFace)
+}
+
+// Logger, when set, receives this package's diagnostics (model downloads,
+// cache recovery, licence notes); otherwise slog's default logger does.
+var Logger *slog.Logger
+
+func logger() *slog.Logger {
+	if Logger != nil {
+		return Logger
+	}
+	return slog.Default()
 }

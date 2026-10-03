@@ -168,11 +168,11 @@ func (s *Store) Remember(ctx context.Context, in RememberInput) (*Fact, error) {
 		if _, err := tx.ExecContext(ctx, `UPDATE facts SET invalidated_at = ?, superseded_by = ? WHERE id = ?`, nowMs, f.ID, oldID); err != nil {
 			return nil, fmt.Errorf("supersede: %w", err)
 		}
-		if err := writeAudit(ctx, tx, nowMs, in.Actor, in.Channel, "supersede", "memo://fact/"+oldID, map[string]any{"by": f.URI}); err != nil {
+		if err := writeAudit(ctx, tx, s.metrics, nowMs, in.Actor, in.Channel, "supersede", "memo://fact/"+oldID, map[string]any{"by": f.URI}); err != nil {
 			return nil, err
 		}
 	}
-	if err := writeAudit(ctx, tx, nowMs, in.Actor, in.Channel, "remember", f.URI, map[string]any{"trust": in.Trust, "evidence": in.EvidenceURI, "supersedes": in.Supersedes}); err != nil {
+	if err := writeAudit(ctx, tx, s.metrics, nowMs, in.Actor, in.Channel, "remember", f.URI, map[string]any{"trust": in.Trust, "evidence": in.EvidenceURI, "supersedes": in.Supersedes}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -252,8 +252,12 @@ func (s *Store) Forget(ctx context.Context, in ForgetInput) error {
 	switch kind {
 	case "doc":
 		// Pages built from this document lose a source: stale, with the reason.
-		if _, err := tx.ExecContext(ctx, `UPDATE pages SET stale = 1, stale_reason = ? WHERE deleted_at IS NULL AND stale = 0 AND id IN (SELECT ps.page_id FROM page_sources ps JOIN chunks c ON c.id = ps.chunk_id WHERE c.document_id = ?)`, "source forgotten: "+in.URI, id); err != nil {
+		staleRes, err := tx.ExecContext(ctx, `UPDATE pages SET stale = 1, stale_reason = ? WHERE deleted_at IS NULL AND stale = 0 AND id IN (SELECT ps.page_id FROM page_sources ps JOIN chunks c ON c.id = ps.chunk_id WHERE c.document_id = ?)`, "source forgotten: "+in.URI, id)
+		if err != nil {
 			return err
+		}
+		if n, _ := staleRes.RowsAffected(); n > 0 {
+			s.metrics.pagesStale.Add(float64(n))
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM chunks WHERE document_id = ?`, id); err != nil {
 			return err
@@ -285,7 +289,7 @@ func (s *Store) Forget(ctx context.Context, in ForgetInput) error {
 			return err
 		}
 	}
-	if err := writeAudit(ctx, tx, nowMs, in.Actor, in.Channel, op, in.URI, map[string]any{"reason": in.Reason, "trust": trust}); err != nil {
+	if err := writeAudit(ctx, tx, s.metrics, nowMs, in.Actor, in.Channel, op, in.URI, map[string]any{"reason": in.Reason, "trust": trust}); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -351,7 +355,7 @@ func (s *Store) SetTrust(ctx context.Context, uri, to, actor, channel string) er
 	if trustRank[to] < trustRank[from] {
 		op = "demote"
 	}
-	if err := writeAudit(ctx, tx, nowMs, actor, channel, op, uri, map[string]any{"from": from, "to": to}); err != nil {
+	if err := writeAudit(ctx, tx, s.metrics, nowMs, actor, channel, op, uri, map[string]any{"from": from, "to": to}); err != nil {
 		return err
 	}
 	return tx.Commit()

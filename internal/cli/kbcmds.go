@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"github.com/kKEo/memory-find/internal/embedding"
 	"github.com/kKEo/memory-find/internal/eval"
 	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/obs"
 	"github.com/kKEo/memory-find/internal/rerank"
 	"github.com/kKEo/memory-find/internal/retrieve"
 	"github.com/kKEo/memory-find/internal/ui"
@@ -31,7 +33,7 @@ func openStore(ctx context.Context, stderr io.Writer, opts kb.Options, embedder 
 		return nil, nil, err
 	}
 	for _, d := range cfg.Deprecations {
-		fmt.Fprintln(stderr, "warning:", d)
+		slog.Warn(d)
 	}
 	db, err := kb.Open(ctx, cfg.KBDir, cfg.DBName, opts)
 	if err != nil {
@@ -48,7 +50,7 @@ func loadEmbedder(ctx context.Context, want bool, stderr io.Writer) (embedding.E
 	}
 	e, cleanup, err := buildEmbedder(ctx)
 	if err != nil {
-		fmt.Fprintf(stderr, "warning: embedding unavailable (%v); vectors will be queued for `memo-mcp backfill`\n", err)
+		slog.Warn("embedding unavailable; vectors will be queued for `memo-mcp backfill`", "err", err)
 		return nil, func() {}
 	}
 	return e, cleanup
@@ -665,7 +667,7 @@ func splitCSV(s string) []string {
 
 func runLog(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: memo-mcp log tail [--n 20] | show <id> | replay [--n 200] | prune")
+		return errors.New("usage: memo-mcp log tail [--n 20] | calls [--n 50] | show <id> | replay [--n 200] | prune")
 	}
 	sub, rest := args[0], args[1:]
 	store, closeFn, err := openStore(ctx, stderr, kb.Options{NoCreate: true}, nil)
@@ -689,9 +691,35 @@ func runLog(ctx context.Context, args []string, stdout, stderr io.Writer) error 
 			fmt.Fprintln(stdout, "(query log is empty; enable it with MEMO_QUERY_LOG=1)")
 			return nil
 		}
+		fmt.Fprintln(stdout, "searches:")
 		for _, e := range entries {
 			fmt.Fprintf(stdout, "%d  %s  %-22s %2d results %4dms  %s\n", e.ID, e.At.Format("2006-01-02 15:04:05"), e.Mode, e.NResults, e.LatencyMs, oneLine(loggedQueries(e.Args), 80))
 		}
+		calls, err := store.CallLogTail(ctx, *n)
+		if err != nil {
+			return err
+		}
+		if len(calls) > 0 {
+			fmt.Fprintln(stdout, "tool calls:")
+			printCalls(stdout, calls)
+		}
+		return nil
+	case "calls":
+		fs := flag.NewFlagSet("log calls", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		n := fs.Int("n", 50, "rows")
+		if _, err := parseInterspersed(fs, rest); err != nil {
+			return err
+		}
+		calls, err := store.CallLogTail(ctx, *n)
+		if err != nil {
+			return err
+		}
+		if len(calls) == 0 {
+			fmt.Fprintln(stdout, "(call log is empty; enable it with MEMO_QUERY_LOG=1 on the server)")
+			return nil
+		}
+		printCalls(stdout, calls)
 		return nil
 	case "show":
 		if len(rest) != 1 {
@@ -739,7 +767,11 @@ func runLog(ctx context.Context, args []string, stdout, stderr io.Writer) error 
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "pruned %d row(s)\n", n)
+		c, err := store.CallLogPrune(ctx, 10000, 30*24*time.Hour)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "pruned %d search row(s) and %d call row(s)\n", n, c)
 		return nil
 	default:
 		return fmt.Errorf("unknown log subcommand %q", sub)
@@ -849,7 +881,7 @@ func runReindex(ctx context.Context, args []string, stdout, stderr io.Writer) er
 	n, err := store.Reindex(ctx, func(done, total int) {
 		pct := done * 100 / max(total, 1)
 		if pct/10 != last/10 {
-			fmt.Fprintf(stderr, "reindex %s: %d/%d (%d%%)\n", embedder.Info().ID, done, total, pct)
+			slog.Info("reindex progress", "model", embedder.Info().ID, "done", done, "total", total, "pct", pct)
 			last = pct
 		}
 	})
@@ -958,7 +990,7 @@ func runEval(ctx context.Context, args []string, stdout, stderr io.Writer) error
 				return err
 			}
 		}
-		fmt.Fprintf(stderr, "loaded corpora with %s in %.1fs\n", modelID, time.Since(t0).Seconds())
+		slog.Info("loaded eval corpora", "model", modelID, "seconds", fmt.Sprintf("%.1f", time.Since(t0).Seconds()))
 		for _, pname := range profileNames {
 			p, err := retrieve.Lookup(pname)
 			if err != nil {
@@ -1072,7 +1104,7 @@ func loadReranker(ctx context.Context, stderr io.Writer) (rerank.Reranker, func(
 	if err != nil {
 		return nil, nil, fmt.Errorf("reranker: %w", err)
 	}
-	fmt.Fprintf(stderr, "reranker %s loaded\n", id)
+	slog.Info("reranker loaded", "model", id)
 	return ce, ce.Close, nil
 }
 
@@ -1478,12 +1510,12 @@ func runCompact(ctx context.Context, args []string, stdout, stderr io.Writer) er
 			fmt.Fprintf(stdout, "ollama writing page for %s …\n", p.Entity.Canonical)
 			res, err := ol.WritePage(ctx, p)
 			if err != nil {
-				fmt.Fprintf(stderr, "  failed: %v\n", err)
+				slog.Error("work item failed", "item", w.ID, "err", err)
 				continue
 			}
 			rep, err := compact.Submit(ctx, store, w.ID, res, !*apply, "ollama/"+ol.Model, kb.ChannelWorker)
 			if err != nil {
-				fmt.Fprintf(stderr, "  submit failed: %v\n", err)
+				slog.Error("submit failed", "item", w.ID, "err", err)
 				continue
 			}
 			printReport(stdout, rep)
@@ -1701,6 +1733,7 @@ func runUI(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	svc := retrieve.New(store, profile, false)
+	obs.Default().AddCollector(store.MetricsCollector(5 * time.Second))
 	srv := ui.New(store, svc, serverVersion)
 	srv.SetEval(func(ctx context.Context) (string, error) {
 		return evalReportMarkdown(ctx)
@@ -1777,4 +1810,14 @@ func runMigrate(ctx context.Context, stdout, stderr io.Writer) error {
 	}
 	fmt.Fprintf(stdout, "%s is at schema v%d\n", st.Path, st.SchemaVersion)
 	return nil
+}
+
+func printCalls(w io.Writer, calls []kb.CallLogEntry) {
+	for _, c := range calls {
+		state := "ok"
+		if !c.OK {
+			state = "ERR " + c.ErrorClass
+		}
+		fmt.Fprintf(w, "%d  %s  %-12s %-9s %4dms %3d results %5d tok  %s  %s\n", c.ID, c.At.Format("2006-01-02 15:04:05"), c.Client, c.Tool, c.LatencyMs, c.NResults, c.TokensOut, state, oneLine(string(c.Args), 70))
+	}
 }

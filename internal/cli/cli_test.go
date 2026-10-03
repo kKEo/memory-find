@@ -306,3 +306,34 @@ func TestFactsForgetTrustCommands(t *testing.T) {
 		t.Fatalf("forget without reason: %d %s", code, errOut)
 	}
 }
+
+func TestMetricsCommandAndServeMetricsAddr(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("MEMO_HOME", home)
+	t.Setenv("MEMO_KB", "m")
+	run := func(args ...string) (string, string, int) {
+		var out, errOut bytes.Buffer
+		code := Main(context.Background(), "test", args, &out, &errOut)
+		return out.String(), errOut.String(), code
+	}
+	_, errOut, code := run("serve", "--metrics-addr", "0.0.0.0:0")
+	if code == 0 || !strings.Contains(errOut, "loopback") {
+		t.Fatalf("non-loopback metrics address accepted: %d %s", code, errOut)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.md"), []byte("# A\n\nalpha beta\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, errOut, code := run("ingest", dir, "--ns", "grpc", "--embed=false"); code != 0 {
+		t.Fatalf("ingest: %s", errOut)
+	}
+	out, errOut, code := run("metrics")
+	if code != 0 || !strings.Contains(out, "documents 1 live") || !strings.Contains(out, "per process") {
+		t.Fatalf("metrics: %d %s %s", code, out, errOut)
+	}
+	out, _, code = run("metrics", "--json")
+	var v map[string]any
+	if code != 0 || json.Unmarshal([]byte(out), &v) != nil || v["kb"] == nil {
+		t.Fatalf("metrics --json: %d %s", code, out)
+	}
+}

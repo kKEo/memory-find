@@ -12,6 +12,7 @@ import (
 
 	"github.com/kKEo/memory-find/internal/graph"
 	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/obs"
 )
 
 // The entity arm and the graph arm (roadmap P7). Both use the mention graph
@@ -140,9 +141,15 @@ func (s *Service) graphFor(ctx context.Context, ns string, asOf *time.Time) (*ns
 		g := s.graphs.m[ns]
 		s.graphs.mu.Unlock()
 		if g != nil && g.edges == n {
+			s.metrics.graphCache.With("hit").Inc()
 			return g, nil
 		}
+		s.metrics.graphCache.With("build").Inc()
+	} else {
+		s.metrics.graphCache.With("build_asof").Inc()
 	}
+	buildTimer := obs.Start()
+	defer buildTimer.ObserveTo(s.metrics.graphBuild)
 	edges, err := s.store.MentionGraph(ctx, ns, asOf)
 	if err != nil {
 		return nil, err

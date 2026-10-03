@@ -95,7 +95,8 @@ Running the binary with no arguments starts the MCP server on stdio. From the te
 - `memo-mcp ingest <file|dir|-> [--ns --kind --uri --title --library --version --trust --context --embed=false]` — add markdown documents; identical content is a no-op, changed content becomes a new revision
 - `memo-mcp search "<query>" [--mode auto|hybrid|keyword|exact|semantic --ns --library --version --kind --limit --format table|json|md --explain --no-model]` — search; `--explain` adds why each result ranked
 - `memo-mcp explain "<query>" <memo://chunk/n>` — the full explanation for one result
-- `memo-mcp log tail|show <id>|replay|prune` — the opt-in query log (`MEMO_QUERY_LOG=1`); `replay` prints logged searches as unlabelled eval candidates (one JSON object per line) ready to be labelled and added to a corpus
+- `memo-mcp log tail|calls|show <id>|replay|prune` — the opt-in query and call logs (`MEMO_QUERY_LOG=1`); `calls` lists tool calls with timing and outcome; `replay` prints logged searches as unlabelled eval candidates (one JSON object per line) ready to be labelled and added to a corpus
+- `memo-mcp metrics [--json --since 24h]` — knowledge-base gauges and per-tool call statistics from the opt-in log
 - `memo-mcp remember "<fact>" [--ns --about --valid-from --valid-to --supersedes --evidence --trust user|curated]` — record a fact (CLI writes are trust `user`; `curated` must be typed)
 - `memo-mcp forget <memo://...> --reason "<why>" [--redact]` — retire a document or fact; the reason is kept and shown
 - `memo-mcp facts ls [--ns --as-of YYYY-MM-DD --history]` — list facts, or what was believed on a date
@@ -137,9 +138,26 @@ The old spellings `--stats` and `--redownload-model` still work for one release 
 | `MEMO_MODEL` | no | Embedding model id from `memo-mcp model ls` (default `granite-small-r2`). Queries use that model's vectors; run `memo-mcp reindex` after switching |
 | `MEMO_PROFILE` | no | Ranking profile (default `default`); see `memo-mcp profiles show` |
 | `MEMO_OLLAMA_URL`, `MEMO_OLLAMA_MODEL` | no | Optional local model for `memo-mcp compact --executor ollama`; loopback only unless `--allow-remote`. Nothing else uses it |
+| `MEMO_METRICS_ADDR` | no | Same as `serve --metrics-addr`: expose Prometheus metrics at `http://<addr>/metrics`. Loopback addresses only; off when empty |
+| `MEMO_LOG_FORMAT` | no | `text` (default) or `json`; structured logs on stderr |
+| `MEMO_LOG_LEVEL` | no | `debug`, `info` (default), `warn`, `error` |
 | `MEMO_RERANK` | no | `1` loads the cross-encoder reranker (`cross-encoder/ms-marco-MiniLM-L6-v2`, Apache-2.0, ~91 MB); only profiles with rerank on (`precise`) use it |
 | `JOURNAL_TOKEN` | deprecated | Old name selector: opens `<JOURNAL_PATH or ~/.memo-mcp>/<token>.db` exactly as before, with a warning. Honoured for one release. |
 | `JOURNAL_PATH` | deprecated | Old base directory override, only with `JOURNAL_TOKEN` |
+
+## Observability
+
+Everything stays on the machine. Metrics are pulled from a loopback address, logs go to the server's stderr, and the opt-in call log lives in your own SQLite file.
+
+- **Metrics.** `memo-mcp serve --metrics-addr 127.0.0.1:9469` (or `MEMO_METRICS_ADDR`) exposes `GET /metrics` in the Prometheus text format: tool calls by tool and outcome with latency and result-size histograms, searches by mode and outcome with per-arm latency and candidate counts, abstentions, degraded searches, cutoff kinds, graph-cache hits, embedding latency by model and role, store writes by operation, plus gauges for every table count (`memo_kb_documents_live`, `memo_kb_pages_stale`, `memo_kb_pending_embeddings{model}`, …), Go runtime stats and `memo_build_info`. The endpoint refuses non-loopback addresses, answers only GET, and checks the Host header. The UI serves its own `/metrics` too. The registry is about 300 lines of standard library, so a dashboard can read every line it depends on; names follow Prometheus conventions and map one to one onto OpenTelemetry names if a bridge is ever wanted.
+- **Logs.** `log/slog` on stderr, `MEMO_LOG_FORMAT=text|json`, `MEMO_LOG_LEVEL`. One line per tool call (tool, client, latency, outcome, error class, results, tokens) and one per search (mode, resolved arms, cutoff, degraded reason, latency). The MCP `logging` capability is not advertised: it is deprecated on the protocol version this server speaks, and Claude Code shows a stdio server's stderr anyway.
+- **Call log.** With `MEMO_QUERY_LOG=1` every tool call is recorded next to every search: `memo-mcp log calls`, `memo-mcp log tail`, the UI `/log` page. Arguments are summarised through an allowlist; written content and returned text are never stored.
+- **Snapshot.** `memo-mcp metrics [--json] [--since 24h]` prints the table-count gauges and, from the opt-in log, per-tool calls, errors and p50/p95 latency plus search aggregates. Live counters are per process, so it says where to scrape them.
+
+```bash
+MEMO_LOG_FORMAT=json memo-mcp serve --metrics-addr 127.0.0.1:9469 2> memo.log
+curl -s http://127.0.0.1:9469/metrics | grep memo_mcp_tool_calls_total
+```
 
 ## How this differs from Claude Code's built-in memory
 
@@ -155,20 +173,21 @@ memo-mcp exists as something different: a small, fully local, fully readable ret
 - [`articles/`](articles/): one article per phase, written for beginners: [why rebuild instead of migrate](articles/why-rebuild-instead-of-migrate.md), [designing the knowledge schema](articles/designing-the-knowledge-schema.md), [search that explains itself](articles/search-that-explains-itself.md), [the embedder is the biggest lever](articles/the-embedder-is-the-biggest-lever.md), [provenance, trust and time](articles/provenance-trust-and-time.md), [designing tools for agents](articles/designing-tools-for-agents.md), [shipping a pure-Go MCP server](articles/shipping-a-pure-go-mcp-server.md), [graph as an index, not an oracle](articles/graph-as-an-index-not-an-oracle.md).
 - [`articles/compaction-without-a-server-llm.md`](articles/compaction-without-a-server-llm.md): how the agent writes the wiki and the server keeps it honest.
 - [`articles/a-knowledge-base-you-can-read.md`](articles/a-knowledge-base-you-can-read.md): the read-only web face and why its numbers are the agent's numbers.
+- [`articles/measuring-the-server-itself.md`](articles/measuring-the-server-itself.md): metrics and logs without telemetry.
 - [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Privacy
 
 - All processing is local — embeddings run in-process, search runs in SQLite.
 - No network calls after the one-time model download.
-- No telemetry, no analytics, no external logging.
+- No telemetry, no analytics, no external logging. Metrics and logs exist, but only locally: `/metrics` binds loopback and is pull-only, logs go to stderr, and the opt-in call log lives in your own SQLite file.
 - Source is small enough to read in full; nothing is obfuscated or minified.
 - Raising trust needs a human. `promote` uses MCP elicitation: the client shows a dialog with the excerpt, source and target level, and only an accepted dialog applies the change. A hook or setting that auto-accepts elicitation dialogs removes that protection; if you configure one, treat `user` and `curated` records as no more trusted than `agent` ones.
 - Two things to know: the knowledge base is a plaintext SQLite file that anyone with access to your home directory can read, and everything the model writes or searches passes through the MCP host as tool input, so it is as private as that host. If the embedding model is unavailable, search runs keyword-only and says so (`degraded`), and documents written in that state get their vectors when `memo-mcp backfill` or the next server start runs.
 
 ## Project status
 
-1.0: the core knowledge base is complete and measured. What is stable, and what 1.x adds (graph as an index, compaction and pages, an optional read-only web UI), is in [`docs/roadmap.md`](docs/roadmap.md). Not planned: HTTP transport, a server-side LLM, importing the v0 journal files. Contributions and issues welcome.
+1.0: the core knowledge base is complete and measured. What is stable, and what 1.x added (graph as an index, compaction and pages, a read-only web UI, local observability), is in [`docs/roadmap.md`](docs/roadmap.md). Not planned: HTTP transport, a server-side LLM, importing the v0 journal files. Contributions and issues welcome.
 
 ## License
 
