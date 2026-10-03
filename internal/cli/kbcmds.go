@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kKEo/memory-find/internal/compact"
 	"github.com/kKEo/memory-find/internal/embedding"
 	"github.com/kKEo/memory-find/internal/eval"
 	"github.com/kKEo/memory-find/internal/kb"
@@ -1386,4 +1387,267 @@ func runGraph(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 	default:
 		return fmt.Errorf("unknown graph subcommand %q", sub)
 	}
+}
+
+// runCompact proposes compaction work; with --executor ollama it also does
+// the page items through a local model and submits them (dry run unless
+// --apply). The server never writes a page; this command is the client.
+func runCompact(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("compact", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	ns := fs.String("ns", "", "namespace (default: all)")
+	kinds := fs.String("kinds", "", "comma-separated: page,stale,conflict,merge,duplicate (default: all)")
+	lint := fs.Bool("lint", false, "also print lint findings")
+	asJSON := fs.Bool("json", false, "print JSON")
+	executor := fs.String("executor", "", "ollama: write page items with a local model (MEMO_OLLAMA_URL, MEMO_OLLAMA_MODEL)")
+	apply := fs.Bool("apply", false, "with --executor: submit the pages instead of a dry run")
+	allowRemote := fs.Bool("allow-remote", false, "with --executor: allow a non-loopback MEMO_OLLAMA_URL")
+	if _, err := parseInterspersed(fs, args); err != nil {
+		return err
+	}
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{}, nil)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	var kindList []string
+	if *kinds != "" {
+		kindList = strings.Split(*kinds, ",")
+	}
+	namespaces := []string{*ns}
+	if *ns == "" {
+		if namespaces, err = store.Namespaces(ctx); err != nil {
+			return err
+		}
+	}
+	var items []kb.WorkItem
+	var findings []compact.Finding
+	for _, n := range namespaces {
+		if _, err := compact.Generate(ctx, store, n, kindList); err != nil {
+			return err
+		}
+		list, err := store.ListWorkItems(ctx, n, "", "open", 0)
+		if err != nil {
+			return err
+		}
+		items = append(items, list...)
+		if *lint {
+			f, err := compact.Lint(ctx, store, n, time.Now())
+			if err != nil {
+				return err
+			}
+			findings = append(findings, f...)
+		}
+	}
+	if *executor != "" {
+		if *executor != "ollama" {
+			return fmt.Errorf("unknown executor %q (only ollama)", *executor)
+		}
+		ol, err := compact.NewOllama(os.Getenv("MEMO_OLLAMA_URL"), os.Getenv("MEMO_OLLAMA_MODEL"), *allowRemote)
+		if err != nil {
+			return err
+		}
+		for _, w := range items {
+			if w.Kind != compact.KindPage && w.Kind != compact.KindStale {
+				continue
+			}
+			var p compact.PagePayload
+			if err := json.Unmarshal(w.Payload, &p); err != nil {
+				return err
+			}
+			fmt.Fprintf(stdout, "ollama writing page for %s …\n", p.Entity.Canonical)
+			res, err := ol.WritePage(ctx, p)
+			if err != nil {
+				fmt.Fprintf(stderr, "  failed: %v\n", err)
+				continue
+			}
+			rep, err := compact.Submit(ctx, store, w.ID, res, !*apply, "ollama/"+ol.Model, kb.ChannelWorker)
+			if err != nil {
+				fmt.Fprintf(stderr, "  submit failed: %v\n", err)
+				continue
+			}
+			printReport(stdout, rep)
+		}
+		return nil
+	}
+	if *asJSON {
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(map[string]any{"items": items, "findings": findings})
+	}
+	if len(items) == 0 {
+		fmt.Fprintln(stdout, "no open work items")
+	}
+	for _, w := range items {
+		fmt.Fprintf(stdout, "%s  %-9s %s\n", w.ID, w.Kind, oneLine(string(w.Payload), 100))
+	}
+	for _, f := range findings {
+		fmt.Fprintf(stdout, "lint %-13s %s  %s\n", f.Kind, f.URI, f.Message)
+	}
+	if len(items) > 0 {
+		fmt.Fprintln(stdout, "next: memo-mcp submit <id> --content-file page.md [--dry-run] | --keep <memo://fact/..> | --accept|--reject | --skip")
+	}
+	return nil
+}
+
+func printReport(w io.Writer, rep *compact.Report) {
+	state := "applied"
+	if rep.DryRun {
+		state = "dry run"
+	} else if !rep.Applied {
+		state = "not applied"
+	}
+	fmt.Fprintf(w, "%s %s item %s", state, rep.Kind, rep.ItemID)
+	if rep.PageURI != "" {
+		fmt.Fprintf(w, "  page %s", rep.PageURI)
+	}
+	fmt.Fprintln(w)
+	if rep.Note != "" {
+		fmt.Fprintln(w, "  "+rep.Note)
+	}
+	for _, s := range rep.Warnings {
+		fmt.Fprintln(w, "  warning: "+s)
+	}
+	for _, s := range rep.Omitted {
+		fmt.Fprintln(w, "  omitted: "+s)
+	}
+	for _, s := range rep.Unsupported {
+		fmt.Fprintln(w, "  unsupported: "+s)
+	}
+	if rep.Diff != "" {
+		fmt.Fprint(w, rep.Diff)
+	}
+}
+
+// runSubmit is the human (or script) side of a work item.
+func runSubmit(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("submit", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	contentFile := fs.String("content-file", "", "page items: markdown file with the page (- for stdin)")
+	title := fs.String("title", "", "page items: title")
+	keep := fs.String("keep", "", "conflict items: memo://fact/<id> to keep")
+	accept := fs.Bool("accept", false, "merge items: merge the names")
+	reject := fs.Bool("reject", false, "merge items: keep the names apart")
+	reason := fs.String("reason", "", "why (audited)")
+	skip := fs.Bool("skip", false, "close the item without doing anything")
+	dry := fs.Bool("dry-run", false, "show the diff and checks without writing")
+	positional, err := parseInterspersed(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(positional) != 1 {
+		return errors.New("usage: memo-mcp submit <item-id> [--content-file f.md --title t | --keep <memo://fact/..> | --accept | --reject | --skip] [--reason ..] [--dry-run]")
+	}
+	res := compact.Result{Title: *title, Keep: *keep, Reason: *reason, Skip: *skip}
+	if *contentFile != "" {
+		var b []byte
+		if *contentFile == "-" {
+			b, err = io.ReadAll(os.Stdin)
+		} else {
+			b, err = os.ReadFile(*contentFile)
+		}
+		if err != nil {
+			return err
+		}
+		res.Content = string(b)
+	}
+	if *accept || *reject {
+		v := *accept
+		res.Accept = &v
+	}
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{}, nil)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	rep, err := compact.Submit(ctx, store, positional[0], res, *dry, "cli", kb.ChannelCLI)
+	if err != nil {
+		return err
+	}
+	printReport(stdout, rep)
+	return nil
+}
+
+// runLint prints what a librarian would flag, changing nothing.
+func runLint(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("lint", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	ns := fs.String("ns", "", "namespace (default: all)")
+	asJSON := fs.Bool("json", false, "print JSON")
+	if _, err := parseInterspersed(fs, args); err != nil {
+		return err
+	}
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	namespaces := []string{*ns}
+	if *ns == "" {
+		if namespaces, err = store.Namespaces(ctx); err != nil {
+			return err
+		}
+	}
+	var all []compact.Finding
+	for _, n := range namespaces {
+		f, err := compact.Lint(ctx, store, n, time.Now())
+		if err != nil {
+			return err
+		}
+		all = append(all, f...)
+	}
+	if *asJSON {
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(all)
+	}
+	if len(all) == 0 {
+		fmt.Fprintln(stdout, "clean: no contradictions, orphans, missing or stale pages, or expired facts")
+		return nil
+	}
+	for _, f := range all {
+		fmt.Fprintf(stdout, "%-13s %s  %s\n", f.Kind, f.URI, f.Message)
+	}
+	return nil
+}
+
+// runPages lists curated pages.
+func runPages(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 || args[0] != "ls" {
+		return errors.New("usage: memo-mcp pages ls [--ns <name>] [--stale] [--json]")
+	}
+	fs := flag.NewFlagSet("pages ls", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	ns := fs.String("ns", "", "namespace")
+	stale := fs.Bool("stale", false, "only stale pages")
+	asJSON := fs.Bool("json", false, "print JSON")
+	if _, err := parseInterspersed(fs, args[1:]); err != nil {
+		return err
+	}
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	pages, err := store.ListPages(ctx, kb.PageFilter{Namespace: *ns, StaleOnly: *stale})
+	if err != nil {
+		return err
+	}
+	if *asJSON {
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(pages)
+	}
+	if len(pages) == 0 {
+		fmt.Fprintln(stdout, "(no pages; agents write them through compact/submit)")
+		return nil
+	}
+	for _, p := range pages {
+		flag := ""
+		if p.Stale {
+			flag = "  STALE: " + p.StaleReason
+		}
+		fmt.Fprintf(stdout, "%s  %-10s %-8s rev %d  %d source(s)  %s  %s%s\n", p.BuiltAt.Format("2006-01-02"), p.Namespace, p.Kind, p.BuiltFromRev, len(p.Sources), p.Title, p.URI, flag)
+	}
+	return nil
 }

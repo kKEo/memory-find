@@ -8,7 +8,7 @@ It began as a Go rewrite of [obra/private-journal-mcp](https://github.com/obra/p
 
 ## What it does
 
-Claude (or any MCP client) gets eight tools over one knowledge base:
+Claude (or any MCP client) gets ten tools over one knowledge base:
 
 | Tool | Purpose |
 |---|---|
@@ -19,7 +19,9 @@ Claude (or any MCP client) gets eight tools over one knowledge base:
 | `forget` | Retire a document or fact with a reason; it leaves every index and its address resolves to "forgotten on … because …". Tool calls may only retire records written by tools |
 | `promote` | Ask to raise a record's trust; tool calls cannot do it themselves. Clients that can show a dialog ask the human directly (excerpt, source, target level); others get the command a human runs |
 | `explore` | Walk the graph index from one named thing: the passages that mention it and the things mentioned alongside it, each with evidence addresses |
-| `status` | Namespaces, the embedding model, pending vectors, background jobs, graph counts |
+| `compact` | Propose tidying work: entities that deserve a page, stale pages, facts that disagree, near-duplicate names and passages. Each item carries the passages and facts needed; the server never writes a page |
+| `submit` | Hand back a page, a conflict decision or a merge decision. Pages are stored as derived (`is_inference`) with the passages they cite; the omission check reports facts the page left out; `dry_run` shows the diff first |
+| `status` | Namespaces, the embedding model, pending vectors, background jobs, graph and page counts |
 
 The same addresses are readable as MCP resources (`memo://doc/{id}`, `memo://chunk/{id}`, `memo://source/{id}`, `memo://fact/{id}`), and `memo://index` or `memo://ns/{namespace}/index` give a one-line-per-document view under 8 KB for the start of a session. [`SKILL.md`](SKILL.md) tells an agent how to use the tools well; `memo-mcp export --index` prints the same index for an `AGENTS.md` or `CLAUDE.md` file.
 
@@ -36,6 +38,8 @@ Everything is stored locally. There is exactly one outbound network call in the 
 The three ranked lists are combined with reciprocal rank fusion at equal weights (a keyword-only hit at rank 1 ties a vector hit at rank 1, so the keyword arm can add results rather than only reorder them), passages are aggregated to documents by their best passage, notes and conversations get a bounded recency boost (×0.8 to ×1.0, halving every 90 days; versioned docs do not age), the list is cut at the first large score gap, and results are packed to the requested token budget. A passage whose only evidence is a semantic similarity below the weak band (0.30) is dropped, so a question about nothing in the corpus returns zero results with a reason and a hint instead of a page of noise.
 
 Two **structural arms** join when the question names two or more known things or asks how things relate: the entity arm returns the passages that mention the named entities, and the graph arm walks the mention graph with personalised PageRank from each named entity and returns the passages all the walks agree on, which is how a question about the Billing Service finds the replication page that never names it. `explore` walks the same graph by hand. Both are routed rather than always on because an always-on entity arm made plain lookups worse.
+
+Curated **pages** are a third thing to search (`granularity: page`): markdown an agent wrote from passages through `compact` and `submit`, stored as derived, citing the passages it was built from, and marked stale the moment one of those passages' documents is revised or forgotten.
 
 A fourth text arm matches **facts** recorded with `remember` and votes for their evidence passage ("facts as extra keys"); `granularity: fact` returns the facts themselves. `as_of` answers with what the knowledge base believed at a date: superseded revisions and replaced facts that were current then. Forgotten records are never returned, not even under `as_of`. Scope filters (namespaces, kinds, sources, library, version, tags, dates, minimum trust) are applied inside every arm's query, before ranking, so a filtered search never loses a result. Each result carries its provenance and a relevance band; with `response_format: explain` it also carries the per-arm ranks and contributions, the recency factor, and a per-query trace (which arms ran and why, what the scope excluded, where the list was cut). The terminal shows the same numbers: `memo-mcp search "<q>" --explain` and `memo-mcp explain "<q>" memo://chunk/<n>`.
 
@@ -96,6 +100,10 @@ Running the binary with no arguments starts the MCP server on stdio. From the te
 - `memo-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user` — the human channel for trust; every change is audited
 - `memo-mcp explore <name> [--ns --hops 1|2 --as-of --json]` — walk the graph index from one entity: its passages and the entities mentioned alongside it, with evidence addresses
 - `memo-mcp graph merges [--state open|merged|rejected|all] | merge <id> | reject <id>` — the review queue of near-duplicate entity names; nothing is merged without a human decision
+- `memo-mcp compact [--ns --kinds page,stale,conflict,merge,duplicate --lint --json]` — propose compaction work; `--executor ollama [--apply]` writes the page items with a local model (`MEMO_OLLAMA_URL`, `MEMO_OLLAMA_MODEL`; dry run unless `--apply`)
+- `memo-mcp submit <item-id> [--content-file page.md | --keep <memo://fact/..> | --accept|--reject | --skip] [--reason ..] [--dry-run]` — the human side of a work item
+- `memo-mcp lint [--ns]` — contradictions, orphan entities, missing or stale pages, expired facts; changes nothing
+- `memo-mcp pages ls [--ns --stale]` — list curated pages
 - `memo-mcp read <memo://doc/...> [--history]` — print a document, chunk, source or fact with its provenance, or its revision chain
 - `memo-mcp ls [--ns --kind --since --json]` — list live documents, newest first
 - `memo-mcp export --md <dir> [--ns]` — write markdown files with front-matter provenance (opens in Obsidian; re-importing yields no new revisions)
@@ -124,6 +132,7 @@ The old spellings `--stats` and `--redownload-model` still work for one release 
 | `MEMO_QUERY_LOG` | no | `1` keeps an opt-in log of searches (arguments, result addresses, scores, trace; never passage text) in the same file |
 | `MEMO_MODEL` | no | Embedding model id from `memo-mcp model ls` (default `granite-small-r2`). Queries use that model's vectors; run `memo-mcp reindex` after switching |
 | `MEMO_PROFILE` | no | Ranking profile (default `default`); see `memo-mcp profiles show` |
+| `MEMO_OLLAMA_URL`, `MEMO_OLLAMA_MODEL` | no | Optional local model for `memo-mcp compact --executor ollama`; loopback only unless `--allow-remote`. Nothing else uses it |
 | `MEMO_RERANK` | no | `1` loads the cross-encoder reranker (`cross-encoder/ms-marco-MiniLM-L6-v2`, Apache-2.0, ~91 MB); only profiles with rerank on (`precise`) use it |
 | `JOURNAL_TOKEN` | deprecated | Old name selector: opens `<JOURNAL_PATH or ~/.memo-mcp>/<token>.db` exactly as before, with a warning. Honoured for one release. |
 | `JOURNAL_PATH` | deprecated | Old base directory override, only with `JOURNAL_TOKEN` |
@@ -140,6 +149,7 @@ memo-mcp exists as something different: a small, fully local, fully readable ret
 - [`docs/schema.md`](docs/schema.md): every table and column in plain words; trust transitions; what `as_of` can see.
 - [`docs/eval/`](docs/eval/): one measured report per tag.
 - [`articles/`](articles/): one article per phase, written for beginners: [why rebuild instead of migrate](articles/why-rebuild-instead-of-migrate.md), [designing the knowledge schema](articles/designing-the-knowledge-schema.md), [search that explains itself](articles/search-that-explains-itself.md), [the embedder is the biggest lever](articles/the-embedder-is-the-biggest-lever.md), [provenance, trust and time](articles/provenance-trust-and-time.md), [designing tools for agents](articles/designing-tools-for-agents.md), [shipping a pure-Go MCP server](articles/shipping-a-pure-go-mcp-server.md), [graph as an index, not an oracle](articles/graph-as-an-index-not-an-oracle.md).
+- [`articles/compaction-without-a-server-llm.md`](articles/compaction-without-a-server-llm.md): how the agent writes the wiki and the server keeps it honest.
 - [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Privacy

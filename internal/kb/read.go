@@ -183,6 +183,12 @@ func (s *Store) Read(ctx context.Context, uri string) (text string, prov Provena
 			return "", Provenance{}, err
 		}
 		return d.Content, d.Prov, nil
+	case "page":
+		p, err := s.ReadPage(ctx, id)
+		if err != nil {
+			return "", Provenance{}, err
+		}
+		return p.Content, PageProvenance(p), nil
 	default:
 		return "", Provenance{}, fmt.Errorf("unsupported address kind %q in %s", kind, uri)
 	}
@@ -285,6 +291,7 @@ type Status struct {
 	JobsFailed        int
 	LastWrite         time.Time
 	Graph             GraphStats
+	Pages             PageStats
 }
 
 // NamespaceStat is a per-namespace row in Status.
@@ -337,6 +344,15 @@ func (s *Store) Status(ctx context.Context) (*Status, error) {
 		return nil, err
 	}
 	if err := one(&st.Graph.OpenMergeReview, `SELECT COUNT(*) FROM merge_candidates WHERE state = 'open'`); err != nil {
+		return nil, err
+	}
+	if err := one(&st.Pages.Pages, `SELECT COUNT(*) FROM pages WHERE deleted_at IS NULL`); err != nil {
+		return nil, err
+	}
+	if err := one(&st.Pages.StalePages, `SELECT COUNT(*) FROM pages WHERE deleted_at IS NULL AND stale = 1`); err != nil {
+		return nil, err
+	}
+	if err := one(&st.Pages.OpenWorkItems, `SELECT COUNT(*) FROM work_items WHERE state = 'open'`); err != nil {
 		return nil, err
 	}
 	if err := one(&st.JobsFailed, `SELECT COUNT(*) FROM jobs WHERE state = 'failed'`); err != nil {
@@ -609,4 +625,15 @@ func (s *Store) Neighbours(ctx context.Context, c *ChunkRead) (prev, next string
 		}
 	}
 	return prev, next, rows.Err()
+}
+
+// PageProvenance is the provenance a derived page carries: origin
+// agent-derived, kind page, revision = build number; Tags carries the
+// stale flag so a reader sees it without another call.
+func PageProvenance(p *Page) Provenance {
+	prov := Provenance{Title: p.Title, Kind: "page", FetchedAt: p.BuiltAt, Trust: p.Trust, Origin: OriginAgentDerived, Namespace: p.Namespace, Revision: p.BuiltFromRev}
+	if p.Stale {
+		prov.Tags = "stale: " + p.StaleReason
+	}
+	return prov
 }

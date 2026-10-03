@@ -32,6 +32,7 @@ leaves the machine except one download of the embedding model.
 ## 2. Layers of knowledge
 
 ```
+L5  pages        curated markdown an agent wrote from passages, cited and stale-aware (1.2)
 L4  graph        entities, aliases, which passage mentions which entity, optional typed edges (1.1)
 L3  facts        one-sentence claims with a validity window and an evidence passage
 L2  chunks       passages of about 200 estimated tokens, indexed three ways
@@ -40,8 +41,7 @@ L0  sources      where it came from: URL or file, library, version, hash, trust,
      bookkeeping namespaces, models, jobs, audit, query_log
 ```
 
-L4 arrived in 1.1 as migration 2; L5 (pages) is reserved for 1.2 and arrives as an additive
-migration. Every layer points down: a fact points at its evidence chunk, a chunk at its
+L4 arrived in 1.1 as migration 2 and L5 in 1.2 as migration 3, both additive. Every layer points down: a fact points at its evidence chunk, a chunk at its
 document, a document at its source. L0–L2 are deterministic and can be rebuilt from the sources;
 L3 is additive and is invalidated, never deleted, when what it claims changes.
 
@@ -56,6 +56,7 @@ Full column-by-column schema: `schema.md`.
 | `memo://chunk/<n>` | one passage; `read` with `granularity: section` adds its neighbours |
 | `memo://fact/<id>` | one fact with its evidence address and its two clocks |
 | `memo://entity/<id>` | one entity: aliases, the passages that mention it, its neighbours with evidence (1.1) |
+| `memo://page/<id>` | one curated page with the passages it was built from and its stale flag (1.2) |
 | `memo://ns/<namespace>/index`, `memo://index` | one line per document and fact, under 8 KB |
 
 Document and fact ids are UUIDv7 (time-ordered); chunk ids are integers. A forgotten record's
@@ -145,7 +146,8 @@ ranked results did not fit) and `narrow_hint` (which scope field would shorten t
 
 **Granularities.** `chunk` returns passages; `document` (default) one result per document with
 its best passage; `fact` returns facts, ordered by score with trust as the tiebreak when two
-conflicting facts score within 10% of each other.
+conflicting facts score within 10% of each other; `page` (1.2) returns curated pages by keyword
+and meaning, each marked `is_inference` and `stale` when a source changed since it was built.
 
 **Reranking.** Opt-in (`MEMO_RERANK=1`, profile `precise`): a cross-encoder re-scores the top 30.
 It did not pass its promotion gate in the bake-off (`docs/eval/v0.7.0.md`, spike S8) and is
@@ -252,7 +254,27 @@ deterministic: same key → same entity; near key (3-gram Jaccard ≥ 0.8, not s
 only in a number) → a merge candidate for a human; otherwise a new entity. Spike S6 and
 `docs/eval/v1.1.0.md` hold the numbers.
 
+## 11b. Compaction and pages (1.2)
+
+The server never writes a page. `compact(namespace, kinds, lint)` scans and records work items
+the calling agent can do: an entity with three or more live passages and no page (or whose
+page is stale, or which gained two or more passages since the page was built: the recurrence
+trigger), two live facts about one subject whose validity windows overlap and whose statements
+differ (with the rule the server would apply: trust first, then recency), an open merge
+candidate, two near-duplicate passages from different documents (word 3-gram Jaccard ≥ 0.75).
+Each payload carries the passages, facts and previous page, so the work needs no second call.
+`submit(item_id, …, dry_run)` stores a page with `is_inference = 1` and its sources, invalidates
+the losing fact of a conflict under the trust rule, or records a merge decision; the report
+carries a line diff against the previous page, the omission check (recorded facts about the
+subject whose content words are mostly absent from the page) and the corruption check (page
+sentences that share fewer than half their content words with any source). `lint` reports
+contradictions, orphan entities, missing pages, stale pages and expired facts with addresses.
+Raw rows are never touched; `docs/eval/v1.2.0.md` holds the checksum proof. An optional local
+model (`memo-mcp compact --executor ollama`) can write page items from the terminal; no other
+code path knows it exists.
+
 ## 12. Not in 1.0
 
-HTTP transport (OD-11), a server-side LLM, prompts, compaction and pages (1.2), the web UI
-(1.3). The graph arm and `explore` arrived in 1.1 as additive changes. The MCP `profile` parameter. Importing v0 journal files.
+HTTP transport (OD-11), a server-side LLM, prompts, the web UI (1.3). The graph arm and
+`explore` arrived in 1.1, compaction and pages (`compact`, `submit`, `granularity=page`) in 1.2,
+all as additive changes; the tool count is ten. The MCP `profile` parameter. Importing v0 journal files.

@@ -124,7 +124,7 @@ func TestListToolsGolden(t *testing.T) {
 	}
 }
 
-func TestToolSurfaceIsExactlyEightTools(t *testing.T) {
+func TestToolSurfaceIsExactlyTenTools(t *testing.T) {
 	cs, _ := newTestSession(t)
 	res, err := cs.ListTools(context.Background(), nil)
 	if err != nil {
@@ -134,7 +134,7 @@ func TestToolSurfaceIsExactlyEightTools(t *testing.T) {
 	for _, tool := range res.Tools {
 		names = append(names, tool.Name)
 	}
-	if strings.Join(names, ",") != "explore,forget,ingest,promote,read,remember,search,status" {
+	if strings.Join(names, ",") != "compact,explore,forget,ingest,promote,read,remember,search,status,submit" {
 		t.Fatalf("tools = %v", names)
 	}
 }
@@ -178,7 +178,7 @@ func TestAnnotations(t *testing.T) {
 		if a.OpenWorldHint == nil || *a.OpenWorldHint {
 			t.Errorf("tool %q must declare a closed world", tool.Name)
 		}
-		wantReadOnly := tool.Name != "ingest" && tool.Name != "remember" && tool.Name != "forget"
+		wantReadOnly := tool.Name != "ingest" && tool.Name != "remember" && tool.Name != "forget" && tool.Name != "compact" && tool.Name != "submit"
 		if a.ReadOnlyHint != wantReadOnly {
 			t.Errorf("tool %q readOnlyHint = %v", tool.Name, a.ReadOnlyHint)
 		}

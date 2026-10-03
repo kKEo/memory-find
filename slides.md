@@ -534,10 +534,38 @@ flowchart LR
 
 ---
 
+# The Agent Writes the Wiki
+
+The server never writes a page. It proposes, stores, checks and marks stale.
+
+```
+→ compact(namespace: "platform", kinds: ["page"])
+← 1 open work item:
+   01a1…  page  3 live passages mention Ledger Store and it has no page
+          payload: 3 passages with addresses, 1 fact to cover, no previous page
+→ submit(item_id: "01a1…", content: "# Ledger Store …", dry_run: true)
+← Dry run. warning: 1 recorded fact about Ledger Store is not reflected in the page
+   omitted: The Ledger Store keeps seven years of history.
+   + # Ledger Store
+   + Append-only table of money movements (memo://chunk/1) …
+```
+
+<v-clicks>
+
+- A page cites the passages it came from; when one is revised or forgotten the page is **stale**, and `search` says so.
+- Two facts that disagree become a **conflict item** with the rule stated (trust, then recency); the loser is invalidated, never deleted.
+- The **omission check** and the **corruption check** are string-level: no judge model, no second opinion from a model about a model.
+- Raw rows are byte-identical after the whole loop. Measured with a checksum, not asserted.
+
+</v-clicks>
+
+---
+
 # Design Decisions & Tradeoffs
 
 | Decision | Why | The tradeoff |
 |----------|-----|--------------|
+| **The client LLM writes pages, the server checks them** | No model in the server, no network, every page attributable | Page quality is the agent's; the server can only flag omissions and unsupported sentences |
 | **Mention edges first, typed edges optional** | Most multi-hop gain at zero model cost | No "X depends on Y" answers without client-supplied relations |
 | **In-memory graph per namespace, no recursive CTEs** | 10 ms to build, single-digit ms to walk | Rebuilt when the namespace changes |
 | **Deterministic resolution with a review queue** | Nothing merges silently; precision over recall | A human must look at the queue |

@@ -58,6 +58,29 @@ func (s *Store) Export(ctx context.Context, dir string, opts ExportOptions) (*Ex
 			fmt.Fprintf(&index, "- [%s](%s) — %s, %s%s\n", orTitle(d.Prov.Title), filepath.ToSlash(filepath.Join(d.Prov.Kind, filepath.Base(rel))), d.Prov.Kind, d.Prov.Trust, versionSuffix(d.Prov.Version))
 			res.Files++
 		}
+		pages, err := s.ListPages(ctx, PageFilter{Namespace: ns})
+		if err != nil {
+			return nil, err
+		}
+		if len(pages) > 0 {
+			index.WriteString("\n## Pages (derived by agents; see built_from)\n\n")
+		}
+		for _, pg := range pages {
+			rel := filepath.Join(ns, "pages", slug(pg.Title)+"-"+shortID(pg.ID)+".md")
+			full := filepath.Join(dir, rel)
+			if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+				return nil, err
+			}
+			if err := os.WriteFile(full, []byte(renderPageMarkdown(&pg)), 0o644); err != nil {
+				return nil, err
+			}
+			stale := ""
+			if pg.Stale {
+				stale = " (stale)"
+			}
+			fmt.Fprintf(&index, "- [%s](%s) — %s page, %s%s\n", pg.Title, filepath.ToSlash(filepath.Join("pages", filepath.Base(rel))), pg.Kind, pg.Trust, stale)
+			res.Files++
+		}
 		if err := os.WriteFile(filepath.Join(dir, ns, "_index.md"), []byte(index.String()), 0o644); err != nil {
 			return nil, err
 		}
@@ -297,4 +320,20 @@ func oneLineIndex(s string, max int) string {
 		return string(r[:max]) + "…"
 	}
 	return s
+}
+
+// renderPageMarkdown writes a derived page with front matter that says so.
+func renderPageMarkdown(p *Page) string {
+	var sb strings.Builder
+	sb.WriteString("---\n")
+	fmt.Fprintf(&sb, "memo_uri: %s\ntitle: %s\nkind: page\npage_kind: %s\nnamespace: %s\nis_inference: true\ntrust: %s\nbuilt_at: %s\nbuilt_from_rev: %d\nstale: %t\n", p.URI, yamlStr(p.Title), p.Kind, p.Namespace, p.Trust, p.BuiltAt.UTC().Format(time.RFC3339), p.BuiltFromRev, p.Stale)
+	if p.StaleReason != "" {
+		fmt.Fprintf(&sb, "stale_reason: %s\n", yamlStr(p.StaleReason))
+	}
+	sb.WriteString("built_from:\n")
+	for _, c := range p.Sources {
+		sb.WriteString("  - " + c + "\n")
+	}
+	sb.WriteString("---\n\n" + strings.TrimRight(p.Content, "\n") + "\n")
+	return sb.String()
 }

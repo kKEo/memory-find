@@ -151,6 +151,14 @@ func Main(ctx context.Context, version string, args []string, stdout, stderr io.
 		err = runExplore(ctx, rest, stdout, stderr)
 	case "graph":
 		err = runGraph(ctx, rest, stdout, stderr)
+	case "compact":
+		err = runCompact(ctx, rest, stdout, stderr)
+	case "submit":
+		err = runSubmit(ctx, rest, stdout, stderr)
+	case "lint":
+		err = runLint(ctx, rest, stdout, stderr)
+	case "pages":
+		err = runPages(ctx, rest, stdout, stderr)
 	case "help", "-h", "--help":
 		usage(stdout)
 	default:
@@ -182,6 +190,11 @@ Usage:
   memo-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user
   memo-mcp explore <name> [--ns --hops 1|2 --as-of --json]   walk the graph index from one entity
   memo-mcp graph merges [--state] | merge <id> | reject <id>   review near-duplicate entity names
+  memo-mcp compact [--ns --kinds page,stale,conflict,merge,duplicate --lint --json] [--executor ollama --apply]
+                                   propose compaction work (pages to write, conflicts, merges, duplicates)
+  memo-mcp submit <item-id> [--content-file f.md --title t | --keep <memo://fact/..> | --accept|--reject | --skip] [--reason ..] [--dry-run]
+  memo-mcp lint [--ns --json]      contradictions, orphan entities, missing or stale pages, expired facts
+  memo-mcp pages ls [--ns --stale --json]   list curated pages
   memo-mcp read <memo://...> [--history]   print a record with its provenance, or its revision chain
   memo-mcp ls [--ns --kind --since 2026-01-01 --json]   list live documents, newest first
   memo-mcp export --md <dir> [--ns <name>]              write markdown files with front matter
@@ -201,6 +214,7 @@ Environment:
   MEMO_MODEL     embedding model id from 'memo-mcp model ls' (default granite-small-r2)
   MEMO_PROFILE   ranking profile (default "default"); overrides in $MEMO_HOME/profiles.json
   MEMO_RERANK=1  attach the cross-encoder reranker (used by the precise profile)
+  MEMO_OLLAMA_URL, MEMO_OLLAMA_MODEL   optional local model for 'compact --executor ollama' (loopback by default)
   JOURNAL_TOKEN, JOURNAL_PATH    deprecated aliases of MEMO_KB / MEMO_HOME (old journal files are not opened)
 `)
 }

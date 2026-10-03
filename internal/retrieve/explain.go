@@ -66,6 +66,10 @@ type ProvRef struct {
 	Trust     string    `json:"trust"`
 	Origin    string    `json:"origin"`
 	Namespace string    `json:"namespace"`
+	// Pages only (P8): derived by an agent, and whether a source changed since.
+	IsInference bool   `json:"is_inference,omitempty"`
+	Stale       bool   `json:"stale,omitempty"`
+	StaleReason string `json:"stale_reason,omitempty"`
 }
 
 // Freshness flags.

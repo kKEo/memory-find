@@ -81,7 +81,7 @@ func TestStatusAndVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.SchemaVersion != 2 || st.Sources != 1 || st.LiveDocuments != 1 || st.Chunks != res.Chunks || st.DefaultModel != "hash" || st.PendingEmbeddings["hash"] != 0 || len(st.Namespaces) != 1 {
+	if st.SchemaVersion != 3 || st.Sources != 1 || st.LiveDocuments != 1 || st.Chunks != res.Chunks || st.DefaultModel != "hash" || st.PendingEmbeddings["hash"] != 0 || len(st.Namespaces) != 1 {
 		t.Fatalf("status %+v", st)
 	}
 	rep, err := s.Verify(ctx, false)
