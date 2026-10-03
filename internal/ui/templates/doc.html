@@ -1,0 +1,6 @@
+{{template "head" .}}{{with .Data}}<h1>{{.Doc.Prov.Title}}</h1>
+<p>{{template "prov" .Doc.Prov}} · revision {{.Doc.Prov.Revision}} · updated {{dt .Doc.UpdatedAt}} · <code>{{.Doc.URI}}</code>{{if .Doc.Superseded}} · <span class="warn">superseded by <a href="/doc/{{.Doc.Superseded}}">a newer revision</a></span>{{end}}{{if .Doc.Prov.Tags}} · <span class="warn">{{.Doc.Prov.Tags}}</span>{{end}}</p>
+{{if .Doc.Context}}<blockquote>{{.Doc.Context}}</blockquote>{{end}}
+<pre>{{.Doc.Content}}</pre>
+{{if .Chunks}}<h2>Passages</h2><table><tr><th class="num">#</th><th>section</th><th>text</th><th class="num">tokens</th></tr>{{range .Chunks}}<tr><td class="num"><a href="{{href .URI}}">{{.Ord}}</a></td><td class="muted">{{.SectionPath}}</td><td>{{.Text}}</td><td class="num">{{.EstTokens}}</td></tr>{{end}}</table>{{end}}
+{{template "history" .History}}{{end}}{{template "foot" .}}

@@ -552,3 +552,94 @@ func (s *Store) GraphStats(ctx context.Context) (GraphStats, error) {
 	err := s.db.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM entities), (SELECT COUNT(*) FROM mentions), (SELECT COUNT(*) FROM edges WHERE invalidated_at IS NULL), (SELECT COUNT(*) FROM merge_candidates WHERE state = 'open')`).Scan(&g.Entities, &g.Mentions, &g.Edges, &g.OpenMergeReview)
 	return g, err
 }
+
+// RebuildMentions re-extracts rung-1 mentions for every live chunk of a
+// namespace (all namespaces when ns is empty): for files written before the
+// graph layer existed, or after an extraction improvement. Existing
+// entities are kept and resolved against; mentions of live chunks are
+// replaced. Returns chunks processed.
+func (s *Store) RebuildMentions(ctx context.Context, ns string) (int, error) {
+	namespaces := []string{ns}
+	if ns == "" {
+		var err error
+		if namespaces, err = s.Namespaces(ctx); err != nil {
+			return 0, err
+		}
+	}
+	total := 0
+	for _, n := range namespaces {
+		docs, err := s.liveDocs(ctx, n)
+		if err != nil {
+			return total, err
+		}
+		for _, d := range docs {
+			n, err := s.rebuildDocMentions(ctx, n, d.id, d.title)
+			if err != nil {
+				return total, err
+			}
+			total += n
+		}
+	}
+	return total, nil
+}
+
+type liveDoc struct{ id, title string }
+
+func (s *Store) liveDocs(ctx context.Context, ns string) ([]liveDoc, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT d.id, s.title FROM documents d JOIN sources s ON s.id = d.source_id WHERE s.namespace = ? AND d.deleted_at IS NULL AND d.superseded_by IS NULL`, ns)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var docs []liveDoc
+	for rows.Next() {
+		var d liveDoc
+		if err := rows.Scan(&d.id, &d.title); err != nil {
+			return nil, err
+		}
+		docs = append(docs, d)
+	}
+	return docs, rows.Err()
+}
+
+func (s *Store) docChunksForRebuild(ctx context.Context, docID string) ([]int64, []chunk.Chunk, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, ord, section_path, text, est_tokens, COALESCE(lang, '') FROM chunks WHERE document_id = ? ORDER BY ord`, docID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	var ids []int64
+	var chunks []chunk.Chunk
+	for rows.Next() {
+		var id int64
+		var c chunk.Chunk
+		if err := rows.Scan(&id, &c.Ord, &c.SectionPath, &c.Text, &c.EstTokens, &c.Lang); err != nil {
+			return nil, nil, err
+		}
+		ids = append(ids, id)
+		chunks = append(chunks, c)
+	}
+	return ids, chunks, rows.Err()
+}
+
+func (s *Store) rebuildDocMentions(ctx context.Context, ns, docID, title string) (int, error) {
+	ids, chunks, err := s.docChunksForRebuild(ctx, docID)
+	if err != nil {
+		return 0, err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM mentions WHERE chunk_id IN (SELECT id FROM chunks WHERE document_id = ?)`, docID); err != nil {
+		return 0, err
+	}
+	if _, err := s.linkMentions(ctx, tx, ns, title, ids, chunks, nil, nil, s.now().UnixMilli()); err != nil {
+		return 0, err
+	}
+	return len(ids), tx.Commit()
+}

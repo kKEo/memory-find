@@ -1,0 +1,4 @@
+{{template "head" .}}<h1>Lint</h1>{{with .Data}}<p class="muted">What a librarian would flag. Nothing here changes anything; the work is done by agents through <code>compact</code>/<code>submit</code> or by you with the CLI.</p>
+<table><tr><th>kind</th><th>where</th><th>what</th></tr>{{range .Findings}}<tr><td>{{.Kind}}</td><td><a href="{{href .URI}}">{{.URI}}</a></td><td>{{.Message}}</td></tr>{{end}}</table>
+{{if not .Findings}}<p class="ok">Clean.</p>{{end}}
+{{if .Items}}<h2>Open work items</h2><table><tr><th>created</th><th>kind</th><th>namespace</th><th>id</th></tr>{{range .Items}}<tr><td>{{dt .CreatedAt}}</td><td>{{.Kind}}</td><td>{{.Namespace}}</td><td><code>{{.ID}}</code></td></tr>{{end}}</table>{{end}}{{end}}{{template "foot" .}}

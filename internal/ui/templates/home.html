@@ -1,0 +1,14 @@
+{{template "head" .}}<h1>Knowledge base</h1>
+{{with .Data}}
+<div class="cards">
+<div class="card"><div class="big">{{.Status.LiveDocuments}}</div>live documents · {{.Status.Revisions}} revisions</div>
+<div class="card"><div class="big">{{.Status.Chunks}}</div>passages · {{.Status.Facts}} facts</div>
+<div class="card"><div class="big">{{.Status.Graph.Entities}}</div>entities · {{.Status.Graph.Mentions}} mentions</div>
+<div class="card"><div class="big">{{.Status.Pages.Pages}}</div>pages{{if .Status.Pages.StalePages}} · <span class="warn">{{.Status.Pages.StalePages}} stale</span>{{end}} · {{.Status.Pages.OpenWorkItems}} open work items</div>
+</div>
+<h2>Namespaces</h2><table><tr><th>name</th><th>description</th><th class="num">documents</th><th class="num">passages</th><th></th></tr>
+{{range .Status.Namespaces}}<tr><td>{{.Name}}</td><td class="muted">{{.Description}}</td><td class="num">{{.Documents}}</td><td class="num">{{.Chunks}}</td><td><a href="/search?ns={{.Name}}">search</a> · <a href="/facts?ns={{.Name}}">facts</a></td></tr>{{end}}</table>
+<h2>Recent documents</h2><table><tr><th>updated</th><th>namespace</th><th>kind</th><th>title</th><th>version</th><th>trust</th></tr>
+{{range .Recent}}<tr><td>{{date .UpdatedAt}}</td><td>{{.Namespace}}</td><td>{{.Kind}}</td><td><a href="{{href .URI}}">{{.Title}}</a></td><td>{{.Version}}</td><td><span class="badge">{{.Trust}}</span></td></tr>{{end}}</table>
+{{if .Pages}}<h2>Recent pages <span class="muted">(written by agents)</span></h2><ul>{{range .Pages}}<li><a href="{{href .URI}}">{{.Title}}</a> <span class="muted">{{.Namespace}} · rev {{.BuiltFromRev}}</span>{{if .Stale}} <span class="badge stale">stale</span>{{end}}</li>{{end}}</ul>{{end}}
+{{end}}{{template "foot" .}}

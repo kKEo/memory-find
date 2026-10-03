@@ -159,6 +159,10 @@ func Main(ctx context.Context, version string, args []string, stdout, stderr io.
 		err = runLint(ctx, rest, stdout, stderr)
 	case "pages":
 		err = runPages(ctx, rest, stdout, stderr)
+	case "ui":
+		err = runUI(ctx, rest, stdout, stderr)
+	case "migrate":
+		err = runMigrate(ctx, stdout, stderr)
 	case "help", "-h", "--help":
 		usage(stdout)
 	default:
@@ -189,15 +193,17 @@ Usage:
   memo-mcp facts ls [--ns --as-of YYYY-MM-DD --history --json]
   memo-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user
   memo-mcp explore <name> [--ns --hops 1|2 --as-of --json]   walk the graph index from one entity
-  memo-mcp graph merges [--state] | merge <id> | reject <id>   review near-duplicate entity names
+  memo-mcp graph merges [--state] | merge <id> | reject <id> | rebuild [--ns]   review near-duplicate names; re-extract mentions
   memo-mcp compact [--ns --kinds page,stale,conflict,merge,duplicate --lint --json] [--executor ollama --apply]
                                    propose compaction work (pages to write, conflicts, merges, duplicates)
   memo-mcp submit <item-id> [--content-file f.md --title t | --keep <memo://fact/..> | --accept|--reject | --skip] [--reason ..] [--dry-run]
   memo-mcp lint [--ns --json]      contradictions, orphan entities, missing or stale pages, expired facts
   memo-mcp pages ls [--ns --stale --json]   list curated pages
+  memo-mcp ui [--addr 127.0.0.1:0 --no-model]   read-only web face on loopback (prints the URL)
   memo-mcp read <memo://...> [--history]   print a record with its provenance, or its revision chain
   memo-mcp ls [--ns --kind --since 2026-01-01 --json]   list live documents, newest first
   memo-mcp export --md <dir> [--ns <name>]              write markdown files with front matter
+  memo-mcp migrate                 bring an existing file to this binary's schema version
   memo-mcp verify [--repair]       check integrity (chunks, vectors, indexes)
   memo-mcp backfill                embed chunks whose vectors are pending
   memo-mcp status                  print knowledge-base statistics

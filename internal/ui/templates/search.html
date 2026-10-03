@@ -1,0 +1,37 @@
+{{template "head" .}}<h1>Search</h1>
+{{with .Data}}
+<form class="filters" action="/search" method="get">
+<label>query<input type="search" name="q" value="{{.Query}}" size="50" autofocus></label>
+<label>mode<select name="mode">{{range $m := (list "auto" "hybrid" "keyword" "exact" "semantic" "graph")}}<option {{if eq $m $.Data.Mode}}selected{{end}}>{{$m}}</option>{{end}}</select></label>
+<label>granularity<select name="granularity">{{range $g := (list "document" "chunk" "fact" "page")}}<option {{if eq $g $.Data.Granularity}}selected{{end}}>{{$g}}</option>{{end}}</select></label>
+<label>namespace<input name="ns" value="{{.Namespace}}" size="10"></label>
+<label>library<input name="library" value="{{.Library}}" size="12"></label>
+<label>version<input name="version" value="{{.Version}}" size="8"></label>
+<label>as of<input name="as_of" value="{{.AsOf}}" placeholder="YYYY-MM-DD" size="10"></label>
+<button>Search</button></form>
+{{if .Err}}<p class="warn">{{.Err}}</p>{{end}}
+{{with .Resp}}
+{{if .Reason}}<p class="warn">No results: {{.Reason}}. <span class="muted">{{.Hint}}</span></p>{{end}}
+{{if .Results}}<table><tr><th class="num">#</th><th>relevance</th><th>title</th><th>where</th><th>passage</th><th class="num">score</th></tr>
+{{range .Results}}<tr data-address="{{.URI}}" data-final="{{f5 .Score}}"><td class="num">{{.Rank}}</td><td><span class="badge {{.Band}}">{{.Band}}</span> {{pf .Relevance}}</td>
+<td><a href="{{href .URI}}">{{.Title}}</a>{{if .SectionPath}} <span class="muted">› {{.SectionPath}}</span>{{end}}<br><small>{{template "prov" .Provenance}}{{if .Provenance.IsInference}} · <span class="badge">derived</span>{{end}}{{if .Provenance.Stale}} <span class="badge stale">stale</span>{{end}}</small></td>
+<td class="muted">{{.Provenance.Namespace}}</td><td>{{.Content}}{{if .ChunkURI}} <a href="{{href .ChunkURI}}" class="muted">↗</a>{{end}}</td><td class="num">{{f5 .Score}}</td></tr>
+{{if .Why}}<tr class="explain"><td></td><td colspan="5"><details><summary>why rank {{.Why.Rank}}: fused {{f5 .Why.Fused}} × recency {{f3 .Why.RecencyFactor}} = {{f5 .Why.Final}}</summary>
+<table><tr><th>arm</th><th class="num">rank</th><th class="num">raw</th><th></th><th class="num">contribution</th><th>matched</th></tr>
+{{range .Why.Arms}}<tr><td>{{.Arm}}</td><td class="num">{{pi .Rank}}</td><td class="num">{{pf .Raw}}</td><td class="muted">{{.RawKind}}</td><td class="num">{{f5 .Contribution}}</td><td>{{join .MatchedTerms ", "}}</td></tr>{{end}}</table>
+{{if .Why.Graph}}<p class="muted">graph: seeds {{join .Why.Graph.Seeds ", "}} · score {{f5 .Why.Graph.PPRScore}} · hops {{.Why.Graph.Hops}}{{if .Why.Graph.HubPenalised}} · hub penalised{{end}}</p>{{end}}
+{{if .Why.Time}}<p class="muted">recorded {{date .Why.Time.RecordedAt}}{{if .Why.Time.ValidFrom}} · valid from {{pdate .Why.Time.ValidFrom}}{{end}}{{if .Why.Time.ValidTo}} · valid to {{pdate .Why.Time.ValidTo}}{{end}}{{if .Why.Time.SupersededBy}} · superseded by {{.Why.Time.SupersededBy}}{{end}}</p>{{end}}
+</details></td></tr>{{end}}{{end}}</table>
+{{if .Truncated}}<p class="muted">{{.Truncated}} more result(s) did not fit; narrow with {{.NarrowHint}}.</p>{{end}}{{end}}
+{{with .Trace}}<h2>Trace</h2><table>
+<tr><th>mode</th><td>{{.ModeRequested}} → {{.ModeResolved}} <span class="muted">({{.RoutingReason}})</span></td></tr>
+<tr><th>arms</th><td>{{join .ArmsRun " + "}}{{range $a, $n := .CandidatesPerArm}} · {{$a}} {{$n}} candidates{{end}}</td></tr>
+<tr><th>profile / model</th><td>{{.Profile}} / {{.ModelID}}</td></tr>
+{{if .Entities}}<tr><th>entities</th><td>{{join .Entities ", "}}</td></tr>{{end}}
+<tr><th>filtered</th><td>{{.Filtered.ByScope}} · {{.Filtered.LiveDocs}} live documents · {{.Filtered.ByRevocation}} superseded/forgotten excluded{{if .Filtered.ByMinTrust}} · {{.Filtered.ByMinTrust}} below min trust{{end}}{{if .Filtered.BySemanticFloor}} · {{.Filtered.BySemanticFloor}} below the similarity floor{{end}}</td></tr>
+<tr><th>cutoff</th><td>{{.Cutoff.Kind}} at {{.Cutoff.Position}}{{if .Cutoff.Gap}} (gap {{f3 .Cutoff.Gap}}){{end}}</td></tr>
+<tr><th>latency</th><td>{{range $a, $ms := .LatencyMsPerArm}}{{$a}} {{ms $ms}} ms · {{end}}</td></tr>
+{{if .Degraded.Flag}}<tr><th class="warn">degraded</th><td class="warn">{{.Degraded.Reason}}</td></tr>{{end}}
+{{if .AsOf}}<tr><th>as of</th><td>{{pdate .AsOf}}</td></tr>{{end}}
+</table>{{end}}
+{{end}}{{end}}{{template "foot" .}}

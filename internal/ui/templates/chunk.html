@@ -1,0 +1,8 @@
+{{template "head" .}}{{with .Data}}<h1>Passage {{.Chunk.ID}} <span class="muted">of <a href="{{href .Chunk.DocumentURI}}">{{.Chunk.Prov.Title}}</a></span></h1>
+<p>{{template "prov" .Chunk.Prov}} · <code>{{.Chunk.URI}}</code>{{if .Chunk.SectionPath}} · section {{.Chunk.SectionPath}}{{end}} · {{.Chunk.EstTokens}} tokens{{if .Chunk.Prov.Tags}} · <span class="warn">{{.Chunk.Prov.Tags}}</span>{{end}}</p>
+{{if .Chunk.ContextHeader}}<p class="muted">context header: {{.Chunk.ContextHeader}}</p>{{end}}
+{{if .Prev}}<blockquote>{{.Prev}}</blockquote>{{end}}
+<pre>{{.Chunk.Text}}</pre>
+{{if .Next}}<blockquote>{{.Next}}</blockquote>{{end}}
+{{if .Entities}}<h2>Mentions</h2><p>{{range .Entities}}<a class="badge" href="{{href .URI}}">{{.Canonical}}</a> {{end}}</p>{{end}}
+{{end}}{{template "foot" .}}

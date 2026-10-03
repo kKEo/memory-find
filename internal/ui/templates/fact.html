@@ -1,0 +1,5 @@
+{{template "head" .}}{{with .Data}}<h1>Fact</h1><p class="big">{{.Fact.Statement}}</p>
+<p><span class="muted">{{.Fact.Namespace}}</span> · trust <span class="badge">{{.Fact.Trust}}</span> · origin {{.Fact.Origin}} · recorded {{dt .Fact.RecordedAt}}{{if .Fact.ValidFrom}} · valid from {{pdate .Fact.ValidFrom}}{{end}}{{if .Fact.ValidTo}} · valid to {{pdate .Fact.ValidTo}}{{end}}{{if .Fact.InvalidatedAt}} · <span class="warn">superseded {{pdate .Fact.InvalidatedAt}} by <a href="/fact/{{.Fact.SupersededBy}}">{{short .Fact.SupersededBy}}</a></span>{{end}} · <code>{{.Fact.URI}}</code></p>
+{{if .Fact.About}}<p>about: {{range .Fact.About}}<a class="badge" href="/entity/{{.}}">{{.}}</a> {{end}}</p>{{end}}
+{{if .Evidence}}<h2>Evidence</h2><p class="muted"><a href="{{href .Evidence.URI}}">{{.Evidence.URI}}</a> in <a href="{{href .Evidence.DocumentURI}}">{{.Evidence.Prov.Title}}</a></p><pre>{{.Evidence.Text}}</pre>{{end}}
+{{template "history" .History}}{{end}}{{template "foot" .}}

@@ -1087,6 +1087,23 @@ less and shipped two phases in a month, so treat these as ranges, not promises.
 
 ### P9 — A knowledge base you can read (optional) · 3 days · `v1.3.0`
 
+> **Status (2026-10-03): built.** `internal/ui`: `memo-mcp ui [--addr 127.0.0.1:0 --no-model
+> --allow-remote]` prints the URL; stdlib `net/http`, `html/template`, `embed.FS`, no
+> JavaScript; GET-only routes `/`, `/search`, `/doc/{id}`, `/chunk/{id}`, `/source/{id}`,
+> `/facts?as_of=&history=`, `/fact/{id}`, `/entity/{id}?hops=`, `/page/{id}`, `/pages`,
+> `/status`, `/log`, `/lint`, `/eval`; a Host-header allowlist (the bound address and its
+> loopback spellings) and a refusal to bind non-loopback without `--allow-remote`; a CSP that
+> allows only the page's own stylesheet. The search page renders the same `Why`/`Trace`
+> structs as an explain table and a trace table; `TestSearchNumbersEqualTheService` asserts
+> the UI's addresses and scores equal the service's for the same query, down to the rendered
+> digits. Live smoke on the P6 demo file found two product gaps, both fixed: a read-only open
+> of a file at an older schema now fails with "run `memo-mcp migrate`" (new command) instead
+> of a missing-table error, and `memo-mcp graph rebuild` re-extracts mentions for files
+> written before the graph layer. Not built: `export --html` (the optional static site;
+> `export --md` plus the UI cover the human face), screenshots in the README (none taken in
+> this session; the README describes the pages). Remaining: commit, `git tag -a v1.3.0`.
+
+
 - **Story.** (c).
 - **Goal.** A browser window onto the same store for people who do not live in a terminal:
   search with the explain table, a document and chunk viewer with provenance and revision chain,

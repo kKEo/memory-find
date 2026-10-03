@@ -1,0 +1,8 @@
+{{template "head" .}}{{with .Data}}<h1>{{.Ex.Entity.Canonical}} <span class="badge">{{.Ex.Entity.Type}}</span></h1>
+<p class="muted">{{.Ex.Entity.Namespace}} · {{.Ex.Entity.Mentions}} passages · <code>{{.Ex.Entity.URI}}</code>{{if .Ex.Entity.Aliases}} · also known as {{join .Ex.Entity.Aliases ", "}}{{end}} · <a href="?hops={{if eq .Hops 1}}2{{else}}1{{end}}">{{if eq .Hops 1}}show two hops{{else}}show one hop{{end}}</a></p>
+{{if .Page}}<p>Page: <a href="{{href .Page.URI}}">{{.Page.Title}}</a> <span class="muted">rev {{.Page.BuiltFromRev}}</span>{{if .Page.Stale}} <span class="badge stale">stale</span>{{end}}</p>{{end}}
+{{if .Facts}}<h2>Facts about it</h2><ul>{{range .Facts}}<li><a href="{{href .URI}}">{{.Statement}}</a> <span class="badge">{{.Trust}}</span></li>{{end}}</ul>{{end}}
+<h2>Passages</h2><ul>{{range .Ex.Chunks}}<li><a href="{{href .}}">{{.}}</a></li>{{end}}</ul>
+<h2>Mentioned alongside</h2><table><tr><th class="num">hop</th><th>entity</th><th class="num">shared passages</th><th>relation</th><th>evidence</th></tr>
+{{range .Ex.Neighbours}}<tr><td class="num">{{.Hop}}</td><td><a href="{{href .Entity.URI}}">{{.Entity.Canonical}}</a></td><td class="num">{{.Shared}}</td><td class="muted">{{.Rel}}</td><td>{{range .Evidence}}<a href="{{href .}}">{{.}}</a> {{end}}</td></tr>{{end}}</table>
+{{if not .Ex.Neighbours}}<p class="muted">Nothing else is mentioned alongside it.</p>{{end}}{{end}}{{template "foot" .}}

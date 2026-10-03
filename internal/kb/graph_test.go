@@ -98,3 +98,22 @@ func TestGraphLinksResolvesAndExplores(t *testing.T) {
 		t.Fatalf("fact subject not linked: %q %v", subj, err)
 	}
 }
+
+func TestRebuildMentionsRestoresTheGraph(t *testing.T) {
+	s, _ := openTestStore(t, nil)
+	ctx := context.Background()
+	if _, err := s.Ingest(ctx, IngestInput{Namespace: "w", Content: "# Client.Connect\n\nDials the Widgets Server.\n", Source: SourceInput{URI: "https://w/1", Title: "Client.Connect", Kind: KindDoc, Origin: OriginWeb}, Trust: TrustUser, Actor: "t", Channel: ChannelCLI}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM mentions`); err != nil {
+		t.Fatal(err)
+	}
+	n, err := s.RebuildMentions(ctx, "")
+	if err != nil || n != 1 {
+		t.Fatalf("rebuild: %d %v", n, err)
+	}
+	e, err := s.ReadEntity(ctx, "Widgets Server", "w")
+	if err != nil || e.Mentions != 1 {
+		t.Fatalf("entity after rebuild: %+v %v", e, err)
+	}
+}

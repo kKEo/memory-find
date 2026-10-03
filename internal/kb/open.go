@@ -106,9 +106,21 @@ func Open(ctx context.Context, dir, name string, opts Options) (*sql.DB, error) 
 			return nil, err
 		}
 		securePermissions(path)
+	} else {
+		// A read-only open cannot migrate; say so plainly instead of failing
+		// later on a missing table.
+		var v int
+		if err := db.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&v); err == nil && v < len(migrations) {
+			db.Close()
+			return nil, fmt.Errorf("%w: file is at schema v%d, this binary expects v%d; run `memo-mcp migrate` (or any writing command) once", ErrSchemaBehind, v, len(migrations))
+		}
 	}
 	return db, nil
 }
+
+// ErrSchemaBehind is returned by a read-only open of a file that an older
+// binary wrote and that newer migrations have not been applied to.
+var ErrSchemaBehind = errors.New("knowledge base needs migration")
 
 // probeOwnership refuses a file that has tables but is not ours. A brand-new
 // empty file (no tables) is fine: migration 1 will claim it.

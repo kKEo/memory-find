@@ -1,0 +1,6 @@
+{{template "head" .}}<h1>Facts</h1>{{with .Data}}
+<form class="filters" action="/facts" method="get"><label>namespace<input name="ns" value="{{.Namespace}}"></label><label>as of<input name="as_of" value="{{.AsOf}}" placeholder="YYYY-MM-DD"></label><label>history<input type="checkbox" name="history" value="1" {{if .History}}checked{{end}}></label><button>Show</button></form>
+<p class="muted">What the knowledge base believes{{if .AsOf}} as of {{.AsOf}}{{else}} now{{end}}. Superseded facts are kept as history; forgotten facts never appear.</p>
+<table><tr><th>recorded</th><th>namespace</th><th>statement</th><th>about</th><th>valid</th><th>trust</th><th>state</th></tr>
+{{range .Facts}}<tr><td>{{date .RecordedAt}}</td><td>{{.Namespace}}</td><td><a href="{{href .URI}}">{{.Statement}}</a></td><td class="muted">{{join .About ", "}}</td><td class="muted">{{pdate .ValidFrom}} → {{pdate .ValidTo}}</td><td><span class="badge">{{.Trust}}</span></td><td>{{if .InvalidatedAt}}<span class="warn">superseded {{pdate .InvalidatedAt}}</span>{{else}}<span class="ok">live</span>{{end}}</td></tr>{{end}}</table>
+{{if not .Facts}}<p class="muted">No facts match.</p>{{end}}{{end}}{{template "foot" .}}

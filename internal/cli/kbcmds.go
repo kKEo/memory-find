@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,6 +20,7 @@ import (
 	"github.com/kKEo/memory-find/internal/kb"
 	"github.com/kKEo/memory-find/internal/rerank"
 	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memory-find/internal/ui"
 )
 
 // openStore resolves the configuration and opens the knowledge base. embedder
@@ -1334,7 +1336,7 @@ func runExplore(ctx context.Context, args []string, stdout, stderr io.Writer) er
 // near-duplicate names, and the decision to merge or keep apart.
 func runGraph(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: memo-mcp graph merges [--state open|merged|rejected] | merge <id> | reject <id>")
+		return errors.New("usage: memo-mcp graph merges [--state open|merged|rejected] | merge <id> | reject <id> | rebuild [--ns <name>]")
 	}
 	sub, rest := args[0], args[1:]
 	switch sub {
@@ -1365,6 +1367,24 @@ func runGraph(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 			fmt.Fprintf(stdout, "%4d  %.2f  %-9s %q <> %q  (%s; %s)\n", m.ID, m.Score, m.State, m.A.Canonical, m.B.Canonical, m.A.Namespace, m.Reason)
 		}
 		fmt.Fprintln(stdout, "decide with: memo-mcp graph merge <id> | reject <id>")
+		return nil
+	case "rebuild":
+		fs := flag.NewFlagSet("graph rebuild", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		ns := fs.String("ns", "", "namespace (default: all)")
+		if _, err := parseInterspersed(fs, rest); err != nil {
+			return err
+		}
+		store, closeFn, err := openStore(ctx, stderr, kb.Options{}, nil)
+		if err != nil {
+			return err
+		}
+		defer closeFn()
+		n, err := store.RebuildMentions(ctx, *ns)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "re-extracted mentions for %d passage(s)\n", n)
 		return nil
 	case "merge", "reject":
 		if len(rest) != 1 {
@@ -1649,5 +1669,112 @@ func runPages(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 		}
 		fmt.Fprintf(stdout, "%s  %-10s %-8s rev %d  %d source(s)  %s  %s%s\n", p.BuiltAt.Format("2006-01-02"), p.Namespace, p.Kind, p.BuiltFromRev, len(p.Sources), p.Title, p.URI, flag)
 	}
+	return nil
+}
+
+// runUI serves the read-only web face on loopback and prints the URL.
+func runUI(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("ui", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	addr := fs.String("addr", "127.0.0.1:0", "listen address (loopback unless --allow-remote)")
+	allowRemote := fs.Bool("allow-remote", false, "allow a non-loopback address (the UI shows everything in the knowledge base)")
+	noModel := fs.Bool("no-model", false, "do not load the embedding model (search is keyword-only)")
+	if _, err := parseInterspersed(fs, args); err != nil {
+		return err
+	}
+	cfg, err := ResolveConfig(os.Getenv)
+	if err != nil {
+		return err
+	}
+	if err := retrieve.LoadOverrides(filepath.Join(filepath.Dir(cfg.KBDir), "profiles.json")); err != nil {
+		return err
+	}
+	embedder, cleanup := loadEmbedder(ctx, !*noModel, stderr)
+	defer cleanup()
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, embedder)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	profile, err := retrieve.Lookup(os.Getenv("MEMO_PROFILE"))
+	if err != nil {
+		return err
+	}
+	svc := retrieve.New(store, profile, false)
+	srv := ui.New(store, svc, serverVersion)
+	srv.SetEval(func(ctx context.Context) (string, error) {
+		return evalReportMarkdown(ctx)
+	})
+	ln, err := srv.Listen(*addr, *allowRemote)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "memo-mcp ui: http://%s  (read-only; Ctrl-C to stop)\n", ln.Addr())
+	hs := &http.Server{Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	go func() {
+		<-ctx.Done()
+		shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_ = hs.Shutdown(shutdown)
+	}()
+	if err := hs.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
+
+// evalReportMarkdown runs the labelled corpora with the hash embedder in a
+// throwaway knowledge base (the CI gate) and returns the markdown report.
+func evalReportMarkdown(ctx context.Context) (string, error) {
+	dir, err := os.MkdirTemp("", "memo-eval-*")
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(dir)
+	db, err := kb.Open(ctx, dir, "eval", kb.Options{})
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+	store := kb.NewStore(db, embedding.NewHashEmbedder(384))
+	notes, _, err := eval.Load(ctx, store, eval.ToDocs(eval.Corpus()))
+	if err != nil {
+		return "", err
+	}
+	kbIDs, _, err := eval.Load(ctx, store, eval.CorpusKB())
+	if err != nil {
+		return "", err
+	}
+	factIDs, err := eval.LoadFacts(ctx, store, kbIDs, eval.FactsKB(), eval.ForgottenDocsKB())
+	if err != nil {
+		return "", err
+	}
+	for k, v := range factIDs {
+		kbIDs[k] = v
+	}
+	svc := retrieve.New(store, retrieve.Default, false)
+	a, err := eval.Run(ctx, svc, notes, eval.Queries(), eval.RunOptions{})
+	if err != nil {
+		return "", err
+	}
+	b, err := eval.Run(ctx, svc, kbIDs, append(eval.QueriesKB(), eval.QueriesFactsKB()...), eval.RunOptions{})
+	if err != nil {
+		return "", err
+	}
+	return a.Markdown("notes corpus") + "\n" + b.Markdown("knowledge-base corpus"), nil
+}
+
+// runMigrate brings the file to this binary's schema version and exits.
+func runMigrate(ctx context.Context, stdout, stderr io.Writer) error {
+	store, closeFn, err := openStore(ctx, stderr, kb.Options{NoCreate: true}, nil)
+	if err != nil {
+		return err
+	}
+	defer closeFn()
+	st, err := store.Status(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "%s is at schema v%d\n", st.Path, st.SchemaVersion)
 	return nil
 }
