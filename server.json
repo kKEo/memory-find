@@ -11,7 +11,6 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "registryBaseUrl": "https://github.com",
       "identifier": "https://github.com/kKEo/memory-find/releases/download/v__VERSION__/memo-mcp___VERSION___linux_amd64.tar.gz",
       "version": "__VERSION__",
       "fileSha256": "__SHA256_LINUX_AMD64__",
