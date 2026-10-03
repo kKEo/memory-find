@@ -1,0 +1,2 @@
+{{template "head" .}}{{with .Data}}<h1>{{.Prov.Title}} <span class="muted">(latest revision of a source)</span></h1>
+<p>{{template "prov" .Prov}} · revision {{.Prov.Revision}} · <code>memo://source/{{.ID}}</code>{{if .Prov.Tags}} · <span class="warn">{{.Prov.Tags}}</span>{{end}}</p><pre>{{.Text}}</pre>{{template "history" .History}}{{end}}{{template "foot" .}}

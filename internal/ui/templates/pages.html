@@ -1,0 +1,4 @@
+{{template "head" .}}<h1>Pages <span class="muted">written by agents, cited and stale-aware</span></h1>
+<table><tr><th>built</th><th>namespace</th><th>kind</th><th>title</th><th class="num">rev</th><th class="num">sources</th><th>trust</th><th></th></tr>
+{{range .Data}}<tr><td>{{date .BuiltAt}}</td><td>{{.Namespace}}</td><td>{{.Kind}}</td><td><a href="{{href .URI}}">{{.Title}}</a></td><td class="num">{{.BuiltFromRev}}</td><td class="num">{{len .Sources}}</td><td><span class="badge">{{.Trust}}</span></td><td>{{if .Stale}}<span class="badge stale">stale</span>{{end}}</td></tr>{{end}}</table>
+{{if not .Data}}<p class="muted">No pages yet. Agents write them through <code>compact</code> and <code>submit</code>.</p>{{end}}{{template "foot" .}}

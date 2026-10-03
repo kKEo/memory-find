@@ -226,6 +226,11 @@ model2vec table with no ONNX at all, the instant tier.
   Re-importing the export produces zero new revisions.
 - `export --index` prints the ≤ 8 KB index for `AGENTS.md`/`CLAUDE.md`; `SKILL.md` tells an
   agent how to use the tools.
+- `memo-mcp ui` (1.3) serves the same store read-only on loopback: search with the explain
+  table, documents, passages, facts timeline, entities, pages, status, lint, log, eval. It
+  calls the same `retrieve.Service` with the same request shape the agent gets, and a test
+  asserts the rendered numbers equal the service's. GET only; Host header checked against the
+  bound address (DNS-rebinding defence); non-loopback binding needs `--allow-remote`.
 
 ## 11. Measurement
 
@@ -275,6 +280,7 @@ code path knows it exists.
 
 ## 12. Not in 1.0
 
-HTTP transport (OD-11), a server-side LLM, prompts, the web UI (1.3). The graph arm and
-`explore` arrived in 1.1, compaction and pages (`compact`, `submit`, `granularity=page`) in 1.2,
-all as additive changes; the tool count is ten. The MCP `profile` parameter. Importing v0 journal files.
+HTTP transport for MCP (OD-11), a server-side LLM, prompts. The graph arm and `explore`
+arrived in 1.1, compaction and pages (`compact`, `submit`, `granularity=page`) in 1.2, the
+read-only web UI in 1.3, all as additive changes; the tool count is ten. The UI's HTTP server
+is not an MCP transport: it has no tools and no mutating route. The MCP `profile` parameter. Importing v0 journal files.

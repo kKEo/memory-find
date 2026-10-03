@@ -3,6 +3,17 @@
 All notable changes. Tags follow semantic versioning; each tag has an eval report in
 `docs/eval/` from `v0.6.0` on.
 
+## [1.3.0] — 2026-10-03 — a knowledge base you can read (P9)
+
+- `memo-mcp ui`: read-only web face on loopback, server-rendered, no JavaScript. Search with
+  the explain and trace tables, documents and passages with provenance and history, the facts
+  timeline with `as_of`, entity neighbourhoods, pages with sources, status, lint, the query
+  log, the eval report. GET only; Host-header allowlist; `--allow-remote` required for a
+  non-loopback address.
+- A test asserts the UI's numbers equal the retrieval service's for the same query.
+- `memo-mcp migrate`; read-only commands refuse a file at an older schema with that advice.
+- `memo-mcp graph rebuild [--ns]` re-extracts mentions for files written before 1.1.
+
 ## [1.2.0] — 2026-10-03 — compaction and pages (P8)
 
 - Migration 3: `pages`, `page_sources`, `page_vecs`, `pages_fts`, `work_items`.

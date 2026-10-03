@@ -23,6 +23,8 @@ Claude (or any MCP client) gets ten tools over one knowledge base:
 | `submit` | Hand back a page, a conflict decision or a merge decision. Pages are stored as derived (`is_inference`) with the passages they cite; the omission check reports facts the page left out; `dry_run` shows the diff first |
 | `status` | Namespaces, the embedding model, pending vectors, background jobs, graph and page counts |
 
+For a human there is `memo-mcp ui`: a read-only web page on loopback with the same search (and the same explain table the agent gets), documents and passages with provenance and history, the facts timeline, entity neighbourhoods, agent-written pages, status, lint and the query log. Nothing on it can change the knowledge base.
+
 The same addresses are readable as MCP resources (`memo://doc/{id}`, `memo://chunk/{id}`, `memo://source/{id}`, `memo://fact/{id}`), and `memo://index` or `memo://ns/{namespace}/index` give a one-line-per-document view under 8 KB for the start of a session. [`SKILL.md`](SKILL.md) tells an agent how to use the tools well; `memo-mcp export --index` prints the same index for an `AGENTS.md` or `CLAUDE.md` file.
 
 Everything is stored locally. There is exactly one outbound network call in the whole system: downloading the embedding model from Hugging Face on first start. After that, nothing leaves the machine. The server never fetches URLs; the agent fetches and passes the text.
@@ -99,7 +101,7 @@ Running the binary with no arguments starts the MCP server on stdio. From the te
 - `memo-mcp facts ls [--ns --as-of YYYY-MM-DD --history]` — list facts, or what was believed on a date
 - `memo-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user` — the human channel for trust; every change is audited
 - `memo-mcp explore <name> [--ns --hops 1|2 --as-of --json]` — walk the graph index from one entity: its passages and the entities mentioned alongside it, with evidence addresses
-- `memo-mcp graph merges [--state open|merged|rejected|all] | merge <id> | reject <id>` — the review queue of near-duplicate entity names; nothing is merged without a human decision
+- `memo-mcp graph merges [--state open|merged|rejected|all] | merge <id> | reject <id> | rebuild [--ns]` — the review queue of near-duplicate entity names (nothing is merged without a human decision); `rebuild` re-extracts mentions for files written before the graph layer or after an extraction change
 - `memo-mcp compact [--ns --kinds page,stale,conflict,merge,duplicate --lint --json]` — propose compaction work; `--executor ollama [--apply]` writes the page items with a local model (`MEMO_OLLAMA_URL`, `MEMO_OLLAMA_MODEL`; dry run unless `--apply`)
 - `memo-mcp submit <item-id> [--content-file page.md | --keep <memo://fact/..> | --accept|--reject | --skip] [--reason ..] [--dry-run]` — the human side of a work item
 - `memo-mcp lint [--ns]` — contradictions, orphan entities, missing or stale pages, expired facts; changes nothing
@@ -108,9 +110,11 @@ Running the binary with no arguments starts the MCP server on stdio. From the te
 - `memo-mcp ls [--ns --kind --since --json]` — list live documents, newest first
 - `memo-mcp export --md <dir> [--ns]` — write markdown files with front-matter provenance (opens in Obsidian; re-importing yields no new revisions)
 - `memo-mcp export --index [--ns --library x@v --max-bytes 8192]` — print a compact index (title, address, kind, version, trust per document; facts summarised) sized for `AGENTS.md`/`CLAUDE.md`; lines that do not fit are counted in a footer
+- `memo-mcp migrate` — bring a file written by an older binary to the current schema (read-only commands such as `status`, `ui` and `search` refuse an out-of-date file and say this)
 - `memo-mcp verify [--repair]` — check chunks, vectors and indexes
 - `memo-mcp backfill` — embed chunks whose vectors are pending
 - `memo-mcp status` — print knowledge-base statistics (read-only; never creates a file)
+- `memo-mcp ui [--addr 127.0.0.1:0 --no-model]` — the read-only web face: search with the explain table, documents and passages with provenance and history, the facts timeline, entity neighbourhoods, pages with their sources, status, lint, the query log and the eval report. Loopback only unless `--allow-remote`; no mutating route exists
 
 The lab:
 
@@ -150,6 +154,7 @@ memo-mcp exists as something different: a small, fully local, fully readable ret
 - [`docs/eval/`](docs/eval/): one measured report per tag.
 - [`articles/`](articles/): one article per phase, written for beginners: [why rebuild instead of migrate](articles/why-rebuild-instead-of-migrate.md), [designing the knowledge schema](articles/designing-the-knowledge-schema.md), [search that explains itself](articles/search-that-explains-itself.md), [the embedder is the biggest lever](articles/the-embedder-is-the-biggest-lever.md), [provenance, trust and time](articles/provenance-trust-and-time.md), [designing tools for agents](articles/designing-tools-for-agents.md), [shipping a pure-Go MCP server](articles/shipping-a-pure-go-mcp-server.md), [graph as an index, not an oracle](articles/graph-as-an-index-not-an-oracle.md).
 - [`articles/compaction-without-a-server-llm.md`](articles/compaction-without-a-server-llm.md): how the agent writes the wiki and the server keeps it honest.
+- [`articles/a-knowledge-base-you-can-read.md`](articles/a-knowledge-base-you-can-read.md): the read-only web face and why its numbers are the agent's numbers.
 - [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Privacy

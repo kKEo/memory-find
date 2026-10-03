@@ -561,10 +561,29 @@ The server never writes a page. It proposes, stores, checks and marks stale.
 
 ---
 
+# A Knowledge Base You Can Read
+
+`memo-mcp ui` → `http://127.0.0.1:PORT` · read-only · no JavaScript
+
+<v-clicks>
+
+- **Search** with the explain table: per-arm rank, raw score, contribution, matched terms; the trace underneath.
+- **Documents and passages** with provenance, neighbours and the revision chain.
+- **Facts** as a timeline: live, superseded, `as_of` any date.
+- **Entities** with what is mentioned alongside them; **pages** with the passages they cite and their stale flag.
+- **Status, lint, the query log, the eval report.**
+- The test that matters: the numbers on the page **equal the service's** for the same query. One ranking, three faces.
+- Loopback only, GET only, Host header checked. A web server is where mistakes happen, so it came last.
+
+</v-clicks>
+
+---
+
 # Design Decisions & Tradeoffs
 
 | Decision | Why | The tradeoff |
 |----------|-----|--------------|
+| **One explain contract, three faces (CLI, MCP, UI)** | A human and an agent argue about the same numbers | The UI cannot show anything the service does not compute |
 | **The client LLM writes pages, the server checks them** | No model in the server, no network, every page attributable | Page quality is the agent's; the server can only flag omissions and unsupported sentences |
 | **Mention edges first, typed edges optional** | Most multi-hop gain at zero model cost | No "X depends on Y" answers without client-supplied relations |
 | **In-memory graph per namespace, no recursive CTEs** | 10 ms to build, single-digit ms to walk | Rebuilt when the namespace changes |

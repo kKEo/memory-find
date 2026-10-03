@@ -1,0 +1,12 @@
+{{template "head" .}}<h1>Status</h1>{{with .Data}}
+<table><tr><th>file</th><td><code>{{.Status.Path}}</code> · {{f3 .Status.SizeMB}} MB · schema v{{.Status.SchemaVersion}}</td></tr>
+<tr><th>documents</th><td>{{.Status.LiveDocuments}} live, {{.Status.Revisions}} revisions, {{.Status.Sources}} sources</td></tr>
+<tr><th>passages / facts</th><td>{{.Status.Chunks}} / {{.Status.Facts}}</td></tr>
+<tr><th>graph</th><td>{{.Status.Graph.Entities}} entities · {{.Status.Graph.Mentions}} mentions · {{.Status.Graph.Edges}} typed edges · {{.Status.Graph.OpenMergeReview}} open merge candidates</td></tr>
+<tr><th>pages</th><td>{{.Status.Pages.Pages}} ({{.Status.Pages.StalePages}} stale) · {{.Status.Pages.OpenWorkItems}} open work items</td></tr>
+<tr><th>embedding model</th><td>{{.Status.DefaultModel}}{{range $m, $n := .Status.PendingEmbeddings}} · {{$m}}: {{$n}} pending{{end}}</td></tr>
+<tr><th>jobs</th><td>{{.Status.JobsQueued}} queued · {{.Status.JobsFailed}} failed</td></tr>
+<tr><th>last write</th><td>{{dt .Status.LastWrite}}</td></tr></table>
+{{if .Models}}<h2>Installed models</h2><table><tr><th>id</th><th>name</th><th class="num">dim</th><th>licence</th><th></th></tr>{{range .Models}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td class="num">{{.Dim}}</td><td>{{.Licence}}</td><td>{{if .IsDefault}}<span class="ok">default</span>{{end}}</td></tr>{{end}}</table>{{end}}
+<h2>Ranking profiles</h2>{{range .Profiles}}<details><summary>{{.Name}}</summary><pre>{{call $.Data.Describe .}}</pre></details>{{end}}
+{{end}}{{template "foot" .}}

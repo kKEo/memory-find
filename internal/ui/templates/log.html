@@ -1,0 +1,4 @@
+{{template "head" .}}<h1>Query log</h1><p class="muted">Opt-in (<code>MEMO_QUERY_LOG=1</code>); never stores passage text. Newest first.</p>
+<table><tr><th>when</th><th>queries</th><th>mode</th><th>profile</th><th class="num">results</th><th class="num">ms</th></tr>
+{{range .Data}}<tr><td>{{dt .At}}</td><td>{{.Queries}}</td><td>{{.Mode}}</td><td class="muted">{{.Profile}}</td><td class="num">{{.NResults}}</td><td class="num">{{.LatencyMs}}</td></tr>{{end}}</table>
+{{if not .Data}}<p class="muted">The log is empty or disabled.</p>{{end}}{{template "foot" .}}

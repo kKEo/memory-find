@@ -1,0 +1,5 @@
+{{template "head" .}}{{with .Data}}<h1>{{.Title}} <span class="badge">derived</span>{{if .Stale}} <span class="badge stale">stale</span>{{end}}</h1>
+<p class="muted">{{.Kind}} page · {{.Namespace}} · trust <span class="badge">{{.Trust}}</span> · written by {{.Actor}} · built {{dt .BuiltAt}} rev {{.BuiltFromRev}} · <code>{{.URI}}</code>{{if .SubjectID}} · <a href="/entity/{{.SubjectID}}">entity</a>{{end}}</p>
+{{if .Stale}}<p class="warn">Stale: {{.StaleReason}}. Read the cited passages for the current text.</p>{{end}}
+<pre>{{.Content}}</pre>
+<h2>Built from</h2><ul>{{range .Sources}}<li><a href="{{href .}}">{{.}}</a></li>{{end}}</ul>{{end}}{{template "foot" .}}
