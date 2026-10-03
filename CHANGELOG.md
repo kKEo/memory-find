@@ -9,7 +9,7 @@ All notable changes. Tags follow semantic versioning; each tag has an eval repor
   (quick start, everyday use, trust, privacy, use cases) and an operator guide (install,
   configuration reference, tuning, lifecycle, metric catalogue, Prometheus rules and alerts,
   backup, troubleshooting). Built with mdBook (`make docs`, `make docs-serve`) and deployed to
-  GitHub Pages by `.github/workflows/docs.yml`.
+  GitHub Pages from `master` by `.github/workflows/docs.yml`.
 - `scripts/docs-check.sh`: fails when a `MEMO_*` variable, a command or a metric in the code is
   missing from the operator guide, or a guide link is broken.
 - CI: the Windows test job is disabled for now; release archives for Windows are still built.
