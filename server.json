@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.kKEo/memory-find",
-  "description": "Local, explainable knowledge base for agents: hybrid search with provenance, trust and time, in one Go binary over SQLite.",
+  "description": "Local, explainable knowledge base for AI agents: hybrid search with provenance over SQLite.",
   "repository": {
     "url": "https://github.com/kKEo/memory-find",
     "source": "github"
