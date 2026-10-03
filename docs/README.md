@@ -6,6 +6,8 @@ What is current, what is history, and where to start. Dates are the last substan
 
 | Document | What it is | Updated |
 |---|---|---|
+| [`guide/user/`](guide/user/README.md) | The user guide: business value, quick start, everyday use, trust, privacy. Plain English. | 2026-10-03 |
+| [`guide/operator/`](guide/operator/README.md) | The operator guide: architecture overview, install, configuration reference, tuning, lifecycle, monitoring, operations. GitBook-compatible; built with mdBook (`make docs`). | 2026-10-03 |
 | [`roadmap.md`](roadmap.md) | The plan: ten phases from "reset the map" to an explainable local knowledge base, with decisions, spikes, verification and a glossary. Start here. | 2026-10-02 |
 | [`knowledge-base-sota.md`](knowledge-base-sota.md) | The research behind the roadmap: agent memory systems, graph RAG, retrieval, MCP, security, with the decision drivers (D-A … D-O) the roadmap cites. Long and technical; the roadmap's glossary defines its terms. | 2026-10-02 (links) |
 | [`architecture.md`](architecture.md) | The 1.0 contract: layers, the write and read paths, every formula and default, the explain field reference, the address scheme, the export front matter. | 2026-10-02 |
