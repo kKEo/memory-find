@@ -26,6 +26,11 @@ Both must agree on `MEMO_HOME` and `MEMO_KB` to see the same file.
 | `MEMO_LOG_FORMAT` | `text` | `text` or `json`. Logs always go to **stderr** |
 | `MEMO_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. Unknown values fall back to the default with one warning |
 | `MEMO_HTTP_ADDR` | empty (stdio) | Same as `serve --http`: serve MCP over HTTP at `http://<addr>/mcp` and the live web UI at `http://<addr>/`. Loopback addresses only, unless `serve --allow-remote` |
+| `MEMO_HTTP_AUTH` | `token` when remote or behind a proxy, else `none` | Same as `serve --auth`. `none` is refused on an exposed address unless mTLS is on |
+| `MEMO_HTTP_TOKEN_FILE` | `<MEMO_HOME>/http-token` | Bearer token file for `serve --http`. Created with mode 0600 when missing; refused if other users can read it |
+| `MEMO_TLS_CERT` / `MEMO_TLS_KEY` | empty | Same as `serve --tls-cert` / `--tls-key`: PEM certificate (chain) and key; the server speaks HTTPS |
+| `MEMO_TLS_CLIENT_CA` | empty | Same as `serve --tls-client-ca`: require client certificates signed by this PEM CA (mTLS) |
+| `MEMO_PUBLIC_URL` | empty | Same as `serve --public-url`: the URL clients use. Required when remote or behind a proxy |
 | `MEMO_METRICS_ADDR` | empty (off) | Same as `serve --metrics-addr`: serve Prometheus metrics at `http://<addr>/metrics`. Loopback addresses only |
 | `MEMO_QUERY_LOG` | unset | `1` records every search in `query_log` and every tool call in `call_log`, in the same file. See [Call and query logs](../monitoring/call-log.md) |
 

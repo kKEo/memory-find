@@ -25,6 +25,13 @@ All notable changes. Tags follow semantic versioning; each tag has an eval repor
   this mode the UI gains a **Live** page: active clients, calls in flight (an ingest links to
   its run), background backfill/reindex state, and per-tool calls, errors and p50/p95 latency
   plus ingest throughput since start. `/ingest` also lists ingest calls still in flight.
+- `serve --http` authentication: a bearer token (`<MEMO_HOME>/http-token`, 0600, printed by the
+  new `memo-mcp http-token [--rotate]`) protects `/mcp`, the UI and `/metrics`, and is on by
+  default whenever the server is reachable from elsewhere. Browsers log in with a single-use
+  link printed at startup (or by pasting the token) and get an HttpOnly, SameSite=Strict
+  session cookie. HTTPS with `--tls-cert`/`--tls-key`, optional mTLS with `--tls-client-ca`,
+  `--behind-proxy` for a TLS-terminating proxy, and `--public-url`. Plain HTTP on a
+  non-loopback address and unauthenticated exposure are refused.
 - Fix MCP registry publishing: `server.json` no longer sets `registryBaseUrl` on the MCPB package.
 
 ## [1.4.0] — 2026-10-03 — measuring the server itself (P10)

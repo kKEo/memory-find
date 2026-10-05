@@ -38,8 +38,54 @@ background backfill, and tool and ingest latency since start. The standalone `me
 reads the knowledge-base file alone and has no Live page.
 
 Start the server yourself (a terminal, `launchd` or a `systemd --user` unit). Clients do not
-start it, and its logs go to its own stderr. The address is loopback-only unless you pass
-`--allow-remote`. There is no authentication, so only do that on a trusted network.
+start it, and its logs go to its own stderr.
+
+### Authentication
+
+One shared secret, the **bearer token**, protects `/mcp`, the UI and `/metrics`. It lives in
+`<MEMO_HOME>/http-token` (mode 0600, created on first use); `memo-mcp http-token` prints it.
+
+| Setup | Auth by default | Notes |
+|---|---|---|
+| `--http 127.0.0.1:PORT` | none | Only your machine can connect. Add `--auth token` to keep other OS users on a shared machine out |
+| `--behind-proxy` | token | A reverse proxy (Caddy, nginx) terminates TLS and forwards to a loopback `--http`. Needs `--public-url` |
+| `--allow-remote` on a non-loopback address | token | Needs TLS (`--tls-cert`/`--tls-key`) and `--public-url`. Plain HTTP is refused |
+| `--tls-client-ca` (mTLS) | token, or `--auth none` | Clients must present a certificate signed by that CA; the token is optional on top |
+
+The server refuses any setup that would expose the knowledge base without authentication or
+send the token unencrypted over the network.
+
+**Claude Code** sends the token as a header:
+
+```bash
+claude mcp add --transport http memo https://box.example:8765/mcp \
+  --header "Authorization: Bearer $(memo-mcp http-token)"
+```
+
+`$(memo-mcp http-token)` is expanded once, when you run the command, and the token is stored in
+Claude Code's configuration. After `memo-mcp http-token --rotate`, restart the server and run
+`claude mcp remove memo` and the `add` line again.
+
+**Prometheus** uses the same header (`authorization: { credentials_file: … }` in the scrape
+config).
+
+**Browsers** cannot send the header. The server prints a **login link** at startup,
+`…/login?code=…`, that works once, within 15 minutes. Opening it sets a session cookie
+(HttpOnly, SameSite=Strict, Secure over HTTPS, 30 days). Without the link, `/login` asks for
+the token. `/logout` ends the session. Rotating the token logs every browser out. The
+link appears in the server's log, so treat that log as sensitive while the link is valid.
+
+A full remote example with a certificate:
+
+```bash
+memo-mcp serve --http 0.0.0.0:8765 --allow-remote \
+  --tls-cert /etc/memo/cert.pem --tls-key /etc/memo/key.pem \
+  --public-url https://box.example:8765
+```
+
+mTLS needs a client certificate in every client. Browsers and Prometheus support that.
+Check your MCP client's documentation before relying on mTLS alone; with the token on as
+well (the default), a client that cannot present a certificate cannot connect at all.
 
 ## Claude Desktop
 

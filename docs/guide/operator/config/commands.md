@@ -13,7 +13,8 @@ the summary. Flags may come before or after positional arguments.
 
 | Command | Opens | Purpose and flags |
 |---|---|---|
-| `memo-mcp serve` | rw | MCP server on stdio. `--metrics-addr 127.0.0.1:PORT` exposes `/metrics` on loopback (default `$MEMO_METRICS_ADDR`, off when empty). Starts a background backfill and reindex for the current model. `--http 127.0.0.1:PORT` (default `$MEMO_HTTP_ADDR`) serves MCP over HTTP at `/mcp` instead of stdio, with the web UI and its live pages at `/` and metrics at `/metrics`, all on one port. `--allow-remote` permits a non-loopback `--http` address (there is no authentication) |
+| `memo-mcp serve` | rw | MCP server on stdio. `--metrics-addr 127.0.0.1:PORT` exposes `/metrics` on loopback (default `$MEMO_METRICS_ADDR`, off when empty). Starts a background backfill and reindex for the current model. `--http 127.0.0.1:PORT` (default `$MEMO_HTTP_ADDR`) serves MCP over HTTP at `/mcp` instead of stdio, with the web UI and its live pages at `/` and metrics at `/metrics`, all on one port. `--allow-remote` permits a non-loopback `--http` address; it then also needs TLS (`--tls-cert`/`--tls-key`, or `--behind-proxy`), `--public-url`, and authentication. `--auth token\|none` (default `token` when remote or behind a proxy), `--token-file`, `--tls-client-ca` for mTLS. See [Connecting MCP clients](../install/clients.md#one-shared-server-over-http) |
+| `memo-mcp http-token` | rw | Prints the bearer token for `serve --http`, creating `<MEMO_HOME>/http-token` (0600) when missing. `--rotate` replaces it; restart the server afterwards. `--file` picks another path |
 | `memo-mcp ui` | ro | Read-only web UI. `--addr` (default `127.0.0.1:0`, a random port; the URL is printed), `--allow-remote` permits a non-loopback address, `--no-model` gives keyword-only search |
 
 ## Writing

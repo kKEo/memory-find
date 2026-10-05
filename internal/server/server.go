@@ -231,14 +231,23 @@ func (s *Server) Run(ctx context.Context) error {
 	return s.mcp.Run(ctx, &mcp.StdioTransport{})
 }
 
+// HTTPOptions tunes HTTPHandler.
+type HTTPOptions struct {
+	// BehindProxy: a reverse proxy on this machine forwards requests to
+	// loopback with the public Host header, which the SDK's DNS-rebinding
+	// check would refuse. Only set it when requests are authenticated.
+	BehindProxy bool
+}
+
 // HTTPHandler serves MCP over streamable HTTP (one long-running server for
 // any number of clients). The SDK rejects a localhost request with a
 // foreign Host header (DNS rebinding); cross-origin browser requests are
-// refused as well.
-func (s *Server) HTTPHandler() http.Handler {
+// refused as well. Authentication wraps this handler (internal/httpauth).
+func (s *Server) HTTPHandler(o HTTPOptions) http.Handler {
 	h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s.mcp }, &mcp.StreamableHTTPOptions{
-		SessionTimeout: 30 * time.Minute,
-		Logger:         slog.New(obs.MinLevel(s.logger.With("component", "mcp-http").Handler(), slog.LevelWarn)),
+		SessionTimeout:             30 * time.Minute,
+		Logger:                     slog.New(obs.MinLevel(s.logger.With("component", "mcp-http").Handler(), slog.LevelWarn)),
+		DisableLocalhostProtection: o.BehindProxy,
 	})
 	return http.NewCrossOriginProtection().Handler(h)
 }
