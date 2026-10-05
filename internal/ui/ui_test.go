@@ -3,18 +3,22 @@ package ui
 import (
 	"context"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
 
 	"github.com/kKEo/memory-find/internal/embedding"
 	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/live"
+	"github.com/kKEo/memory-find/internal/obs"
 	"github.com/kKEo/memory-find/internal/retrieve"
 )
 
@@ -175,5 +179,103 @@ func TestMetricsRoute(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("POST /metrics: %d", rec.Code)
+	}
+}
+
+func TestIngestConsole(t *testing.T) {
+	s, store, _ := newUI(t)
+	h := s.Handler()
+	ctx := context.Background()
+
+	code, body := get(t, h, "/ingest", "")
+	if code != 200 || !strings.Contains(body, "No ingests recorded") || strings.Contains(body, `http-equiv="refresh"`) {
+		t.Fatalf("empty console: %d\n%s", code, body)
+	}
+
+	id, err := store.StartIngestRun(ctx, kb.IngestRunInput{Channel: kb.ChannelCLI, Actor: "cli", Namespace: "widgets", Total: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordIngestItem(ctx, id, kb.IngestItem{Name: "a.md", URI: "memo://doc/x", Outcome: kb.OutcomeNew, Revision: 1, Chunks: 3, Embedded: 3, Bytes: 2048, Ms: 12}); err != nil {
+		t.Fatal(err)
+	}
+	code, body = get(t, h, "/ingest", "")
+	if code != 200 || !strings.Contains(body, `http-equiv="refresh"`) || !strings.Contains(body, `<span class="badge running">running</span>`) || !strings.Contains(body, "1/2") || !strings.Contains(body, "2.0 KB") {
+		t.Fatalf("running console: %d\n%s", code, body)
+	}
+	if _, body = get(t, h, "/ingest?refresh=off", ""); strings.Contains(body, `http-equiv="refresh"`) {
+		t.Error("refresh=off still refreshes")
+	}
+	code, body = get(t, h, "/ingest/"+id, "")
+	if code != 200 || !strings.Contains(body, "a.md") || !strings.Contains(body, "memo://doc/x") || !strings.Contains(body, `http-equiv="refresh"`) {
+		t.Fatalf("run page: %d\n%s", code, body)
+	}
+
+	if err := store.FinishIngestRun(ctx, id, nil); err != nil {
+		t.Fatal(err)
+	}
+	code, body = get(t, h, "/ingest", "")
+	if code != 200 || strings.Contains(body, `http-equiv="refresh"`) || !strings.Contains(body, `<span class="badge done">done</span>`) {
+		t.Fatalf("finished console: %d\n%s", code, body)
+	}
+	if code, body = get(t, h, "/status", ""); code != 200 || !strings.Contains(body, "Recent ingests") {
+		t.Errorf("status lacks recent ingests: %d", code)
+	}
+	if code, _ = get(t, h, "/ingest/missing", ""); code != 404 {
+		t.Errorf("unknown run: %d, want 404", code)
+	}
+}
+
+type fakeLive struct{ snap live.Snapshot }
+
+func (f fakeLive) Live() live.Snapshot { return f.snap }
+
+func TestLivePage(t *testing.T) {
+	_, store, svc := newUI(t)
+	now := time.Now()
+	reg := obs.NewRegistry()
+	reg.Counter("memo_mcp_tool_calls_total", "", "tool", "outcome").With("search", "ok").Add(3)
+	reg.Counter("memo_mcp_tool_calls_total", "", "tool", "outcome").With("search", "tool_error").Inc()
+	reg.Histogram("memo_mcp_tool_call_duration_seconds", "", obs.LatencyBuckets, "tool").With("search").Observe(0.004)
+	reg.Counter("memo_store_ingests_total", "", "outcome").With("new").Add(2)
+	src := fakeLive{live.Snapshot{Version: "v1", KBPath: "/kb/x.db", Model: "hash", Started: now.Add(-time.Hour), Background: "idle",
+		Sessions: []live.Session{{ID: "abcdef123456789", Client: "claude-code", Since: now.Add(-time.Minute), Calls: 4, LastCall: now}},
+		InFlight: []live.Call{{Tool: "ingest", Client: "claude-code", Started: now.Add(-2 * time.Second), Namespace: "web", RunID: "run-42"}}}}
+	h := New(store, svc, "test", WithLive(src), WithRegistry(reg)).Handler()
+
+	code, body := get(t, h, "/live", "")
+	if code != 200 {
+		t.Fatalf("/live: %d\n%s", code, body)
+	}
+	for _, want := range []string{"claude-code", "/kb/x.db", `href="/ingest/run-42"`, `<td>search</td><td class="num">4</td>`, `<span class="warn">1</span>`, `http-equiv="refresh"`, `href="/live">Live</a>`, "up 1h0m0s"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("/live lacks %q", want)
+		}
+	}
+	if _, body = get(t, h, "/ingest", ""); !strings.Contains(body, "In flight on this server") || !strings.Contains(body, `http-equiv="refresh"`) {
+		t.Error("/ingest lacks the in-flight banner")
+	}
+
+	plain := New(store, svc, "test").Handler()
+	if code, _ = get(t, plain, "/live", ""); code != 404 {
+		t.Errorf("standalone /live: %d, want 404", code)
+	}
+	if _, body = get(t, plain, "/status", ""); !strings.Contains(body, "serve --http") || strings.Contains(body, `href="/live"`) {
+		t.Error("standalone status should point at serve --http and hide Live")
+	}
+}
+
+func TestQuantile(t *testing.T) {
+	b := []obs.Bucket{{Le: 0.01, Count: 50}, {Le: 0.1, Count: 90}, {Le: 1, Count: 100}, {Le: math.Inf(1), Count: 100}}
+	for q, want := range map[float64]float64{0.5: 0.01, 0.25: 0.005, 0.7: 0.055, 0.95: 0.55} {
+		if got := quantile(b, q); math.Abs(got-want) > 1e-9 {
+			t.Errorf("q%.2f = %v, want %v", q, got, want)
+		}
+	}
+	if !math.IsNaN(quantile([]obs.Bucket{{Le: math.Inf(1)}}, 0.5)) {
+		t.Error("empty histogram should be NaN")
+	}
+	if got := quantile([]obs.Bucket{{Le: 1, Count: 1}, {Le: math.Inf(1), Count: 10}}, 0.9); got != 1 {
+		t.Errorf("rank in +Inf = %v, want last finite bound", got)
 	}
 }

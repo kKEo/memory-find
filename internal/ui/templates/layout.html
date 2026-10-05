@@ -1,8 +1,8 @@
 {{define "head"}}<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{.Title}} · memo-mcp</title><link rel="stylesheet" href="/style.css"></head><body>
-<header><a class="brand" href="/">memo-mcp</a><span class="version">{{.Version}} · read-only</span>
-<a href="/search">Search</a><a href="/facts">Facts</a><a href="/pages">Pages</a><a href="/lint">Lint</a><a href="/status">Status</a><a href="/log">Log</a><a href="/eval">Eval</a>
+{{if .Refresh}}<meta http-equiv="refresh" content="{{.Refresh}}">{{end}}<title>{{.Title}} · memo-mcp</title><link rel="stylesheet" href="/style.css"></head><body>
+<header><a class="brand" href="/">memo-mcp</a><span class="version">{{.Version}} · {{if .Live}}<span class="ok">live</span> · up {{.Uptime}}{{else}}read-only{{end}}</span>
+<a href="/search">Search</a><a href="/facts">Facts</a><a href="/pages">Pages</a><a href="/lint">Lint</a><a href="/status">Status</a>{{if .Live}}<a href="/live">Live</a>{{end}}<a href="/ingest">Ingest</a><a href="/log">Log</a><a href="/eval">Eval</a>
 <form action="/search" method="get"><input type="search" name="q" placeholder="search the knowledge base" value="{{.Query}}"><button>Go</button></form></header><main>{{end}}
 {{define "foot"}}</main><footer>Every number here is the one the agent saw: the same store, the same ranking service, the same explain structs. Nothing on these pages can change the knowledge base.</footer></body></html>{{end}}
 {{define "prov"}}<span class="muted">{{.Namespace}}/{{.Kind}}</span> · trust <span class="badge">{{.Trust}}</span> · origin {{.Origin}}{{if .Version}} · {{.Version}}{{end}}{{if .Library}} · {{.Library}}{{end}}{{if .SourceURI}} · <a href="{{.SourceURI}}" rel="noreferrer">source</a>{{end}}{{end}}

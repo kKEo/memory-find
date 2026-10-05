@@ -64,6 +64,35 @@ path to the program; `~` does not work here.
 
 Then quit Claude Desktop completely and open it again.
 
+### Optional: one shared server for all your Claude Code sessions
+
+With the setup above, every Claude Code session starts its own copy of memo-mcp in the
+background. Alternatively, you can run **one** memo-mcp yourself and let every session connect to
+it over a local web address. Pick this if you want the **Live** page in the browser view,
+which shows which sessions are connected and what they are doing right now.
+
+1. In a terminal, start the server and leave the terminal open:
+
+   ```bash
+   MEMO_KB=my-project ~/bin/memo-mcp serve --http 127.0.0.1:8765
+   ```
+
+2. Connect Claude Code to it, once:
+
+   ```bash
+   claude mcp add --transport http memo http://127.0.0.1:8765/mcp
+   ```
+
+   If you already added `memo` with the command above, remove it first with
+   `claude mcp remove memo`, or give this one another name.
+
+3. Open `http://127.0.0.1:8765/` in your browser to see your memory, including the **Live**
+   page.
+
+Claude can use the memory only while that terminal is running. If you close it, Claude
+reports that memo is not connected; start it again and run `/mcp` in Claude Code to
+reconnect. The address works only on your own computer.
+
 ## Step 3: Check that Claude sees it
 
 Start a new conversation and ask:

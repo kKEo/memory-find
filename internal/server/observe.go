@@ -55,6 +55,7 @@ type callInfo struct {
 	err      error
 	class    string
 	nResults int
+	liveID   uint64
 }
 
 type callInfoKey struct{}
@@ -73,7 +74,8 @@ func (s *Server) observe(next mcp.MethodHandler) mcp.MethodHandler {
 		var info *callInfo
 		if method == "tools/call" {
 			if p, ok := req.GetParams().(*mcp.CallToolParamsRaw); ok {
-				info = &callInfo{tool: p.Name}
+				info = &callInfo{tool: p.Name, liveID: s.live.begin(req, p.Name)}
+				defer s.live.end(info.liveID)
 				ctx = context.WithValue(ctx, callInfoKey{}, info)
 			}
 		}
@@ -88,6 +90,7 @@ func (s *Server) observe(next mcp.MethodHandler) mcp.MethodHandler {
 			// Old protocol: initialize; 2026-07-28: discover, with the client
 			// identity in request metadata that the session has validated.
 			s.m.sessions.With(sessionClient(req)).Inc()
+			s.live.connected(req)
 		case "resources/read":
 			kind := "unknown"
 			if p, ok := req.GetParams().(*mcp.ReadResourceParams); ok {

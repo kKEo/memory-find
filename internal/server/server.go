@@ -5,11 +5,13 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -36,6 +38,9 @@ type Server struct {
 	registry *obs.Registry
 	callLog  bool
 	m        *mcpMetrics
+	version  string
+	kbPath   string
+	live     *tracker
 }
 
 // Option configures New.
@@ -47,12 +52,15 @@ func WithLogger(l *slog.Logger) Option { return func(s *Server) { s.logger = l }
 // WithRegistry sets the metrics registry (default: obs.Default()).
 func WithRegistry(r *obs.Registry) Option { return func(s *Server) { s.registry = r } }
 
+// WithKBPath names the knowledge-base file on the live page.
+func WithKBPath(p string) Option { return func(s *Server) { s.kbPath = p } }
+
 // WithCallLog turns on per-tool-call rows in the knowledge base's opt-in log.
 func WithCallLog(on bool) Option { return func(s *Server) { s.callLog = on } }
 
 // New builds the MCP server. version is the build's git tag.
 func New(store *kb.Store, search *retrieve.Service, version string, opts ...Option) *Server {
-	srv := &Server{store: store, search: search, actor: "mcp"}
+	srv := &Server{store: store, search: search, actor: "mcp", version: version, live: newTracker(time.Now())}
 	for _, o := range opts {
 		o(srv)
 	}
@@ -221,6 +229,18 @@ func renderProvHeader(prov kb.Provenance) string {
 // Run serves on stdio until ctx is cancelled or the client disconnects.
 func (s *Server) Run(ctx context.Context) error {
 	return s.mcp.Run(ctx, &mcp.StdioTransport{})
+}
+
+// HTTPHandler serves MCP over streamable HTTP (one long-running server for
+// any number of clients). The SDK rejects a localhost request with a
+// foreign Host header (DNS rebinding); cross-origin browser requests are
+// refused as well.
+func (s *Server) HTTPHandler() http.Handler {
+	h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s.mcp }, &mcp.StreamableHTTPOptions{
+		SessionTimeout: 30 * time.Minute,
+		Logger:         slog.New(obs.MinLevel(s.logger.With("component", "mcp-http").Handler(), slog.LevelWarn)),
+	})
+	return http.NewCrossOriginProtection().Handler(h)
 }
 
 func boolPtr(b bool) *bool { return &b }
@@ -554,13 +574,18 @@ func (s *Server) handleIngest(ctx context.Context, req *mcp.CallToolRequest, arg
 		}
 		docID = id
 	}
+	actor := clientName(req, s.actor)
+	run := s.startIngestRun(ctx, kb.IngestRunInput{Channel: kb.ChannelTool, Actor: actor, Namespace: ns, Total: 1})
+	s.live.annotate(ctx, ns, run)
+	start := time.Now()
 	res, err := s.store.Ingest(ctx, kb.IngestInput{
 		Namespace: ns, Content: args.Content, Context: args.Context, DocumentID: docID,
 		Source:  kb.SourceInput{URI: args.Source.URI, Title: title, Kind: kind, Library: args.Source.Library, Version: args.Source.Version, Origin: origin, Tags: args.Source.Tags},
 		Trust:   kb.TrustAgent, // tool writes are capped at agent (docs/schema.md §7)
-		Actor:   clientName(req, s.actor),
+		Actor:   actor,
 		Channel: kb.ChannelTool,
 	})
+	s.finishIngestRun(ctx, run, kb.IngestItemFor(cmp.Or(title, args.Source.URI), len(args.Content), time.Since(start), res, err), err)
 	if err != nil {
 		return nil, IngestOut{}, err
 	}
@@ -572,6 +597,29 @@ func (s *Server) handleIngest(ctx context.Context, req *mcp.CallToolRequest, arg
 		text += fmt.Sprintf(", %d pending (keyword search works for them now; vectors follow)", out.Pending)
 	}
 	return textResult(text), out, nil
+}
+
+// startIngestRun opens a console run for the web UI. Tracking is best
+// effort: a failure is logged and never changes the ingest result.
+func (s *Server) startIngestRun(ctx context.Context, in kb.IngestRunInput) string {
+	id, err := s.store.StartIngestRun(ctx, in)
+	if err != nil {
+		s.logger.Warn("ingest run tracking", "err", err)
+	}
+	return id
+}
+
+// finishIngestRun records the single item of a tool ingest and closes the run.
+func (s *Server) finishIngestRun(ctx context.Context, runID string, it kb.IngestItem, ingestErr error) {
+	if runID == "" {
+		return
+	}
+	if err := s.store.RecordIngestItem(ctx, runID, it); err != nil {
+		s.logger.Warn("ingest run tracking", "err", err)
+	}
+	if err := s.store.FinishIngestRun(ctx, runID, ingestErr); err != nil {
+		s.logger.Warn("ingest run tracking", "err", err)
+	}
 }
 
 func (s *Server) handleSearch(ctx context.Context, _ *mcp.CallToolRequest, args searchArgs) (*mcp.CallToolResult, SearchOut, error) {

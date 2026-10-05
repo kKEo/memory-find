@@ -145,6 +145,27 @@ func runIngest(ctx context.Context, args []string, stdout, stderr io.Writer) err
 		return errors.New("nothing to ingest (no .md files found)")
 	}
 
+	runID, err := store.StartIngestRun(ctx, kb.IngestRunInput{Channel: kb.ChannelCLI, Actor: "cli", Namespace: *ns, Total: len(items)})
+	if err != nil {
+		fmt.Fprintf(stderr, "warning: ingest run not tracked: %v\n", err)
+	}
+	track := func(it kb.IngestItem) {
+		if runID == "" {
+			return
+		}
+		if err := store.RecordIngestItem(ctx, runID, it); err != nil {
+			fmt.Fprintf(stderr, "warning: ingest run not tracked: %v\n", err)
+		}
+	}
+	finish := func(runErr error) error {
+		if runID != "" {
+			if err := store.FinishIngestRun(context.WithoutCancel(ctx), runID, runErr); err != nil {
+				fmt.Fprintf(stderr, "warning: ingest run not tracked: %v\n", err)
+			}
+		}
+		return runErr
+	}
+
 	var written, dedup, pending int
 	for _, it := range items {
 		fm, body := kb.ParseExported(it.content)
@@ -172,9 +193,11 @@ func runIngest(ctx context.Context, args []string, stdout, stderr io.Writer) err
 				in.DocumentID = id
 			}
 		}
+		start := time.Now()
 		res, err := store.Ingest(ctx, in)
+		track(kb.IngestItemFor(it.name, len(body), time.Since(start), res, err))
 		if err != nil {
-			return fmt.Errorf("%s: %w", it.name, err)
+			return finish(fmt.Errorf("%s: %w", it.name, err))
 		}
 		switch {
 		case res.Dedup:
@@ -191,7 +214,7 @@ func runIngest(ctx context.Context, args []string, stdout, stderr io.Writer) err
 		fmt.Fprintf(stdout, ", %d chunk vectors pending (run `memo-mcp backfill`)", pending)
 	}
 	fmt.Fprintln(stdout)
-	return nil
+	return finish(nil)
 }
 
 func runRead(ctx context.Context, args []string, stdout, stderr io.Writer) error {

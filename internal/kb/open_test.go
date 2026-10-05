@@ -28,10 +28,10 @@ func TestOpenCreatesClaimedFileAtVersion1(t *testing.T) {
 		t.Fatalf("application_id = %#x, want %#x", appID, ApplicationID)
 	}
 	v, err := SchemaVersion(context.Background(), db)
-	if err != nil || v != 4 {
-		t.Fatalf("user_version = %d (%v), want 4", v, err)
+	if err != nil || v != 5 {
+		t.Fatalf("user_version = %d (%v), want 5", v, err)
 	}
-	for _, table := range []string{"namespaces", "models", "jobs", "audit", "query_log", "sources", "documents", "chunks", "chunk_vecs", "facts", "fact_vecs", "chunks_fts", "chunks_fts_exact", "facts_fts"} {
+	for _, table := range []string{"namespaces", "models", "jobs", "audit", "query_log", "sources", "documents", "chunks", "chunk_vecs", "facts", "fact_vecs", "chunks_fts", "chunks_fts_exact", "facts_fts", "ingest_runs", "ingest_run_items"} {
 		var n int
 		if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE name = ?`, table).Scan(&n); err != nil || n != 1 {
 			t.Errorf("table %s missing (n=%d err=%v)", table, n, err)

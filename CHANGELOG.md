@@ -13,6 +13,19 @@ All notable changes. Tags follow semantic versioning; each tag has an eval repor
 - `scripts/docs-check.sh`: fails when a `MEMO_*` variable, a command or a metric in the code is
   missing from the operator guide, or a guide link is broken.
 - CI: the Windows test job is disabled for now; release archives for Windows are still built.
+- Web UI ingest console (`/ingest`, `/ingest/{id}`): every `memo-mcp ingest` batch and MCP
+  `ingest` call is recorded as a run with live progress (running / done / failed / stalled) and
+  stats: documents written, unchanged and failed, chunks, embedded and pending vectors, bytes,
+  duration and docs/s, plus one row per document. The page reloads itself while a run is in
+  progress (no JS; the CSP is unchanged). `/status` lists the last five runs. Schema migration 5
+  adds `ingest_runs` and `ingest_run_items`.
+- `memo-mcp serve --http 127.0.0.1:8765` (`MEMO_HTTP_ADDR`): one long-running MCP server over
+  streamable HTTP at `/mcp` for any number of clients (`claude mcp add --transport http`), with
+  the web UI and `/metrics` on the same port. Loopback only unless `--allow-remote`. Only in
+  this mode the UI gains a **Live** page: active clients, calls in flight (an ingest links to
+  its run), background backfill/reindex state, and per-tool calls, errors and p50/p95 latency
+  plus ingest throughput since start. `/ingest` also lists ingest calls still in flight.
+- Fix MCP registry publishing: `server.json` no longer sets `registryBaseUrl` on the MCPB package.
 
 ## [1.4.0] — 2026-10-03 — measuring the server itself (P10)
 

@@ -7,6 +7,9 @@
 - **Claude Desktop:** quit it completely, not just the window, and open it again. Check that
   the path in the settings file is the full path to the program, starting with `/` on a Mac or
   `C:\` on Windows.
+- **Shared server** (`memo-mcp serve --http`): check that the terminal running it is still
+  open and shows no error, then run `/mcp` in Claude Code to reconnect. The address in
+  `claude mcp add` must end in `/mcp` and use the same port the server prints.
 - On a Mac, the program may be blocked the first time. See
   [Quick start](quick-start.md), step 1.
 

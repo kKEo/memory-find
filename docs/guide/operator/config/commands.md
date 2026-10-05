@@ -13,7 +13,7 @@ the summary. Flags may come before or after positional arguments.
 
 | Command | Opens | Purpose and flags |
 |---|---|---|
-| `memo-mcp serve` | rw | MCP server on stdio. `--metrics-addr 127.0.0.1:PORT` exposes `/metrics` on loopback (default `$MEMO_METRICS_ADDR`, off when empty). Starts a background backfill and reindex for the current model |
+| `memo-mcp serve` | rw | MCP server on stdio. `--metrics-addr 127.0.0.1:PORT` exposes `/metrics` on loopback (default `$MEMO_METRICS_ADDR`, off when empty). Starts a background backfill and reindex for the current model. `--http 127.0.0.1:PORT` (default `$MEMO_HTTP_ADDR`) serves MCP over HTTP at `/mcp` instead of stdio, with the web UI and its live pages at `/` and metrics at `/metrics`, all on one port. `--allow-remote` permits a non-loopback `--http` address (there is no authentication) |
 | `memo-mcp ui` | ro | Read-only web UI. `--addr` (default `127.0.0.1:0`, a random port; the URL is printed), `--allow-remote` permits a non-loopback address, `--no-model` gives keyword-only search |
 
 ## Writing
