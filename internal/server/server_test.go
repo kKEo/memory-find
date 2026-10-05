@@ -333,3 +333,24 @@ func TestRememberForgetPromoteRoundTrip(t *testing.T) {
 		t.Fatalf("forgotten fact served: %+v", gone.Results)
 	}
 }
+
+// Each ingest tool call is one single-item run for the web UI console.
+func TestIngestToolRecordsRun(t *testing.T) {
+	cs, store := newTestSession(t)
+	res := callTool(t, cs, "ingest", map[string]any{"content": "# Backoff\n\nRetries back off exponentially.\n", "namespace": "grpc", "source": map[string]any{"title": "Backoff"}})
+	if res.IsError {
+		t.Fatalf("ingest: %s", resultText(res))
+	}
+	runs, err := store.IngestRunsTail(context.Background(), 10)
+	if err != nil || len(runs) != 1 {
+		t.Fatalf("runs = %+v %v", runs, err)
+	}
+	r := runs[0]
+	if r.Channel != kb.ChannelTool || r.Actor != "test-client" || r.State != kb.RunDone || r.Total != 1 || r.Written != 1 || r.Chunks == 0 {
+		t.Errorf("run = %+v", r)
+	}
+	_, items, err := store.IngestRun(context.Background(), r.ID)
+	if err != nil || len(items) != 1 || items[0].Name != "Backoff" || items[0].Outcome != kb.OutcomeNew {
+		t.Errorf("items = %+v %v", items, err)
+	}
+}

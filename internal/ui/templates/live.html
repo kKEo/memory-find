@@ -1,0 +1,29 @@
+{{template "head" .}}<h1>Live</h1><p class="muted">In-memory state of the MCP server hosting this page. Counters cover this process since it started. Refreshing every {{.Refresh}}s{{if .Refresh}} · <a href="/live?refresh=off">stop</a>{{else}} · <a href="/live">resume</a>{{end}}.</p>
+{{with .Data}}<div class="cards">
+<div class="card"><div class="muted">clients active</div><div class="big">{{len .Snap.Sessions}}</div></div>
+<div class="card"><div class="muted">calls in flight</div><div class="big">{{len .Snap.InFlight}}</div></div>
+<div class="card"><div class="muted">documents ingested</div><div class="big">{{.Ingest.New}}</div><div class="muted">{{.Ingest.Revision}} revisions · {{.Ingest.Dedup}} unchanged{{if .Ingest.Error}} · <span class="warn">{{.Ingest.Error}} failed</span>{{end}}</div></div>
+</div>
+<h2>Server</h2>
+<table><tr><th>version</th><td>{{.Snap.Version}}</td></tr>
+<tr><th>started</th><td>{{dt .Snap.Started}} · up {{dur (.Now.Sub .Snap.Started)}}</td></tr>
+<tr><th>knowledge base</th><td><code>{{.Snap.KBPath}}</code></td></tr>
+<tr><th>embedding model</th><td>{{if .Snap.Model}}{{.Snap.Model}}{{else}}<span class="warn">none (keyword only)</span>{{end}}</td></tr>
+<tr><th>background</th><td>{{.Snap.Background}}</td></tr></table>
+<h2>Clients</h2><p class="muted">Connected now, or made a call in the last 30 minutes.</p>
+<table><tr><th>client</th><th>session</th><th>connected</th><th class="num">calls</th><th>last call</th></tr>
+{{range .Snap.Sessions}}<tr><td>{{.Client}}</td><td class="muted"><code>{{short .ID}}</code></td><td>{{dt .Since}} <span class="muted">({{dur ($.Data.Now.Sub .Since)}} ago)</span></td><td class="num">{{.Calls}}</td><td>{{if not .LastCall.IsZero}}{{dur ($.Data.Now.Sub .LastCall)}} ago{{else}}<span class="muted">none yet</span>{{end}}</td></tr>{{end}}</table>
+{{if not .Snap.Sessions}}<p class="muted">No clients active.</p>{{end}}
+<h2>In flight</h2>
+<table><tr><th>tool</th><th>client</th><th class="num">running for</th><th>details</th></tr>
+{{range .Snap.InFlight}}<tr><td>{{.Tool}}</td><td>{{.Client}}</td><td class="num">{{dur ($.Data.Now.Sub .Started)}}</td><td>{{if .RunID}}<a href="/ingest/{{.RunID}}">ingest run</a>{{if .Namespace}} · {{.Namespace}}{{end}}{{end}}</td></tr>{{end}}</table>
+{{if not .Snap.InFlight}}<p class="muted">Nothing running.</p>{{end}}
+<h2>Tool calls since start</h2>
+<table><tr><th>tool</th><th class="num">calls</th><th class="num">errors</th><th class="num">asked a human</th><th class="num">p50 ms</th><th class="num">p95 ms</th></tr>
+{{range .Tools}}<tr><td>{{.Tool}}</td><td class="num">{{.Calls}}</td><td class="num">{{if .Errors}}<span class="warn">{{.Errors}}</span>{{else}}0{{end}}</td><td class="num">{{.InputNeeded}}</td><td class="num">{{qms .P50}}</td><td class="num">{{qms .P95}}</td></tr>{{end}}</table>
+{{if not .Tools}}<p class="muted">No tool calls yet.</p>{{end}}
+<h2>Ingest since start</h2>
+<table><tr><th>documents</th><td>{{.Ingest.New}} new · {{.Ingest.Revision}} revisions · {{.Ingest.Dedup}} unchanged · {{if .Ingest.Error}}<span class="warn">{{.Ingest.Error}} failed</span>{{else}}0 failed{{end}}</td></tr>
+<tr><th>passages</th><td>{{.Ingest.Chunks}} written · {{.Ingest.Vectors}} vectors stored</td></tr>
+<tr><th>latency</th><td>p50 {{qms .Ingest.P50}} ms · p95 {{qms .Ingest.P95}} ms (embedding included)</td></tr></table>
+<p class="muted">Every ingest, including CLI batches and earlier runs: <a href="/ingest">Ingest</a>.</p>{{end}}{{template "foot" .}}

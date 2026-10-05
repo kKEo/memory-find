@@ -304,6 +304,13 @@ trusted than the winner; near-duplicate passages are recorded, never deleted (D-
 |---|---|---|
 | `call_log` | `id`, `ts`, `client`, `method` (`tools/call`), `tool`, `latency_ms`, `ok`, `error_class`, `n_results`, `tokens_out`, `args_summary_json` | One row per MCP tool call, written only when `MEMO_QUERY_LOG=1`. The argument summary is an allowlist per tool (query, scope, addresses, sizes); the content of what was written and the text that came back are never stored. Pruned with `query_log`. |
 
+### 5.9 Bookkeeping added later: `ingest_runs` (migration 5)
+
+| Table | Columns | In plain words |
+|---|---|---|
+| `ingest_runs` | `id`, `channel` (`cli` \| `tool`), `actor`, `namespace`, `state` (`running` \| `done` \| `failed`), `started_at`, `updated_at`, `finished_at`, `total`, `done`, `written`, `unchanged`, `failed`, `chunks`, `embedded`, `pending`, `bytes`, `error` | One row per `memo-mcp ingest` batch or MCP `ingest` call, with counters updated after every document. The web UI's `/ingest` console polls it. A run still `running` that has not moved for 10 minutes is shown as `stalled` (derived, never stored). |
+| `ingest_run_items` | `id`, `run_id`, `seq`, `name`, `uri`, `outcome` (`new` \| `revision` \| `unchanged` \| `error`), `revision`, `chunks`, `embedded`, `pending`, `bytes`, `ms`, `error` | One row per document a run handled. Names, addresses and counts only, never the content. |
+
 ## 6. What is indexed where (P1 and P2)
 
 | Question | Answered by |
@@ -355,6 +362,7 @@ by default (recall first); it labels every result and offers `scope.min_trust`.
 | 2 | `entities`, `entity_aliases`, `mentions`, `merge_candidates`, `edges` | P7 |
 | 3 | `pages`, `page_sources`, `page_vecs`, `work_items` | P8 |
 | 4 | `call_log` | P10 |
+| 5 | `ingest_runs`, `ingest_run_items` | — |
 
 Migrations run inside `BEGIN IMMEDIATE`, read `user_version` inside the transaction, and refuse
 negative or future versions.

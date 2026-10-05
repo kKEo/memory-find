@@ -1,0 +1,16 @@
+{{template "head" .}}<h1>Ingest</h1><p class="muted">Every ingest, from <code>memo-mcp ingest</code> batches (channel <code>cli</code>) and from the MCP <code>ingest</code> tool (channel <code>tool</code>). Newest first.{{if .Refresh}} Refreshing every {{.Refresh}}s while a run is in progress · <a href="/ingest?refresh=off">stop</a>.{{end}}</p>
+{{with .Data}}{{if .InFlight}}<h2>In flight on this server</h2><table><tr><th>client</th><th>namespace</th><th class="num">running for</th><th>run</th></tr>{{range .InFlight}}<tr><td>{{.Client}}</td><td>{{.Namespace}}</td><td class="num">{{dur ($.Data.Now.Sub .Started)}}</td><td>{{if .RunID}}<a href="/ingest/{{.RunID}}">{{short .RunID}}</a>{{end}}</td></tr>{{end}}</table>{{end}}
+<div class="cards">
+<div class="card"><div class="muted">in progress</div><div class="big">{{.Summary.Running}}</div></div>
+<div class="card"><div class="muted">documents written, 24h</div><div class="big">{{.Summary.DocsDay}}</div></div>
+<div class="card"><div class="muted">failed documents, 24h</div><div class="big{{if .Summary.ErrorsDay}} warn{{end}}">{{.Summary.ErrorsDay}}</div></div>
+</div>
+<h2>Runs</h2>
+<table><tr><th>started</th><th>channel</th><th>state</th><th>progress</th><th class="num">written</th><th class="num">unchanged</th><th class="num">failed</th><th class="num">chunks</th><th class="num">embedded / pending</th><th class="num">size</th><th class="num">time</th><th class="num">docs/s</th><th>error</th></tr>
+{{range .Runs}}<tr><td><a href="/ingest/{{.ID}}">{{dt .StartedAt}}</a></td><td>{{.Channel}} <span class="muted">{{.Actor}}</span>{{if .Namespace}} <span class="muted">· {{.Namespace}}</span>{{end}}</td>
+<td><span class="badge {{.State}}">{{.State}}</span></td>
+<td><progress max="{{.Total}}" value="{{.Done}}">{{.Percent}}%</progress> <span class="muted">{{.Done}}/{{.Total}}</span></td>
+<td class="num">{{.Written}}</td><td class="num">{{.Unchanged}}</td><td class="num">{{if .Failed}}<span class="warn">{{.Failed}}</span>{{else}}0{{end}}</td>
+<td class="num">{{.Chunks}}</td><td class="num">{{.Embedded}} / {{if .Pending}}<span class="warn">{{.Pending}}</span>{{else}}0{{end}}</td>
+<td class="num">{{bytes .Bytes}}</td><td class="num">{{dur .Elapsed}}</td><td class="num">{{f1 .DocsPerSecond}}</td><td class="warn">{{.Error}}</td></tr>{{end}}</table>
+{{if not .Runs}}<p class="muted">No ingests recorded yet. Runs appear here from schema v5 on.</p>{{end}}{{end}}{{template "foot" .}}

@@ -25,6 +25,7 @@ Both must agree on `MEMO_HOME` and `MEMO_KB` to see the same file.
 |---|---|---|
 | `MEMO_LOG_FORMAT` | `text` | `text` or `json`. Logs always go to **stderr** |
 | `MEMO_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. Unknown values fall back to the default with one warning |
+| `MEMO_HTTP_ADDR` | empty (stdio) | Same as `serve --http`: serve MCP over HTTP at `http://<addr>/mcp` and the live web UI at `http://<addr>/`. Loopback addresses only, unless `serve --allow-remote` |
 | `MEMO_METRICS_ADDR` | empty (off) | Same as `serve --metrics-addr`: serve Prometheus metrics at `http://<addr>/metrics`. Loopback addresses only |
 | `MEMO_QUERY_LOG` | unset | `1` records every search in `query_log` and every tool call in `call_log`, in the same file. See [Call and query logs](../monitoring/call-log.md) |
 

@@ -28,6 +28,7 @@ import (
 	"github.com/kKEo/memory-find/internal/obs"
 	"github.com/kKEo/memory-find/internal/retrieve"
 	"github.com/kKEo/memory-find/internal/server"
+	"github.com/kKEo/memory-find/internal/ui"
 )
 
 // Config is everything the commands need from the environment.
@@ -195,6 +196,7 @@ func usage(w io.Writer) {
 
 Usage:
   memo-mcp [serve] [--metrics-addr 127.0.0.1:9469]   start the MCP server on stdio (default); the flag exposes /metrics on loopback
+  memo-mcp serve --http 127.0.0.1:8765   one long-running MCP server over HTTP (/mcp) with the live web UI (/)
   memo-mcp ingest <file|dir|->     add documents to the knowledge base
       --ns <name> --kind doc|note|code|conversation --uri <u> --title <t>
       --library <l> --version <v> --trust user|curated --context <text> --embed=false
@@ -236,6 +238,7 @@ Environment:
   MEMO_RERANK=1  attach the cross-encoder reranker (used by the precise profile)
   MEMO_OLLAMA_URL, MEMO_OLLAMA_MODEL   optional local model for 'compact --executor ollama' (loopback by default)
   MEMO_METRICS_ADDR   same as 'serve --metrics-addr' (loopback only)
+  MEMO_HTTP_ADDR      same as 'serve --http' (loopback unless --allow-remote)
   MEMO_LOG_FORMAT     text (default) | json      MEMO_LOG_LEVEL   debug | info (default) | warn | error
   JOURNAL_TOKEN, JOURNAL_PATH    deprecated aliases of MEMO_KB / MEMO_HOME (old journal files are not opened)
 `)
@@ -315,6 +318,8 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	metricsAddr := fs.String("metrics-addr", os.Getenv("MEMO_METRICS_ADDR"), "expose Prometheus metrics at http://<addr>/metrics (loopback only; off when empty)")
+	httpAddr := fs.String("http", os.Getenv("MEMO_HTTP_ADDR"), "serve MCP over HTTP at http://<addr>/mcp, with the live web UI at http://<addr>/ (off when empty: stdio)")
+	allowRemote := fs.Bool("allow-remote", false, "with --http: allow a non-loopback address (there is no authentication)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -337,6 +342,15 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) error {
 			return err
 		}
 	}
+	// The HTTP listener is bound early for the same reason.
+	var webLn net.Listener
+	if *httpAddr != "" {
+		webLn, err = ui.Listen(*httpAddr, *allowRemote)
+		if err != nil {
+			return err
+		}
+		defer webLn.Close()
+	}
 	embedder, cleanup, err := buildEmbedder(ctx)
 	if err != nil {
 		slog.Warn("embedding unavailable; search is keyword-only and new vectors are queued", "err", err)
@@ -352,24 +366,6 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) error {
 	}
 	defer db.Close()
 	store := kb.NewStore(db, embedder)
-
-	// In the background: drain queued vectors, then embed any passage that
-	// has no vector for THIS model yet (a store built with another model
-	// keeps working by keyword meanwhile and reports degraded until done).
-	if embedder != nil {
-		go func() {
-			if n, err := store.Backfill(ctx); err != nil {
-				slog.Warn("backfill failed", "err", err)
-			} else if n > 0 {
-				slog.Info("backfilled chunk vectors", "n", n)
-			}
-			if n, err := store.Reindex(ctx, nil); err != nil {
-				slog.Warn("reindex failed", "model", embedder.Info().ID, "err", err)
-			} else if n > 0 {
-				slog.Info("embedded passages for the current model", "n", n, "model", embedder.Info().ID)
-			}
-		}()
-	}
 
 	profile, err := retrieve.Lookup(os.Getenv("MEMO_PROFILE"))
 	if err != nil {
@@ -401,8 +397,65 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) error {
 		}()
 		slog.Info("metrics listening", "url", "http://"+ln.Addr().String()+"/metrics")
 	}
-	srv := server.New(store, svc, serverVersion, server.WithLogger(slog.Default().With("component", "mcp")), server.WithRegistry(obs.Default()), server.WithCallLog(cfg.LogQueries))
-	return srv.Run(ctx)
+	srv := server.New(store, svc, serverVersion, server.WithLogger(slog.Default().With("component", "mcp")), server.WithRegistry(obs.Default()), server.WithCallLog(cfg.LogQueries), server.WithKBPath(kb.Path(cfg.KBDir, cfg.DBName)))
+
+	// In the background: drain queued vectors, then embed any passage that
+	// has no vector for THIS model yet (a store built with another model
+	// keeps working by keyword meanwhile and reports degraded until done).
+	if embedder != nil {
+		go func() {
+			srv.SetBackground("backfill running")
+			n, err := store.Backfill(ctx)
+			if err != nil {
+				slog.Warn("backfill failed", "err", err)
+				srv.SetBackground("backfill failed: " + err.Error())
+				return
+			} else if n > 0 {
+				slog.Info("backfilled chunk vectors", "n", n)
+			}
+			srv.SetBackground("reindex running")
+			m, err := store.Reindex(ctx, nil)
+			if err != nil {
+				slog.Warn("reindex failed", "model", embedder.Info().ID, "err", err)
+				srv.SetBackground("reindex failed: " + err.Error())
+				return
+			} else if m > 0 {
+				slog.Info("embedded passages for the current model", "n", m, "model", embedder.Info().ID)
+			}
+			srv.SetBackground(fmt.Sprintf("idle (startup backfill %d, reindex %d vectors)", n, m))
+		}()
+	} else {
+		srv.SetBackground("no embedding model: keyword search only, vectors queued")
+	}
+
+	if webLn == nil {
+		return srv.Run(ctx)
+	}
+	return serveHTTP(ctx, webLn, srv, store, svc)
+}
+
+// serveHTTP runs one long-lived server for any number of MCP clients: MCP
+// at /mcp, the web UI (with live pages) everywhere else.
+func serveHTTP(ctx context.Context, ln net.Listener, srv *server.Server, store *kb.Store, svc *retrieve.Service) error {
+	web := ui.New(store, svc, serverVersion, ui.WithLive(srv))
+	web.AllowListener(ln)
+	web.SetEval(evalReportMarkdown)
+	mux := http.NewServeMux()
+	mux.Handle("/mcp", srv.HTTPHandler())
+	mux.Handle("/", web.Handler())
+	hs := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	go func() {
+		<-ctx.Done()
+		shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = hs.Shutdown(shutdown)
+	}()
+	base := "http://" + ln.Addr().String()
+	slog.Info("serving MCP over HTTP", "mcp", base+"/mcp", "ui", base+"/", "add_to_claude_code", "claude mcp add --transport http memo "+base+"/mcp")
+	if err := hs.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
 }
 
 // serverVersion is set by Main before serving so the MCP implementation

@@ -1,4 +1,4 @@
-{{template "head" .}}<h1>Status</h1>{{with .Data}}
+{{template "head" .}}<h1>Status</h1>{{if not .Live}}<p class="muted">Live server data (connected clients, calls in flight, counters since start) is available when the UI is served by <code>memo-mcp serve --http</code>.</p>{{end}}{{with .Data}}
 <table><tr><th>file</th><td><code>{{.Status.Path}}</code> · {{f3 .Status.SizeMB}} MB · schema v{{.Status.SchemaVersion}}</td></tr>
 <tr><th>documents</th><td>{{.Status.LiveDocuments}} live, {{.Status.Revisions}} revisions, {{.Status.Sources}} sources</td></tr>
 <tr><th>passages / facts</th><td>{{.Status.Chunks}} / {{.Status.Facts}}</td></tr>
@@ -8,5 +8,6 @@
 <tr><th>jobs</th><td>{{.Status.JobsQueued}} queued · {{.Status.JobsFailed}} failed</td></tr>
 <tr><th>last write</th><td>{{dt .Status.LastWrite}}</td></tr></table>
 {{if .Models}}<h2>Installed models</h2><table><tr><th>id</th><th>name</th><th class="num">dim</th><th>licence</th><th></th></tr>{{range .Models}}<tr><td>{{.ID}}</td><td>{{.Name}}</td><td class="num">{{.Dim}}</td><td>{{.Licence}}</td><td>{{if .IsDefault}}<span class="ok">default</span>{{end}}</td></tr>{{end}}</table>{{end}}
+{{if .Ingests}}<h2>Recent ingests <a class="muted" href="/ingest">all →</a></h2><table><tr><th>started</th><th>channel</th><th>state</th><th class="num">progress</th><th class="num">written</th><th class="num">failed</th><th class="num">time</th></tr>{{range .Ingests}}<tr><td><a href="/ingest/{{.ID}}">{{dt .StartedAt}}</a></td><td>{{.Channel}}</td><td><span class="badge {{.State}}">{{.State}}</span></td><td class="num">{{.Done}}/{{.Total}}</td><td class="num">{{.Written}}</td><td class="num">{{.Failed}}</td><td class="num">{{dur .Elapsed}}</td></tr>{{end}}</table>{{end}}
 <h2>Ranking profiles</h2>{{range .Profiles}}<details><summary>{{.Name}}</summary><pre>{{call $.Data.Describe .}}</pre></details>{{end}}
 {{end}}{{template "foot" .}}

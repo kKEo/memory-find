@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"math"
 	"net"
 	"net/http"
 	"strconv"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/kKEo/memory-find/internal/compact"
 	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/live"
 	"github.com/kKEo/memory-find/internal/obs"
 	"github.com/kKEo/memory-find/internal/retrieve"
 )
@@ -39,11 +41,14 @@ type Server struct {
 	mu      sync.Mutex
 	evalFn  func(ctx context.Context) (string, error)
 	evalOut string
+
+	live     live.Source // nil unless hosted by `serve --http`
+	registry *obs.Registry
 }
 
 // New builds the handler set. hosts are the Host header values accepted
 // (the listen address and its loopback spellings).
-func New(store *kb.Store, search *retrieve.Service, version string) *Server {
+func New(store *kb.Store, search *retrieve.Service, version string, opts ...Option) *Server {
 	funcs := template.FuncMap{
 		"f3":   func(v float64) string { return strconv.FormatFloat(v, 'f', 3, 64) },
 		"f5":   func(v float64) string { return strconv.FormatFloat(v, 'f', 5, 64) },
@@ -62,6 +67,15 @@ func New(store *kb.Store, search *retrieve.Service, version string) *Server {
 		"href": uriHref,
 		"json": func(v any) string { b, _ := json.MarshalIndent(v, "", "  "); return string(b) },
 		"ms":   func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) },
+		"f1":   func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) },
+		"dur":  fmtDuration,
+		"qms": func(v float64) string {
+			if math.IsNaN(v) {
+				return "—"
+			}
+			return strconv.FormatFloat(v, 'f', 1, 64)
+		},
+		"bytes": fmtBytes,
 		"short": func(s string) string {
 			if len(s) > 12 {
 				return s[:8]
@@ -70,7 +84,11 @@ func New(store *kb.Store, search *retrieve.Service, version string) *Server {
 		},
 	}
 	t := template.Must(template.New("").Funcs(funcs).ParseFS(templateFS, "templates/*.html"))
-	return &Server{store: store, search: search, version: version, tmpl: t, hosts: map[string]bool{}}
+	s := &Server{store: store, search: search, version: version, tmpl: t, hosts: map[string]bool{}, registry: obs.Default()}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 // SetEval installs the function that produces the eval report (the CLI
@@ -83,27 +101,38 @@ func (s *Server) AllowHost(h string) { s.hosts[strings.ToLower(h)] = true }
 // Listen binds addr (loopback unless allowRemote) and returns the listener,
 // having registered its address as an allowed host.
 func (s *Server) Listen(addr string, allowRemote bool) (net.Listener, error) {
+	ln, err := Listen(addr, allowRemote)
+	if err != nil {
+		return nil, err
+	}
+	s.AllowListener(ln)
+	return ln, nil
+}
+
+// Listen binds addr, refusing a non-loopback address unless allowRemote.
+func Listen(addr string, allowRemote bool) (net.Listener, error) {
 	if addr == "" {
 		addr = "127.0.0.1:0"
 	}
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
-		return nil, fmt.Errorf("--addr must be host:port: %w", err)
+		return nil, fmt.Errorf("address must be host:port: %w", err)
 	}
 	if !allowRemote && host != "127.0.0.1" && host != "localhost" && host != "::1" {
 		return nil, fmt.Errorf("refusing to listen on %s: the UI is read-only but shows everything in the knowledge base; pass --allow-remote if that is intended", addr)
 	}
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
+	return net.Listen("tcp", addr)
+}
+
+// AllowListener accepts the Host header values that reach ln: its bound
+// address and the loopback spellings of its port.
+func (s *Server) AllowListener(ln net.Listener) {
 	bound := ln.Addr().String()
 	_, port, _ := net.SplitHostPort(bound)
 	s.AllowHost(bound)
 	s.AllowHost("localhost:" + port)
 	s.AllowHost("127.0.0.1:" + port)
 	s.AllowHost("[::1]:" + port)
-	return ln, nil
 }
 
 // Handler returns the http.Handler: GET only, Host checked, no mutation.
@@ -121,8 +150,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /pages", s.pagesPage)
 	mux.HandleFunc("GET /status", s.statusPage)
 	mux.HandleFunc("GET /log", s.logPage)
+	mux.HandleFunc("GET /ingest", s.ingestPage)
+	mux.HandleFunc("GET /ingest/{id}", s.ingestRunPage)
 	mux.HandleFunc("GET /lint", s.lintPage)
 	mux.HandleFunc("GET /eval", s.evalPage)
+	if s.live != nil {
+		mux.HandleFunc("GET /live", s.livePage)
+	}
 	mux.HandleFunc("GET /style.css", s.css)
 	mux.Handle("GET /metrics", obs.Handler(obs.Default()))
 	return s.guard(mux)
@@ -161,11 +195,23 @@ type page struct {
 	Query   string
 	Data    any
 	Error   string
+	Refresh int    // seconds; >0 makes the page reload itself (no JS, CSP-safe)
+	Live    bool   // hosted by a live server: nav shows Live
+	Uptime  string // live only
 }
 
 func (s *Server) render(w http.ResponseWriter, name, title string, data any) {
+	s.renderPage(w, name, page{Title: title, Version: s.version, Data: data})
+}
+
+func (s *Server) renderPage(w http.ResponseWriter, name string, p page) {
+	p.Version = s.version
+	if s.live != nil {
+		p.Live = true
+		p.Uptime = fmtDuration(time.Since(s.live.Live().Started).Round(time.Second))
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.tmpl.ExecuteTemplate(w, name, page{Title: title, Version: s.version, Data: data}); err != nil {
+	if err := s.tmpl.ExecuteTemplate(w, name, p); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -459,12 +505,14 @@ func (s *Server) statusPage(w http.ResponseWriter, r *http.Request) {
 	}
 	models, _ := s.store.InstalledModels(r.Context())
 	profiles := retrieve.Profiles()
+	ingests, _ := s.store.IngestRunsTail(r.Context(), 5)
 	s.render(w, "status.html", "Status", struct {
 		Status   *kb.Status
 		Models   []kb.InstalledModel
+		Ingests  []kb.IngestRun
 		Profiles []retrieve.Profile
 		Describe func(retrieve.Profile) string
-	}{st, models, profiles, retrieve.Describe})
+	}{st, models, ingests, profiles, retrieve.Describe})
 }
 
 func (s *Server) logPage(w http.ResponseWriter, r *http.Request) {
@@ -490,6 +538,58 @@ func (s *Server) logPage(w http.ResponseWriter, r *http.Request) {
 		Searches []row
 		Calls    []kb.CallLogEntry
 	}{rows, calls})
+}
+
+// ingestRefresh is how often the ingest console reloads while a run is live.
+const ingestRefresh = 2
+
+// refreshFor returns the reload interval: on while live, unless ?refresh=off.
+func refreshFor(r *http.Request, live bool) int {
+	if !live || r.URL.Query().Get("refresh") == "off" {
+		return 0
+	}
+	return ingestRefresh
+}
+
+func (s *Server) ingestPage(w http.ResponseWriter, r *http.Request) {
+	runs, err := s.store.IngestRunsTail(r.Context(), 50)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	sum, err := s.store.IngestSummary(r.Context())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	var inFlight []live.Call
+	if s.live != nil {
+		for _, c := range s.live.Live().InFlight {
+			if c.Tool == "ingest" {
+				inFlight = append(inFlight, c)
+			}
+		}
+	}
+	s.renderPage(w, "ingest.html", page{Title: "Ingest", Refresh: refreshFor(r, sum.Running > 0 || len(inFlight) > 0),
+		Data: struct {
+			Summary  kb.IngestSummary
+			Runs     []kb.IngestRun
+			InFlight []live.Call
+			Now      time.Time
+		}{sum, runs, inFlight, time.Now()}})
+}
+
+func (s *Server) ingestRunPage(w http.ResponseWriter, r *http.Request) {
+	run, items, err := s.store.IngestRun(r.Context(), r.PathValue("id"))
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	s.renderPage(w, "ingest_run.html", page{Title: "Ingest run", Refresh: refreshFor(r, run.State == kb.RunRunning),
+		Data: struct {
+			Run   kb.IngestRun
+			Items []kb.IngestItem
+		}{run, items}})
 }
 
 func (s *Server) lintPage(w http.ResponseWriter, r *http.Request) {
@@ -565,6 +665,28 @@ func uriHref(uri string) string {
 	return "/"
 }
 
+func fmtDuration(d time.Duration) string {
+	switch {
+	case d < time.Second:
+		return strconv.FormatInt(d.Milliseconds(), 10) + "ms"
+	case d < time.Minute:
+		return strconv.FormatFloat(d.Seconds(), 'f', 1, 64) + "s"
+	default:
+		return d.Round(time.Second).String()
+	}
+}
+
+func fmtBytes(n int64) string {
+	switch {
+	case n < 1<<10:
+		return strconv.FormatInt(n, 10) + " B"
+	case n < 1<<20:
+		return strconv.FormatFloat(float64(n)/(1<<10), 'f', 1, 64) + " KB"
+	default:
+		return strconv.FormatFloat(float64(n)/(1<<20), 'f', 1, 64) + " MB"
+	}
+}
+
 const styleCSS = `
 :root { --fg:#1b1b1b; --muted:#666; --line:#ddd; --bg:#fff; --accent:#1a5fb4; --warn:#b4541a; --soft:#f6f6f4; }
 * { box-sizing:border-box; }
@@ -591,6 +713,9 @@ details { margin:.4rem 0; } summary { cursor:pointer; color:var(--accent); }
 .filters { display:flex; gap:.5rem; flex-wrap:wrap; align-items:end; margin-bottom:1rem; } .filters label { display:flex; flex-direction:column; font-size:.85em; color:var(--muted); }
 blockquote { border-left:3px solid var(--line); margin:.4rem 0; padding:.2rem .8rem; color:var(--muted); }
 .timeline li { margin:.3rem 0; } .timeline .dead { color:var(--muted); text-decoration:line-through; }
+.badge.running { border-color:var(--accent); color:var(--accent); } .badge.done { border-color:#1a7a3a; color:#1a7a3a; }
+.badge.failed, .badge.stalled, .badge.error { border-color:var(--warn); color:var(--warn); }
+progress { width:7rem; height:.7rem; vertical-align:middle; accent-color:var(--accent); }
 footer { color:var(--muted); font-size:.85em; padding:1rem; text-align:center; border-top:1px solid var(--line); margin-top:2rem; }
 `
 

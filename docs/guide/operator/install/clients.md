@@ -22,6 +22,25 @@ Add more variables with additional `--env` flags, for example
 `--env MEMO_QUERY_LOG=1 --env MEMO_LOG_LEVEL=warn`. Check the connection with `/mcp` inside
 Claude Code. Claude Code shows a stdio server's stderr, so memo-mcp's logs appear there.
 
+## One shared server over HTTP
+
+Instead of one process per session, run a single long-lived server and point every client at
+its URL:
+
+```bash
+MEMO_KB=my-project memo-mcp serve --http 127.0.0.1:8765
+claude mcp add --transport http memo http://127.0.0.1:8765/mcp
+```
+
+The same port serves the web UI at `http://127.0.0.1:8765/`. In this mode the UI also has a
+**Live** page with what only the running process knows: active clients, calls in flight,
+background backfill, and tool and ingest latency since start. The standalone `memo-mcp ui`
+reads the knowledge-base file alone and has no Live page.
+
+Start the server yourself (a terminal, `launchd` or a `systemd --user` unit). Clients do not
+start it, and its logs go to its own stderr. The address is loopback-only unless you pass
+`--allow-remote`. There is no authentication, so only do that on a trusted network.
+
 ## Claude Desktop
 
 Edit `claude_desktop_config.json`. On macOS it is in `~/Library/Application Support/Claude/`;
