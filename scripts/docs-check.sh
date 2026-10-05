@@ -65,7 +65,7 @@ cmd_ref=$OP/config/commands.md
 if is_draft "$cmd_ref"; then
   warn "$cmd_ref is a draft; skipping the command check"
 else
-  cmds=$(sed -n '/^func usage/,/^}/p' internal/cli/cli.go | grep -oE '^  memo-mcp \[?[a-z]+' | sed -E 's/^  memo-mcp \[?//' | sort -u)
+  cmds=$(sed -n '/^func usage/,/^}/p' internal/cli/cli.go | grep -oE '^  memo-mcp \[?[a-z][a-z-]*' | sed -E 's/^  memo-mcp \[?//' | sort -u)
   [ -n "$cmds" ] || err "could not extract commands from usage() in internal/cli/cli.go"
   for c in $cmds; do
     grep -qE "memo-mcp $c( |\`|$)" "$cmd_ref" || err "command '$c' is in usage() but missing from $cmd_ref"

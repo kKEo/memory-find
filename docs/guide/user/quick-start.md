@@ -89,6 +89,9 @@ which shows which sessions are connected and what they are doing right now.
 3. Open `http://127.0.0.1:8765/` in your browser to see your memory, including the **Live**
    page.
 
+On your own computer no password is needed. If you want other computers to connect, you need
+a certificate and a token; see "One shared server over HTTP" in the operator guide.
+
 Claude can use the memory only while that terminal is running. If you close it, Claude
 reports that memo is not connected; start it again and run `/mcp` in Claude Code to
 reconnect. The address works only on your own computer.
