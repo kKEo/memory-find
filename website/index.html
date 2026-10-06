@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>memo-mcp — a memory your agent can explain</title>
+<meta name="description" content="memo-mcp is a local MCP server: one Go binary and one SQLite file give your agent a searchable knowledge base that explains why every result ranked where it did.">
+<meta property="og:title" content="memo-mcp — a memory your agent can explain">
+<meta property="og:description" content="A local, explainable, measurable knowledge base for AI agents. One Go binary, one SQLite file, no cloud.">
+<meta name="theme-color" content="#faf8f4">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f5c4f'/%3E%3Ccircle cx='14.5' cy='14.5' r='6.5' fill='none' stroke='white' stroke-width='2.6'/%3E%3Cpath d='m24 24-4.6-4.6' stroke='white' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap nav">
+    <a class="brand" href="#top" aria-label="memo-mcp home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      </span>
+      memo-mcp
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#concept">How it works</a>
+      <a href="#advantages">Why memo-mcp</a>
+      <a href="#demo">Live demo</a>
+      <a href="#tools">Tools</a>
+      <a href="https://kkeo.github.io/memory-find/">Docs</a>
+    </nav>
+    <a class="btn btn-secondary btn-sm" href="https://github.com/kKEo/memory-find">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.7 5.38-5.27 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+      GitHub
+    </a>
+  </div>
+</header>
+
+<main id="top" class="wrap">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-copy">
+      <span class="badge"><span class="badge-dot"></span>Open-source MCP server · MIT licensed</span>
+      <h1>A memory your agent can explain.</h1>
+      <p class="hero-lede">One Go binary and one SQLite file give your agent a knowledge base it can search — and tell you exactly why every answer ranked where it did.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#install">
+          Get started
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn btn-secondary" href="#demo">See a search explain itself</a>
+      </div>
+      <div class="trust-row">
+        <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Runs fully local</span>
+        <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>No telemetry</span>
+        <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>macOS · Linux · Windows</span>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="panel" aria-label="Example explained search result">
+        <div class="panel-bar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <code>search "how does billing handle replication?"</code>
+        </div>
+        <div class="panel-body">
+          <div class="result-head">
+            <div>
+              <div class="result-title">Replication runbook</div>
+              <span class="addr">memo://chunk/212</span>
+            </div>
+            <span class="pill pill-strong">strong</span>
+          </div>
+          <div class="arm-bars">
+            <span>semantic</span><div class="bar"><i style="width:100%"></i></div><code>#1</code>
+            <span>graph</span><div class="bar"><i style="width:100%"></i></div><code>#1</code>
+            <span>keyword</span><div class="bar"><i class="weak" style="width:55%"></i></div><code>#3</code>
+            <span>exact</span><div class="bar"><i class="weak" style="width:0"></i></div><code>—</code>
+          </div>
+          <div class="reason">
+            <span class="reason-label">Why it ranked</span>
+            Found by meaning and by the mention graph from <b>Billing Service</b> — the page never names it.
+          </div>
+          <div class="meta-row">
+            <span>Trust <b>curated</b></span>
+            <span>Source <b>ops wiki, rev 4</b></span>
+            <span>Recency <b>×1.00</b></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Concept -->
+  <section id="concept">
+    <div class="split">
+      <div class="section-head">
+        <span class="eyebrow">How it works</span>
+        <h2>Knowledge goes in with provenance. Answers come out with reasons.</h2>
+        <p>Most agent memory is a black box: things go in, something comes back. memo-mcp is a small retrieval system you can read, inspect and measure — the agent and the human see the same numbers.</p>
+      </div>
+      <ol class="steps">
+        <li class="step">
+          <span class="step-n">1</span>
+          <div class="step-body">
+            <div class="step-title">Ingest <code>ingest</code></div>
+            <p>The agent hands over markdown it fetched or wrote. Same content is a no-op; changed content becomes a new revision.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="step-n">2</span>
+          <div class="step-body">
+            <div class="step-title">Remember <code>remember</code></div>
+            <p>Atomic facts with evidence and validity dates. Corrections supersede — the old fact stays as history.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="step-n">3</span>
+          <div class="step-body">
+            <div class="step-title">Search <code>search</code></div>
+            <p>Words, exact identifiers, meaning, facts and the mention graph — fused into one ranked list.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="step-n">4</span>
+          <div class="step-body">
+            <div class="step-title">Explain <code>response_format: explain</code></div>
+            <p>Every result carries its address, trust, per-arm ranks and the reason it ranked.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- Advantages -->
+  <section id="advantages">
+    <div class="section-head">
+      <span class="eyebrow">Why memo-mcp</span>
+      <h2>Six guarantees a black box can't make.</h2>
+    </div>
+    <div class="grid-3">
+      <article class="feature">
+        <span class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+        <h3>Fully local</h3>
+        <p>Embeddings run in-process, search runs in SQLite. After the one-time model download, nothing leaves the machine.</p>
+        <code>no cloud · no CGo · no telemetry</code>
+      </article>
+      <article class="feature">
+        <span class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6"/></svg></span>
+        <h3>Explainable</h3>
+        <p>Per-arm ranks, contributions, recency factor and a trace of which arms ran and where the list was cut.</p>
+        <code>memo-mcp explain "&lt;q&gt;" memo://chunk/n</code>
+      </article>
+      <article class="feature">
+        <span class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></span>
+        <h3>Measurable</h3>
+        <p>An eval harness reports recall, MRR and nDCG next to latency and tokens. Every change is checked against a baseline.</p>
+        <code>memo-mcp eval --explain-failures</code>
+      </article>
+      <article class="feature">
+        <span class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <h3>Trust needs a human</h3>
+        <p>Every record says where it came from and who vouched for it. Agents can ask to promote trust — only a person can grant it.</p>
+        <code>agent → user → curated</code>
+      </article>
+      <article class="feature">
+        <span class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+        <h3>Aware of time</h3>
+        <p>Ask what the knowledge base believed on any date. Superseded facts are kept; forgotten records say when and why.</p>
+        <code>search … as_of: 2026-03-01</code>
+      </article>
+      <article class="feature">
+        <span class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/></svg></span>
+        <h3>Honest when empty</h3>
+        <p>A question about nothing in the corpus returns zero results with a reason and a hint — not a page of noise.</p>
+        <code>weak band &lt; 0.30 is dropped</code>
+      </article>
+    </div>
+  </section>
+
+  <!-- Demo -->
+  <section id="demo">
+    <div class="demo-head">
+      <div class="section-head">
+        <span class="eyebrow">Live demo</span>
+        <h2>Five arms, one honest list.</h2>
+        <p>Each retrieval arm ranks on its own; reciprocal rank fusion merges them at equal weight. Switch arms off and watch the order change — every score is shown.</p>
+      </div>
+      <div class="arm-toggles" id="arm-toggles" role="group" aria-label="Retrieval arms"></div>
+    </div>
+    <div class="panel demo-panel">
+      <div class="panel-bar">
+        <code>search "how does billing handle replication?" · explain</code>
+        <span class="demo-trace" id="demo-trace" aria-live="polite"></span>
+      </div>
+      <ol class="results" id="results"></ol>
+    </div>
+  </section>
+
+  <!-- Comparison -->
+  <section id="compare">
+    <div class="split">
+      <div class="section-head">
+        <span class="eyebrow">Versus built-in memory</span>
+        <h2>Built-in memory is a fine default. This is for when you need to know why.</h2>
+        <p>memo-mcp doesn't replace your assistant's memory — it gives you a retrieval system you can experiment on with your own data.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="compare">
+          <thead><tr><th scope="col">Question</th><th scope="col">memo-mcp</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Where does it run?</th><td><span class="check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>On your machine, one SQLite file per project</span></td></tr>
+            <tr><th scope="row">Why did this come back?</th><td><span class="check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Per-arm ranks and a written reason</span></td></tr>
+            <tr><th scope="row">Can I tune ranking?</th><td><span class="check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Named profiles, every constant derived</span></td></tr>
+            <tr><th scope="row">Is it getting better?</th><td><span class="check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Measured query by query against a baseline</span></td></tr>
+            <tr><th scope="row">Can a human read it?</th><td><span class="check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Terminal, read-only web UI, markdown export</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tools -->
+  <section id="tools">
+    <div class="section-head">
+      <span class="eyebrow">Ten tools, one contract</span>
+      <h2>What your agent gets.</h2>
+      <p>A stable set of MCP tools, plus <code>memo://</code> addresses readable as resources.</p>
+    </div>
+    <div class="tools">
+      <div class="tool"><code>ingest</code><span>Store a document as markdown</span></div>
+      <div class="tool"><code>search</code><span>Fused, explainable retrieval</span></div>
+      <div class="tool"><code>read</code><span>Dereference a memo:// address</span></div>
+      <div class="tool"><code>remember</code><span>Record a fact with evidence</span></div>
+      <div class="tool"><code>forget</code><span>Retire a record, with a reason</span></div>
+      <div class="tool"><code>promote</code><span>Ask a human to raise trust</span></div>
+      <div class="tool"><code>explore</code><span>Walk the graph from one entity</span></div>
+      <div class="tool"><code>compact</code><span>Propose pages and tidy-ups</span></div>
+      <div class="tool"><code>submit</code><span>Hand back a page or decision</span></div>
+      <div class="tool"><code>status</code><span>Models, jobs and counts</span></div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section id="install" style="border-top:0;padding-top:0">
+    <div class="install">
+      <div class="install-copy">
+        <h2>Give your agent a memory you can read.</h2>
+        <p>macOS, Linux and Windows. ~30 MB, no runtime dependencies. One network call, ever: the embedding model, on first start.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="https://github.com/kKEo/memory-find/releases">Download a release</a>
+          <a class="btn btn-ghost" href="https://kkeo.github.io/memory-find/">Read the guide</a>
+        </div>
+      </div>
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <button class="copy-btn" type="button" data-copy="claude mcp add memo --env MEMO_KB=my-project -- /path/to/memo-mcp">Copy</button>
+        </div>
+<pre><span class="c"># add to Claude Code, one KB per project</span>
+<span class="p">$ </span>claude mcp add memo --env MEMO_KB=my-project -- /path/to/memo-mcp
+
+<span class="c"># ask it why</span>
+<span class="p">$ </span>memo-mcp search "billing replication" --explain</pre>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <span>© 2026 memo-mcp · MIT licensed · No telemetry. No cloud.</span>
+    <div class="footer-links">
+      <a href="https://github.com/kKEo/memory-find">Source</a>
+      <a href="https://github.com/kKEo/memory-find/blob/master/docs/architecture.md">Architecture</a>
+      <a href="https://github.com/kKEo/memory-find/tree/master/articles">Articles</a>
+      <a href="https://github.com/kKEo/memory-find/releases">Releases</a>
+    </div>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

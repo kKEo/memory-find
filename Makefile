@@ -96,3 +96,7 @@ check: fmt vet lint test-race
 clean:
 	rm -f $(BINARY) coverage.out
 	rm -rf site
+
+
+start-http:
+	MEMO_KB=crportal memo-mcp serve  --http 127.0.0.1:8765 
