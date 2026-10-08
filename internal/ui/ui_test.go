@@ -239,7 +239,10 @@ func TestLivePage(t *testing.T) {
 	reg.Histogram("memo_mcp_tool_call_duration_seconds", "", obs.LatencyBuckets, "tool").With("search").Observe(0.004)
 	reg.Counter("memo_store_ingests_total", "", "outcome").With("new").Add(2)
 	src := fakeLive{live.Snapshot{Version: "v1", KBPath: "/kb/x.db", Model: "hash", Started: now.Add(-time.Hour), Background: "idle",
-		Sessions: []live.Session{{ID: "abcdef123456789", Client: "claude-code", Since: now.Add(-time.Minute), Calls: 4, LastCall: now}},
+		Sessions: []live.Session{
+			{ID: "abcdef123456789", Key: "c0ffee000001", Client: "claude-code", ClientVersion: "2.1.4", Since: now.Add(-time.Minute), Calls: 4, LastCall: now, LastSeen: now, Open: true, Stream: true},
+			{ID: "fedcba987654321", Key: "c0ffee000002", Client: "cursor", Since: now.Add(-time.Hour), LastSeen: now.Add(-5 * time.Minute)},
+		},
 		InFlight: []live.Call{{Tool: "ingest", Client: "claude-code", Started: now.Add(-2 * time.Second), Namespace: "web", RunID: "run-42"}}}}
 	h := New(store, svc, "test", WithLive(src), WithRegistry(reg)).Handler()
 
@@ -247,9 +250,15 @@ func TestLivePage(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("/live: %d\n%s", code, body)
 	}
-	for _, want := range []string{"claude-code", "/kb/x.db", `href="/ingest/run-42"`, `<td>search</td><td class="num">4</td>`, `<span class="warn">1</span>`, `http-equiv="refresh"`, `href="/live">Live</a>`, "up 1h0m0s"} {
+	for _, want := range []string{"claude-code", `<span class="muted">2.1.4</span>`, `<span class="badge done">connected</span>`, `<span class="badge stale">left</span>`, "c0ffee000001", "1 connected now",
+		"/kb/x.db", `href="/ingest/run-42"`, `<td>search</td><td class="num">4</td>`, `<span class="warn">1</span>`, `http-equiv="refresh"`, `href="/live">Live</a>`, "up 1h0m0s"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("/live lacks %q", want)
+		}
+	}
+	for _, raw := range []string{"abcdef12", "fedcba98"} {
+		if strings.Contains(body, raw) {
+			t.Errorf("/live shows the raw session id %q", raw)
 		}
 	}
 	if _, body = get(t, h, "/ingest", ""); !strings.Contains(body, "In flight on this server") || !strings.Contains(body, `http-equiv="refresh"`) {

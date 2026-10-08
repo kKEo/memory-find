@@ -33,6 +33,12 @@ All notable changes. Tags follow semantic versioning; each tag has an eval repor
   `--behind-proxy` for a TLS-terminating proxy, and `--public-url`. Plain HTTP on a
   non-loopback address and unauthenticated exposure are refused.
 - Fix MCP registry publishing: `server.json` no longer sets `registryBaseUrl` on the MCPB package.
+- Fix the **Live** page listing a phantom `unknown` client for 30 minutes next to every go-sdk
+  client: the `server/discover` probe such clients send before `initialize` no longer counts as a
+  session, in the page or in `memo_mcp_sessions_total`. Clients now show their version and a
+  state: *connected* (holds its event stream), *open* (session open, no stream) or *left*;
+  sessions are shown by a short hashed handle instead of a prefix of the session id, which
+  grants access to the session.
 
 ## [1.4.0] — 2026-10-03 — measuring the server itself (P10)
 

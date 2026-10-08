@@ -85,12 +85,18 @@ func (s *Server) observe(next mcp.MethodHandler) mcp.MethodHandler {
 			outcome = "error"
 		}
 		s.m.requests.With(method, outcome).Inc()
+		s.live.seen(req)
 		switch method {
 		case "initialize", "server/discover":
 			// Old protocol: initialize; 2026-07-28: discover, with the client
 			// identity in request metadata that the session has validated.
-			s.m.sessions.With(sessionClient(req)).Inc()
-			s.live.connected(req)
+			// Only a request that leaves a session behind counts: go-sdk
+			// clients probe an HTTP server with server/discover first, on a
+			// session the SDK closes right after.
+			if err == nil && established(req) {
+				s.m.sessions.With(sessionClient(req)).Inc()
+				s.live.connected(req)
+			}
 		case "resources/read":
 			kind := "unknown"
 			if p, ok := req.GetParams().(*mcp.ReadResourceParams); ok {
@@ -262,10 +268,28 @@ func (s *Server) persistCall(ctx context.Context, req mcp.Request, info *callInf
 }
 
 func sessionClient(req mcp.Request) string {
-	if ss, ok := req.GetSession().(*mcp.ServerSession); ok && ss != nil {
-		if p := ss.InitializeParams(); p != nil && p.ClientInfo != nil && p.ClientInfo.Name != "" {
-			return p.ClientInfo.Name
-		}
+	name, _ := clientOf(req)
+	return name
+}
+
+// clientOf is the calling client's name and version: from the request
+// metadata under 2026-07-28, else from the session's initialize. The name
+// is "unknown" when the client did not say.
+func clientOf(req mcp.Request) (name, version string) {
+	var impl *mcp.Implementation
+	if r, ok := req.(interface{ ClientInfo() *mcp.Implementation }); ok {
+		impl = r.ClientInfo()
 	}
-	return "unknown"
+	if impl == nil || impl.Name == "" {
+		return "unknown", ""
+	}
+	return impl.Name, impl.Version
+}
+
+// established reports whether a session outlives this request: the SDK
+// closes a session whose initialisation (initialize, or discover on a
+// transport that keeps 2026-07-28 sessions) did not complete.
+func established(req mcp.Request) bool {
+	ss, ok := req.GetSession().(*mcp.ServerSession)
+	return ok && ss != nil && ss.InitializeParams() != nil
 }

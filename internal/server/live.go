@@ -21,10 +21,11 @@ type tracker struct {
 	nextID     uint64
 	inFlight   map[uint64]*live.Call
 	sessions   map[string]*live.Session
+	streams    map[string]int // raw session id -> event streams (GET /mcp) open now
 }
 
 func newTracker(now time.Time) *tracker {
-	return &tracker{started: now, inFlight: map[uint64]*live.Call{}, sessions: map[string]*live.Session{}}
+	return &tracker{started: now, inFlight: map[uint64]*live.Call{}, sessions: map[string]*live.Session{}, streams: map[string]int{}}
 }
 
 func sessionID(req mcp.Request) string {
@@ -35,46 +36,90 @@ func sessionID(req mcp.Request) string {
 }
 
 // clientIdle is how long a client with no open session stays on the live
-// page after its last call. Under the stateless 2026-07-28 protocol a
+// page after it was last seen. Under the stateless 2026-07-28 protocol a
 // client may hold no SDK session between requests, so recent activity is
 // what "connected" means; it matches the HTTP session timeout.
 const clientIdle = 30 * time.Minute
 
-// session returns the entry for id, creating it on first sight. A request
-// without a session id is keyed by client name. Callers hold mu.
-func (t *tracker) session(id, client string, now time.Time) *live.Session {
-	key := id
-	if key == "" {
-		key = "client:" + client
+// trackerKey is the map key of a session: its id, or the client name for a
+// request without a session id.
+func trackerKey(id, client string) string {
+	if id == "" {
+		return "client:" + client
 	}
-	ss := t.sessions[key]
+	return id
+}
+
+// session returns the entry for id, creating it on first sight. Callers
+// hold mu.
+func (t *tracker) session(id, client, version string, now time.Time) *live.Session {
+	k := trackerKey(id, client)
+	ss := t.sessions[k]
 	if ss == nil {
-		ss = &live.Session{ID: id, Client: client, Since: now}
-		t.sessions[key] = ss
+		ss = &live.Session{ID: id, Key: live.SessionKey(k), Client: client, Since: now}
+		t.sessions[k] = ss
 	}
 	if client != "unknown" {
 		ss.Client = client
+		if version != "" {
+			ss.ClientVersion = version
+		}
 	}
+	ss.LastSeen = now
 	return ss
 }
 
 func (t *tracker) connected(req mcp.Request) {
+	name, version := clientOf(req)
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.session(sessionID(req), sessionClient(req), time.Now())
+	t.session(sessionID(req), name, version, time.Now())
+}
+
+// seen marks activity on a session already tracked. It never creates one,
+// so a probe that does not establish a session leaves no trace.
+func (t *tracker) seen(req mcp.Request) {
+	name, _ := clientOf(req)
+	k := trackerKey(sessionID(req), name)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if ss := t.sessions[k]; ss != nil {
+		ss.LastSeen = time.Now()
+	}
+}
+
+// streamOpened and streamClosed bracket a client's event stream. The
+// stream ends the moment the client goes away, unlike the session, which
+// the server keeps until it times out.
+func (t *tracker) streamOpened(id string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.streams[id]++
+}
+
+func (t *tracker) streamClosed(id string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.streams[id]--; t.streams[id] <= 0 {
+		delete(t.streams, id)
+	}
+	if ss := t.sessions[id]; ss != nil {
+		ss.LastSeen = time.Now()
+	}
 }
 
 // begin records a tool call and returns its id for end and annotate.
 func (t *tracker) begin(req mcp.Request, tool string) uint64 {
 	now := time.Now()
-	id, client := sessionID(req), sessionClient(req)
+	id := sessionID(req)
+	client, version := clientOf(req)
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	ss := t.session(id, client, now)
+	ss := t.session(id, client, version, now)
 	ss.Calls++
 	ss.LastCall = now
 	t.nextID++
-	t.inFlight[t.nextID] = &live.Call{Tool: tool, Client: client, Session: id, Started: now}
+	t.inFlight[t.nextID] = &live.Call{Tool: tool, Client: client, Session: id, SessionKey: ss.Key, Started: now}
 	return t.nextID
 }
 
@@ -104,7 +149,8 @@ func (t *tracker) setBackground(s string) {
 }
 
 // Live implements live.Source. A client is listed while the SDK holds its
-// session or it made a call within clientIdle; older entries are dropped.
+// session, its event stream is open, or it was seen within clientIdle;
+// older entries are dropped.
 func (s *Server) Live() live.Snapshot {
 	open := map[string]bool{}
 	for ss := range s.mcp.Sessions() {
@@ -113,18 +159,17 @@ func (s *Server) Live() live.Snapshot {
 	t := s.live
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	snap := live.Snapshot{Version: s.version, KBPath: s.kbPath, Started: t.started, Background: t.background}
+	snap := live.Snapshot{Version: s.version, KBPath: s.kbPath, Started: t.started, Background: t.background,
+		Sessions: []live.Session{}, InFlight: []live.Call{}}
 	if e := s.store.Embedder(); e != nil {
 		snap.Model = e.Info().ID
 	}
 	now := time.Now()
-	for key, ss := range t.sessions {
-		last := ss.LastCall
-		if last.IsZero() {
-			last = ss.Since
-		}
-		if !open[ss.ID] && now.Sub(last) > clientIdle {
-			delete(t.sessions, key)
+	for k, ss := range t.sessions {
+		ss.Open = open[ss.ID]
+		ss.Stream = ss.ID != "" && t.streams[ss.ID] > 0
+		if !ss.Open && !ss.Stream && now.Sub(ss.LastSeen) > clientIdle {
+			delete(t.sessions, k)
 			continue
 		}
 		snap.Sessions = append(snap.Sessions, *ss)

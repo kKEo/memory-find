@@ -39,17 +39,24 @@ type IngestStat struct {
 }
 
 type liveData struct {
-	Snap   live.Snapshot
-	Now    time.Time
-	Tools  []ToolStat
-	Ingest IngestStat
+	Snap      live.Snapshot
+	Now       time.Time
+	Connected int // sessions holding their event stream
+	Tools     []ToolStat
+	Ingest    IngestStat
 }
 
 func (s *Server) livePage(w http.ResponseWriter, r *http.Request) {
 	snap := s.live.Live()
 	tools, ingest := liveStats(s.registry.Snapshot(r.Context()))
+	connected := 0
+	for _, ss := range snap.Sessions {
+		if ss.Stream {
+			connected++
+		}
+	}
 	s.renderPage(w, "live.html", page{Title: "Live", Refresh: refreshFor(r, true),
-		Data: liveData{Snap: snap, Now: time.Now(), Tools: tools, Ingest: ingest}})
+		Data: liveData{Snap: snap, Now: time.Now(), Connected: connected, Tools: tools, Ingest: ingest}})
 }
 
 // liveStats folds the process's counters into per-tool and ingest rows.

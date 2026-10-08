@@ -1,6 +1,6 @@
 {{template "head" .}}<h1>Live</h1><p class="muted">In-memory state of the MCP server hosting this page. Counters cover this process since it started. Refreshing every {{.Refresh}}s{{if .Refresh}} · <a href="/live?refresh=off">stop</a>{{else}} · <a href="/live">resume</a>{{end}}.</p>
 {{with .Data}}<div class="cards">
-<div class="card"><div class="muted">clients active</div><div class="big">{{len .Snap.Sessions}}</div></div>
+<div class="card"><div class="muted">clients active</div><div class="big">{{len .Snap.Sessions}}</div><div class="muted">{{.Connected}} connected now</div></div>
 <div class="card"><div class="muted">calls in flight</div><div class="big">{{len .Snap.InFlight}}</div></div>
 <div class="card"><div class="muted">documents ingested</div><div class="big">{{.Ingest.New}}</div><div class="muted">{{.Ingest.Revision}} revisions · {{.Ingest.Dedup}} unchanged{{if .Ingest.Error}} · <span class="warn">{{.Ingest.Error}} failed</span>{{end}}</div></div>
 </div>
@@ -10,9 +10,9 @@
 <tr><th>knowledge base</th><td><code>{{.Snap.KBPath}}</code></td></tr>
 <tr><th>embedding model</th><td>{{if .Snap.Model}}{{.Snap.Model}}{{else}}<span class="warn">none (keyword only)</span>{{end}}</td></tr>
 <tr><th>background</th><td>{{.Snap.Background}}</td></tr></table>
-<h2>Clients</h2><p class="muted">Connected now, or made a call in the last 30 minutes.</p>
-<table><tr><th>client</th><th>session</th><th>connected</th><th class="num">calls</th><th>last call</th></tr>
-{{range .Snap.Sessions}}<tr><td>{{.Client}}</td><td class="muted"><code>{{short .ID}}</code></td><td>{{dt .Since}} <span class="muted">({{dur ($.Data.Now.Sub .Since)}} ago)</span></td><td class="num">{{.Calls}}</td><td>{{if not .LastCall.IsZero}}{{dur ($.Data.Now.Sub .LastCall)}} ago{{else}}<span class="muted">none yet</span>{{end}}</td></tr>{{end}}</table>
+<h2>Clients</h2><p class="muted">Seen in the last 30 minutes. <b>connected</b>: holds its event stream now · <b>open</b>: session open, no stream · <b>left</b>: session closed.</p>
+<table><tr><th>client</th><th>state</th><th>session</th><th>since</th><th class="num">calls</th><th>last call</th><th>last seen</th></tr>
+{{range .Snap.Sessions}}<tr><td>{{.Client}}{{if .ClientVersion}} <span class="muted">{{.ClientVersion}}</span>{{end}}</td><td>{{if .Stream}}<span class="badge done">connected</span>{{else if .Open}}<span class="badge">open</span>{{else}}<span class="badge stale">left</span>{{end}}</td><td class="muted"><code>{{.Key}}</code></td><td>{{dt .Since}} <span class="muted">({{dur ($.Data.Now.Sub .Since)}} ago)</span></td><td class="num">{{.Calls}}</td><td>{{if not .LastCall.IsZero}}{{dur ($.Data.Now.Sub .LastCall)}} ago{{else}}<span class="muted">none yet</span>{{end}}</td><td>{{dur ($.Data.Now.Sub .LastSeen)}} ago</td></tr>{{end}}</table>
 {{if not .Snap.Sessions}}<p class="muted">No clients active.</p>{{end}}
 <h2>In flight</h2>
 <table><tr><th>tool</th><th>client</th><th class="num">running for</th><th>details</th></tr>

@@ -249,7 +249,17 @@ func (s *Server) HTTPHandler(o HTTPOptions) http.Handler {
 		Logger:                     slog.New(obs.MinLevel(s.logger.With("component", "mcp-http").Handler(), slog.LevelWarn)),
 		DisableLocalhostProtection: o.BehindProxy,
 	})
-	return http.NewCrossOriginProtection().Handler(h)
+	// A GET with a session id is the client's event stream: it stays open
+	// while the client is there, so it tells the live page who is
+	// connected right now.
+	streams := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if id := r.Header.Get("Mcp-Session-Id"); r.Method == http.MethodGet && id != "" {
+			s.live.streamOpened(id)
+			defer s.live.streamClosed(id)
+		}
+		h.ServeHTTP(w, r)
+	})
+	return http.NewCrossOriginProtection().Handler(streams)
 }
 
 func boolPtr(b bool) *bool { return &b }

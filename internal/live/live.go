@@ -5,7 +5,11 @@
 // source; the UI then reads the knowledge-base file alone.
 package live
 
-import "time"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"time"
+)
 
 // Source is implemented by the MCP server when it serves over HTTP.
 type Source interface {
@@ -25,19 +29,34 @@ type Snapshot struct {
 
 // Session is one connected MCP client.
 type Session struct {
-	ID       string
-	Client   string
-	Since    time.Time
-	LastCall time.Time // zero before the first tool call
-	Calls    int
+	// ID is the raw MCP session id. Whoever knows it can act as that
+	// client, so it is never shown: Key is the public handle.
+	ID            string
+	Key           string
+	Client        string
+	ClientVersion string
+	Since         time.Time
+	LastSeen      time.Time // last request of any kind
+	LastCall      time.Time // zero before the first tool call
+	Calls         int
+	Open          bool // the server still holds the session
+	Stream        bool // the client holds its event stream (GET /mcp) right now
 }
 
 // Call is one tool call being served right now.
 type Call struct {
-	Tool      string
-	Client    string
-	Session   string
-	Started   time.Time
-	Namespace string // ingest only
-	RunID     string // ingest only: the ingest run it is recorded under
+	Tool       string
+	Client     string
+	Session    string // raw session id; never shown (see Session.ID)
+	SessionKey string
+	Started    time.Time
+	Namespace  string // ingest only
+	RunID      string // ingest only: the ingest run it is recorded under
+}
+
+// SessionKey is the public handle of a raw session id: stable for the
+// session's lifetime, useless for taking it over.
+func SessionKey(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:6])
 }
