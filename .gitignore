@@ -25,3 +25,11 @@ coverage.out
 
 # Built documentation (make docs).
 /site/
+
+# memo-tray (tray/, its own Go module): binary and app bundle builds.
+/tray/memo-tray
+/tray/dist/
+
+# A go.work would pull the cgo tray module into the root ./... patterns.
+go.work
+go.work.sum

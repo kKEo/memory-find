@@ -1,0 +1,202 @@
+// Package config is memo-tray's settings file, <MEMO_HOME>/tray.json: the
+// servers it starts (knowledge base, address, auth), extra environment for
+// them, and where memo-mcp is installed.
+package config
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/kKEo/memory-find/tray/internal/home"
+)
+
+// Config is tray.json.
+type Config struct {
+	// MemoBinary is the memo-mcp executable; empty means search for it.
+	MemoBinary string `json:"memo_binary,omitempty"`
+	// Env is extra environment for every server memo-tray starts. Apps
+	// started from Finder do not see your shell's variables, so settings
+	// such as MEMO_MODEL go here.
+	Env     map[string]string `json:"env,omitempty"`
+	Servers []Server          `json:"servers,omitempty"`
+	// StopOnQuit stops the servers memo-tray started when it quits
+	// (default true).
+	StopOnQuit *bool `json:"stop_on_quit,omitempty"`
+	// Debug enables the web inspector in stats windows.
+	Debug bool `json:"debug,omitempty"`
+}
+
+// Server is one knowledge base memo-tray can start.
+type Server struct {
+	KB        string            `json:"kb"`
+	Addr      string            `json:"addr"`           // loopback host:port
+	Auth      string            `json:"auth,omitempty"` // none (default) or token
+	Autostart bool              `json:"autostart,omitempty"`
+	Env       map[string]string `json:"env,omitempty"`
+}
+
+// Path is the settings file under MEMO_HOME.
+func Path(homeDir string) string { return filepath.Join(homeDir, "tray.json") }
+
+// Load reads path; a missing file is an empty configuration.
+func Load(path string) (*Config, error) {
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return &Config{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var c Config
+	if err := json.Unmarshal(b, &c); err != nil {
+		return nil, fmt.Errorf("%s: %w", filepath.Base(path), err)
+	}
+	if err := c.Validate(); err != nil {
+		return nil, fmt.Errorf("%s: %w", filepath.Base(path), err)
+	}
+	return &c, nil
+}
+
+// Save writes c to path atomically, readable by the owner only.
+func (c *Config) Save(path string) error {
+	b, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".tray-*.tmp")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	if _, err := tmp.Write(append(b, '\n')); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
+}
+
+// StopsOnQuit reports whether quitting stops the servers memo-tray started.
+func (c *Config) StopsOnQuit() bool { return c.StopOnQuit == nil || *c.StopOnQuit }
+
+// Find returns the entry for a knowledge base, or nil.
+func (c *Config) Find(kb string) *Server {
+	for i := range c.Servers {
+		if c.Servers[i].KB == kb {
+			return &c.Servers[i]
+		}
+	}
+	return nil
+}
+
+// FirstPort and LastPort bound the addresses AddrFor hands out.
+const (
+	FirstPort = 8765
+	LastPort  = 8799
+)
+
+// AddrFor returns the address for kb, assigning the first free port from
+// FirstPort on when kb has none yet; added reports a new entry, which the
+// caller saves, so the knowledge base keeps its MCP URL from then on.
+// free reports whether nothing listens on an address.
+func (c *Config) AddrFor(kb string, free func(addr string) bool) (addr string, added bool, err error) {
+	if s := c.Find(kb); s != nil {
+		return s.Addr, false, nil
+	}
+	used := map[string]bool{}
+	for _, s := range c.Servers {
+		used[s.Addr] = true
+	}
+	for port := FirstPort; port <= LastPort; port++ {
+		a := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+		if !used[a] && free(a) {
+			c.Servers = append(c.Servers, Server{KB: kb, Addr: a})
+			return a, true, nil
+		}
+	}
+	return "", false, fmt.Errorf("no free port in %d-%d; set an address for %s in tray.json", FirstPort, LastPort, kb)
+}
+
+// PortFree reports whether addr can be bound right now.
+func PortFree(addr string) bool {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return false
+	}
+	_ = ln.Close()
+	return true
+}
+
+var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// Reserved reports whether memo-tray sets an environment variable itself
+// (or removes it) for the servers it starts, so tray.json may not.
+func Reserved(name string) bool {
+	switch name {
+	case "MEMO_KB", "MEMO_HOME", "MEMO_PUBLIC_URL", "MEMO_METRICS_ADDR":
+		return true
+	}
+	return strings.HasPrefix(name, "MEMO_HTTP_") || strings.HasPrefix(name, "MEMO_TLS_") || strings.HasPrefix(name, "JOURNAL_")
+}
+
+// Validate checks names, addresses and environment.
+func (c *Config) Validate() error {
+	if err := validEnv(c.Env); err != nil {
+		return err
+	}
+	kbs, addrs := map[string]bool{}, map[string]bool{}
+	for _, s := range c.Servers {
+		if !home.ValidName(s.KB) {
+			return fmt.Errorf("server %q: not a valid knowledge-base name", s.KB)
+		}
+		if kbs[s.KB] {
+			return fmt.Errorf("server %q listed twice", s.KB)
+		}
+		kbs[s.KB] = true
+		host, port, err := net.SplitHostPort(s.Addr)
+		if err != nil {
+			return fmt.Errorf("server %q: addr %q: %w", s.KB, s.Addr, err)
+		}
+		if p, err := strconv.Atoi(port); err != nil || p < 1 || p > 65535 {
+			return fmt.Errorf("server %q: addr %q: bad port", s.KB, s.Addr)
+		}
+		if ip := net.ParseIP(host); host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+			return fmt.Errorf("server %q: addr %q: memo-tray starts loopback servers only", s.KB, s.Addr)
+		}
+		if addrs[s.Addr] {
+			return fmt.Errorf("server %q: addr %s used twice", s.KB, s.Addr)
+		}
+		addrs[s.Addr] = true
+		if s.Auth != "" && s.Auth != "none" && s.Auth != "token" {
+			return fmt.Errorf("server %q: auth must be none or token, not %q", s.KB, s.Auth)
+		}
+		if err := validEnv(s.Env); err != nil {
+			return fmt.Errorf("server %q: %w", s.KB, err)
+		}
+	}
+	return nil
+}
+
+func validEnv(env map[string]string) error {
+	for k := range env {
+		if !envName.MatchString(k) {
+			return fmt.Errorf("env: %q is not a variable name", k)
+		}
+		if Reserved(k) {
+			return fmt.Errorf("env: %s is set by memo-tray itself", k)
+		}
+	}
+	return nil
+}
