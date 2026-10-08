@@ -91,6 +91,7 @@ type harness struct {
 	entries  []runfile.Entry
 	snaps    map[string]live.Snapshot
 	liveErr  map[string]error
+	statsErr map[string]error
 	items    []menu.Item
 	title    string
 	copied   []string
@@ -102,7 +103,7 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	h := &harness{t: t, snaps: map[string]live.Snapshot{}, liveErr: map[string]error{}, now: time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)}
+	h := &harness{t: t, snaps: map[string]live.Snapshot{}, liveErr: map[string]error{}, statsErr: map[string]error{}, now: time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)}
 	home := t.TempDir()
 	h.sup = &fakeSup{children: map[string]supervisor.Child{}, home: home}
 	h.win = &fakeWindows{open: map[string]bool{}}
@@ -117,6 +118,9 @@ func newHarness(t *testing.T) *harness {
 			return h.snaps[t.URL], nil
 		},
 		StatsURL: func(_ context.Context, t client.Target, path string) (string, error) {
+			if err := h.statsErr[t.URL]; err != nil {
+				return "", err
+			}
 			if t.Auth == "token" {
 				return t.URL + "/login?code=c&next=" + path, nil
 			}
@@ -351,5 +355,25 @@ func waitFor(t *testing.T, cond func() bool) {
 			t.Fatal("timed out")
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// A server too old for login links still opens: on its login page.
+func TestOpenStatsOnAnOlderServer(t *testing.T) {
+	h := newHarness(t)
+	key := "http://127.0.0.1:8765"
+	h.server(41, "old", key, "token")
+	h.snaps[key] = live.Snapshot{Schema: 1, Instance: "i1"}
+	h.statsErr[key] = client.ErrNotSupported
+	h.tick()
+	h.a.handle(context.Background(), menu.Action{Kind: menu.OpenStats, Server: key})
+	if len(h.win.opens) != 1 || h.win.opens[0] != key+"|"+key+"/login?next=/live|"+key {
+		t.Errorf("window opens = %q", h.win.opens)
+	}
+	h.statsErr[key] = client.ErrUnauthorized
+	h.a.handle(context.Background(), menu.Action{Kind: menu.OpenStats, Server: key})
+	h.tick()
+	if len(h.win.opens) != 1 || !strings.Contains(h.menuText(), "⚠ open stats window: token refused") {
+		t.Errorf("refused token not reported:\n%s", h.menuText())
 	}
 }

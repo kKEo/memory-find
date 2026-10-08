@@ -27,6 +27,7 @@ import (
 	"github.com/kKEo/memory-find/tray/internal/home"
 	"github.com/kKEo/memory-find/tray/internal/icon"
 	"github.com/kKEo/memory-find/tray/internal/locate"
+	"github.com/kKEo/memory-find/tray/internal/macwin"
 	"github.com/kKEo/memory-find/tray/internal/menu"
 	"github.com/kKEo/memory-find/tray/internal/supervisor"
 	"github.com/kKEo/memory-find/tray/internal/trayui"
@@ -68,6 +69,10 @@ func run() int {
 	logf := openLog(filepath.Join(home.LogDir(homeDir), "tray.log"))
 	logf("memo-tray %s starting (MEMO_HOME %s)", buildVersion(), homeDir)
 
+	debug := false
+	if cfg, err := config.Load(config.Path(homeDir)); err == nil {
+		debug = cfg.Debug
+	}
 	sup := supervisor.New(homeDir, os.Environ())
 	cl := client.New()
 	var a *app.App
@@ -89,7 +94,7 @@ func run() int {
 		MemoVersion: locate.Version,
 		PortFree:    config.PortFree,
 		Render:      ui.Render,
-		Windows:     newWindows(),
+		Windows:     macwin.Init(debug), // its setup runs once the run loop starts
 		OpenURL:     openURL,
 		OpenFile:    openFile,
 		Copy:        copyText,
