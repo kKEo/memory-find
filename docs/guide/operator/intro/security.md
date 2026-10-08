@@ -8,7 +8,7 @@ security properties come from being local, small and explicit.
 | Surface | Exposure | Guard |
 |---|---|---|
 | MCP server | stdio of the client process (default) | No network listener. **stdout is reserved for JSON-RPC**; all diagnostics go to stderr |
-| MCP server, `serve --http` | Loopback by default; non-loopback needs `--allow-remote`, TLS and `--public-url` | Bearer token (constant-time compare) on `/mcp`, UI and `/metrics`, on by default whenever exposed; optional mTLS. Browser sessions: one-time login link or token form, HMAC-derived HttpOnly SameSite=Strict cookie. Cross-origin requests refused; Host allowlist; SDK DNS-rebinding check. Plain HTTP and unauthenticated exposure are refused |
+| MCP server, `serve --http` | Loopback by default; non-loopback needs `--allow-remote`, TLS and `--public-url` | Bearer token (constant-time compare) on `/mcp`, UI and `/metrics`, on by default whenever exposed; optional mTLS. Browser sessions: one-time login link (printed at startup, or minted by `POST /login-link` for a caller holding the token; a cookie cannot mint one) or token form, HMAC-derived HttpOnly SameSite=Strict cookie. MCP session ids are never shown, only a hashed handle (`/live`, `/live.json`). Cross-origin requests refused; Host allowlist; SDK DNS-rebinding check. Plain HTTP and unauthenticated exposure are refused |
 | Web UI | Loopback (`127.0.0.1:0` by default) | GET only, Host header allowlist against DNS rebinding, CSP, no mutating routes. A non-loopback bind needs `--allow-remote` |
 | Metrics endpoint | Off by default; loopback only, with no override | `GET /metrics` only, Host check, 404 for any other path |
 | Ollama executor | Off by default; loopback unless `--allow-remote` | CLI only; no MCP code path reaches it |

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"cmp"
+	"encoding/json"
 	"math"
 	"net/http"
 	"slices"
@@ -57,6 +58,23 @@ func (s *Server) livePage(w http.ResponseWriter, r *http.Request) {
 	}
 	s.renderPage(w, "live.html", page{Title: "Live", Refresh: refreshFor(r, true),
 		Data: liveData{Snap: snap, Now: time.Now(), Connected: connected, Tools: tools, Ingest: ingest}})
+}
+
+// liveJSON serves the live snapshot to companion apps (memo-tray): who is
+// connected and what is running, in the versioned shape of live.Schema.
+// Session ids appear only as their hashed handles.
+func (s *Server) liveJSON(w http.ResponseWriter, _ *http.Request) {
+	snap := s.live.Live()
+	snap.Schema = live.Schema
+	if snap.Sessions == nil {
+		snap.Sessions = []live.Session{}
+	}
+	if snap.InFlight == nil {
+		snap.InFlight = []live.Call{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(snap)
 }
 
 // liveStats folds the process's counters into per-tool and ingest rows.

@@ -37,8 +37,23 @@ The same port serves the web UI at `http://127.0.0.1:8765/`. In this mode the UI
 background backfill, and tool and ingest latency since start. The standalone `memo-mcp ui`
 reads the knowledge-base file alone and has no Live page.
 
-Start the server yourself (a terminal, `launchd` or a `systemd --user` unit). Clients do not
-start it, and its logs go to its own stderr.
+Start the server yourself (a terminal, `launchd` or a `systemd --user` unit), or from the macOS
+menu-bar app, memo-tray. Clients do not start it, and its logs go to its own
+stderr.
+
+### For companion apps
+
+Two routes exist for local tools such as memo-tray rather than for people:
+
+- `GET /live.json`: the Live page's client list as JSON (schema 1): the server's instance id,
+  pid, version, knowledge base and model, every client with its name, version, `open` and
+  `stream` state, call count and last activity, and the calls in flight. Sessions appear only
+  as a short hashed handle; the session id itself grants access to the session, so it is never
+  shown. New fields may be added; anything else changes `schema`.
+- `POST /login-link?next=/live` (token mode only): returns a single-use login link,
+  `{"url": "/login?code=…&next=%2Flive", "expires_at": …}`, for an app that holds the token and
+  opens the UI in a window of its own. Only the `Authorization: Bearer` header is accepted, not
+  a browser session.
 
 ### Authentication
 

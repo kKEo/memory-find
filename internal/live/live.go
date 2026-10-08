@@ -3,6 +3,11 @@
 // work. It holds types only, so the server and the UI share them without
 // importing each other. A stdio server or a standalone UI has no live
 // source; the UI then reads the knowledge-base file alone.
+//
+// The same types are the /live.json contract for companion apps
+// (memo-tray, a separate module that imports this package), so the package
+// depends on the standard library only, and the JSON shape changes only by
+// adding fields; anything else bumps Schema.
 package live
 
 import (
@@ -11,6 +16,9 @@ import (
 	"time"
 )
 
+// Schema is the version of the /live.json shape.
+const Schema = 1
+
 // Source is implemented by the MCP server when it serves over HTTP.
 type Source interface {
 	Live() Snapshot
@@ -18,40 +26,44 @@ type Source interface {
 
 // Snapshot is one consistent view of the server's in-memory state.
 type Snapshot struct {
-	Version    string
-	KBPath     string
-	Model      string // embedding model id; empty when keyword-only
-	Started    time.Time
-	Background string // backfill / reindex state, e.g. "running", "done: 12 vectors"
-	Sessions   []Session
-	InFlight   []Call
+	Schema     int       `json:"schema"`   // set by /live.json
+	Instance   string    `json:"instance"` // random per server process
+	PID        int       `json:"pid"`
+	Version    string    `json:"version"`
+	KB         string    `json:"kb"` // knowledge-base name (MEMO_KB)
+	KBPath     string    `json:"kb_path"`
+	Model      string    `json:"model"` // embedding model id; empty when keyword-only
+	Started    time.Time `json:"started"`
+	Background string    `json:"background"` // backfill / reindex state, e.g. "running", "done: 12 vectors"
+	Sessions   []Session `json:"sessions"`
+	InFlight   []Call    `json:"in_flight"`
 }
 
 // Session is one connected MCP client.
 type Session struct {
 	// ID is the raw MCP session id. Whoever knows it can act as that
 	// client, so it is never shown: Key is the public handle.
-	ID            string
-	Key           string
-	Client        string
-	ClientVersion string
-	Since         time.Time
-	LastSeen      time.Time // last request of any kind
-	LastCall      time.Time // zero before the first tool call
-	Calls         int
-	Open          bool // the server still holds the session
-	Stream        bool // the client holds its event stream (GET /mcp) right now
+	ID            string    `json:"-"`
+	Key           string    `json:"id"`
+	Client        string    `json:"client"`
+	ClientVersion string    `json:"client_version"`
+	Since         time.Time `json:"since"`
+	LastSeen      time.Time `json:"last_seen"`          // last request of any kind
+	LastCall      time.Time `json:"last_call,omitzero"` // zero before the first tool call
+	Calls         int       `json:"calls"`
+	Open          bool      `json:"open"`   // the server still holds the session
+	Stream        bool      `json:"stream"` // the client holds its event stream (GET /mcp) right now
 }
 
 // Call is one tool call being served right now.
 type Call struct {
-	Tool       string
-	Client     string
-	Session    string // raw session id; never shown (see Session.ID)
-	SessionKey string
-	Started    time.Time
-	Namespace  string // ingest only
-	RunID      string // ingest only: the ingest run it is recorded under
+	Tool       string    `json:"tool"`
+	Client     string    `json:"client"`
+	Session    string    `json:"-"` // raw session id; never shown (see Session.ID)
+	SessionKey string    `json:"session"`
+	Started    time.Time `json:"started"`
+	Namespace  string    `json:"namespace,omitempty"` // ingest only
+	RunID      string    `json:"run_id,omitempty"`    // ingest only: the ingest run it is recorded under
 }
 
 // SessionKey is the public handle of a raw session id: stable for the

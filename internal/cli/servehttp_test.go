@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"io"
 	"math/big"
@@ -25,6 +26,7 @@ import (
 	"github.com/kKEo/memory-find/internal/embedding"
 	"github.com/kKEo/memory-find/internal/httpauth"
 	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/live"
 	"github.com/kKEo/memory-find/internal/retrieve"
 	"github.com/kKEo/memory-find/internal/server"
 )
@@ -173,6 +175,17 @@ func TestServeHTTPHostsMCPAndLiveUI(t *testing.T) {
 	if _, body = get(t, c, base+"/metrics"); !strings.Contains(body, "memo_mcp_tool_calls_total") {
 		t.Error("/metrics lacks tool counters")
 	}
+	code, body = get(t, c, base+"/live.json")
+	var snap live.Snapshot
+	if err := json.Unmarshal([]byte(body), &snap); code != 200 || err != nil {
+		t.Fatalf("/live.json: %d %v\n%s", code, err, body)
+	}
+	if snap.Schema != live.Schema || snap.KB != "live" || snap.PID != os.Getpid() || snap.Instance == "" {
+		t.Errorf("/live.json server fields = %+v", snap)
+	}
+	if len(snap.Sessions) != 1 || snap.Sessions[0].Client != "http-client" || snap.Sessions[0].Calls != 1 || snap.Sessions[0].ID != "" {
+		t.Errorf("/live.json sessions = %+v", snap.Sessions)
+	}
 }
 
 type bearer struct {
@@ -217,8 +230,35 @@ func TestServeHTTPSWithToken(t *testing.T) {
 		t.Errorf("browser without session: %d, want redirect to /login", code)
 	}
 
-	req, _ := http.NewRequest("GET", base+"/login?code="+h.guard.LoginCode(), nil)
+	if code, _ := get(t, plain, base+"/live.json"); code != 401 {
+		t.Errorf("/live.json without token: %d, want 401", code)
+	}
+
+	// An app holding the token gets a login link for its own window.
+	req, _ := http.NewRequest("POST", base+"/login-link?next=/live", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
 	resp, err := plain.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var link httpauth.LoginLink
+	err = json.NewDecoder(resp.Body).Decode(&link)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || err != nil || !strings.HasPrefix(link.URL, "/login?code=") {
+		t.Fatalf("login link: %d %v %+v", resp.StatusCode, err, link)
+	}
+	req, _ = http.NewRequest("GET", base+link.URL, nil)
+	resp, err = plain.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 303 || resp.Header.Get("Location") != "/live" || len(resp.Cookies()) != 1 {
+		t.Fatalf("minted login link: %d %q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+
+	req, _ = http.NewRequest("GET", base+"/login?code="+h.guard.LoginCode(), nil)
+	resp, err = plain.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}

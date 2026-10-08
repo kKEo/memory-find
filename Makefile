@@ -22,10 +22,11 @@ eval:
 baseline-update:
 	go test ./internal/eval/ -run TestRetrievalEval -count=1 -update-baseline
 
-# golden-update re-records the tools/list golden file after a deliberate
-# tool-surface change. Review the diff before committing.
+# golden-update re-records the tools/list and /live.json golden files after a
+# deliberate contract change. Review the diff before committing.
 golden-update:
 	go test ./internal/server/ -run TestListToolsGolden -count=1 -update
+	go test ./internal/ui/ -run TestLiveJSONGolden -count=1 -update
 
 # spike runs a throwaway experiment under spikes/<name> (never part of the
 # binary or of PR CI). Usage: make spike NAME=s2-vectors

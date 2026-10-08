@@ -1,6 +1,7 @@
 package httpauth
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -160,5 +161,70 @@ func TestOneTimeLoginCode(t *testing.T) {
 	g.now = time.Now
 	if rec := do(h, httptest.NewRequest("GET", "/login?code="+old, nil)); rec.Code != 401 {
 		t.Errorf("expired code accepted: %d", rec.Code)
+	}
+}
+
+// An app holding the token mints single-use login links for a browser
+// window; a browser session (cookie) cannot, and the token never appears
+// in the link.
+func TestLoginLink(t *testing.T) {
+	g, h := guarded()
+	link := func(method, auth, next string, cookie *http.Cookie) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, "/login-link?next="+url.QueryEscape(next), nil)
+		if auth != "" {
+			r.Header.Set("Authorization", auth)
+		}
+		if cookie != nil {
+			r.AddCookie(cookie)
+		}
+		return do(h, r)
+	}
+	if rec := link("GET", "Bearer "+testToken, "/live", nil); rec.Code != 405 || rec.Header().Get("Allow") != "POST" {
+		t.Errorf("GET: %d, want 405", rec.Code)
+	}
+	cookie := &http.Cookie{Name: CookieName, Value: g.session}
+	for name, rec := range map[string]*httptest.ResponseRecorder{
+		"no auth":      link("POST", "", "/live", nil),
+		"cookie only":  link("POST", "", "/live", cookie),
+		"wrong bearer": link("POST", "Bearer wrong", "/live", cookie),
+	} {
+		if rec.Code != 401 {
+			t.Errorf("%s: %d, want 401", name, rec.Code)
+		}
+	}
+
+	rec := link("POST", "Bearer "+testToken, "/live", nil)
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "application/json" || rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("bearer: %d %v", rec.Code, rec.Header())
+	}
+	var ll LoginLink
+	if err := json.Unmarshal(rec.Body.Bytes(), &ll); err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(ll.URL)
+	if err != nil || u.Path != "/login" || u.Host != "" || u.Query().Get("next") != "/live" || u.Query().Get("code") == "" ||
+		strings.Contains(ll.URL, testToken) || time.Until(ll.ExpiresAt) > codeTTL || time.Until(ll.ExpiresAt) < codeTTL-time.Minute {
+		t.Fatalf("link = %+v", ll)
+	}
+	if rec := do(h, httptest.NewRequest("GET", ll.URL, nil)); rec.Code != 303 || rec.Header().Get("Location") != "/live" || len(rec.Result().Cookies()) != 1 {
+		t.Fatalf("logging in with the link: %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+	if rec := do(h, httptest.NewRequest("GET", ll.URL, nil)); rec.Code != 401 {
+		t.Errorf("link reused: %d", rec.Code)
+	}
+
+	rec = link("POST", "Bearer "+testToken, "//evil.example/", nil)
+	if err := json.Unmarshal(rec.Body.Bytes(), &ll); err != nil {
+		t.Fatal(err)
+	}
+	if u, _ := url.Parse(ll.URL); u.Query().Get("next") != "/" {
+		t.Errorf("open redirect through next: %q", ll.URL)
+	}
+
+	r := httptest.NewRequest("POST", "/login-link", nil)
+	r.Header.Set("Authorization", "Bearer "+testToken)
+	r.Header.Set("Sec-Fetch-Site", "cross-site")
+	if rec := do(h, r); rec.Code != 403 {
+		t.Errorf("cross-site: %d, want 403", rec.Code)
 	}
 }

@@ -3,7 +3,11 @@ package server
 import (
 	"cmp"
 	"context"
+	"crypto/rand"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +20,7 @@ import (
 // names and timings are kept, never arguments or results.
 type tracker struct {
 	mu         sync.Mutex
+	instance   string // tells a restarted server from the old one at the same address
 	started    time.Time
 	background string
 	nextID     uint64
@@ -25,7 +30,7 @@ type tracker struct {
 }
 
 func newTracker(now time.Time) *tracker {
-	return &tracker{started: now, inFlight: map[uint64]*live.Call{}, sessions: map[string]*live.Session{}, streams: map[string]int{}}
+	return &tracker{instance: rand.Text(), started: now, inFlight: map[uint64]*live.Call{}, sessions: map[string]*live.Session{}, streams: map[string]int{}}
 }
 
 func sessionID(req mcp.Request) string {
@@ -159,8 +164,11 @@ func (s *Server) Live() live.Snapshot {
 	t := s.live
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	snap := live.Snapshot{Version: s.version, KBPath: s.kbPath, Started: t.started, Background: t.background,
-		Sessions: []live.Session{}, InFlight: []live.Call{}}
+	snap := live.Snapshot{Instance: t.instance, PID: os.Getpid(), Version: s.version, KBPath: s.kbPath,
+		Started: t.started, Background: t.background, Sessions: []live.Session{}, InFlight: []live.Call{}}
+	if s.kbPath != "" {
+		snap.KB = strings.TrimSuffix(filepath.Base(s.kbPath), ".db")
+	}
 	if e := s.store.Embedder(); e != nil {
 		snap.Model = e.Info().ID
 	}

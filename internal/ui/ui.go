@@ -156,6 +156,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /eval", s.evalPage)
 	if s.live != nil {
 		mux.HandleFunc("GET /live", s.livePage)
+		mux.HandleFunc("GET /live.json", s.liveJSON)
 	}
 	mux.HandleFunc("GET /style.css", s.css)
 	mux.Handle("GET /metrics", obs.Handler(obs.Default()))

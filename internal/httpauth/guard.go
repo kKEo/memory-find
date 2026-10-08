@@ -5,8 +5,10 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/json"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -51,6 +53,11 @@ func New(token string, secure bool) *Guard {
 // The server prints it at startup so a browser can log in without the
 // token being pasted or put in a URL.
 func (g *Guard) LoginCode() string {
+	code, _ := g.mintCode()
+	return code
+}
+
+func (g *Guard) mintCode() (string, time.Time) {
 	code := NewToken()
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -60,8 +67,9 @@ func (g *Guard) LoginCode() string {
 			delete(g.codes, c)
 		}
 	}
-	g.codes[code] = now.Add(codeTTL)
-	return code
+	exp := now.Add(codeTTL)
+	g.codes[code] = exp
+	return code, exp
 }
 
 func (g *Guard) useCode(code string) bool {
@@ -82,9 +90,8 @@ func (g *Guard) tokenOK(s string) bool {
 // Authorized reports whether r carries the bearer token or a valid session
 // cookie.
 func (g *Guard) Authorized(r *http.Request) bool {
-	if h := r.Header.Get("Authorization"); h != "" {
-		scheme, cred, ok := strings.Cut(h, " ")
-		return ok && strings.EqualFold(scheme, "Bearer") && g.tokenOK(strings.TrimSpace(cred))
+	if r.Header.Get("Authorization") != "" {
+		return g.bearerOK(r)
 	}
 	if c, err := r.Cookie(CookieName); err == nil {
 		return subtle.ConstantTimeCompare([]byte(c.Value), []byte(g.session)) == 1
@@ -92,15 +99,26 @@ func (g *Guard) Authorized(r *http.Request) bool {
 	return false
 }
 
-// Wrap guards next. /login and /logout are served here; /style.css stays
-// open so the login page is styled. Browsers without a session are sent
-// to /login; everything else gets 401 with a Bearer challenge.
+// bearerOK reports whether r carries the token in its Authorization header.
+func (g *Guard) bearerOK(r *http.Request) bool {
+	scheme, cred, ok := strings.Cut(r.Header.Get("Authorization"), " ")
+	return ok && strings.EqualFold(scheme, "Bearer") && g.tokenOK(strings.TrimSpace(cred))
+}
+
+// Wrap guards next. /login, /logout and /login-link are served here;
+// /style.css stays open so the login page is styled. Browsers without a
+// session are sent to /login; everything else gets 401 with a Bearer
+// challenge.
 func (g *Guard) Wrap(next http.Handler) http.Handler {
 	login := http.NewCrossOriginProtection().Handler(http.HandlerFunc(g.login))
+	loginLink := http.NewCrossOriginProtection().Handler(http.HandlerFunc(g.loginLink))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/login":
 			login.ServeHTTP(w, r)
+			return
+		case "/login-link":
+			loginLink.ServeHTTP(w, r)
 			return
 		case "/logout":
 			g.setCookie(w, "", -1)
@@ -121,6 +139,34 @@ func (g *Guard) Wrap(next http.Handler) http.Handler {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="memo-mcp"`)
 		http.Error(w, "unauthorized: send Authorization: Bearer <token> (memo-mcp http-token prints it)", http.StatusUnauthorized)
 	})
+}
+
+// loginLink answers POST /login-link?next=<path> with a single-use login
+// link, for an app that holds the token and opens the UI in a window of its
+// own (memo-tray), so the token never reaches the browser or a URL. Only the
+// Authorization header counts: a browser session cannot mint more sessions.
+func (g *Guard) loginLink(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !g.bearerOK(r) {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="memo-mcp"`)
+		http.Error(w, "unauthorized: send Authorization: Bearer <token> (memo-mcp http-token prints it)", http.StatusUnauthorized)
+		return
+	}
+	code, exp := g.mintCode()
+	link := "/login?" + url.Values{"code": {code}, "next": {safeNext(r.URL.Query().Get("next"))}}.Encode()
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(LoginLink{URL: link, ExpiresAt: exp})
+}
+
+// LoginLink is the /login-link response: URL is relative to the server.
+type LoginLink struct {
+	URL       string    `json:"url"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 func wantsHTML(r *http.Request) bool {

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "instance": "K2Q7EXAMPLEINSTANCE",
+  "pid": 4242,
+  "version": "v1.5.0",
+  "kb": "crportal",
+  "kb_path": "/home/u/.memo-mcp/kb/crportal.db",
+  "model": "granite-small-r2",
+  "started": "2026-10-08T12:00:00Z",
+  "background": "idle",
+  "sessions": [
+    {
+      "id": "3fa94c0d12ab",
+      "client": "claude-code",
+      "client_version": "2.1.4",
+      "since": "2026-10-08T12:01:00Z",
+      "last_seen": "2026-10-08T12:03:00Z",
+      "last_call": "2026-10-08T12:02:00Z",
+      "calls": 14,
+      "open": true,
+      "stream": true
+    },
+    {
+      "id": "9d1c22e07f10",
+      "client": "cursor",
+      "client_version": "",
+      "since": "2026-10-08T12:05:00Z",
+      "last_seen": "2026-10-08T12:05:00Z",
+      "calls": 0,
+      "open": true,
+      "stream": false
+    }
+  ],
+  "in_flight": [
+    {
+      "tool": "ingest",
+      "client": "claude-code",
+      "session": "3fa94c0d12ab",
+      "started": "2026-10-08T12:03:00Z",
+      "namespace": "web",
+      "run_id": "run-42"
+    }
+  ]
+}
+
