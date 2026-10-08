@@ -36,13 +36,17 @@ func TestTokenFile(t *testing.T) {
 		t.Errorf("after rotate Load = %q", got)
 	}
 	if runtime.GOOS != "windows" {
-		os.Chmod(path, 0o644)
+		if err := os.Chmod(path, 0o644); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "chmod 600") {
 			t.Errorf("world-readable token accepted: %v", err)
 		}
 	}
 	short := filepath.Join(t.TempDir(), "short")
-	os.WriteFile(short, []byte("abc\n"), 0o600)
+	if err := os.WriteFile(short, []byte("abc\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := Load(short); err == nil {
 		t.Error("short token accepted")
 	}
@@ -52,7 +56,7 @@ const testToken = "0123456789abcdef0123456789abcdef-test"
 
 func guarded() (*Guard, http.Handler) {
 	g := New(testToken, true)
-	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("inside " + r.URL.Path)) })
+	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("inside " + r.URL.Path)) })
 	return g, g.Wrap(ok)
 }
 

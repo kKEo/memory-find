@@ -68,7 +68,7 @@ func TestPrepareHTTPRules(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			s, err := prepareHTTP(c.f, home)
 			if s != nil {
-				s.ln.Close()
+				_ = s.ln.Close()
 			}
 			switch {
 			case c.want == "" && err != nil:
@@ -131,7 +131,7 @@ func get(t *testing.T, c *http.Client, url string, hdr ...string) (int, string) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	b, _ := io.ReadAll(resp.Body)
 	return resp.StatusCode, string(b)
 }
@@ -244,7 +244,7 @@ func TestServeHTTPSWithToken(t *testing.T) {
 	}
 	var link httpauth.LoginLink
 	err = json.NewDecoder(resp.Body).Decode(&link)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != 200 || err != nil || !strings.HasPrefix(link.URL, "/login?code=") {
 		t.Fatalf("login link: %d %v %+v", resp.StatusCode, err, link)
 	}
@@ -253,7 +253,7 @@ func TestServeHTTPSWithToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != 303 || resp.Header.Get("Location") != "/live" || len(resp.Cookies()) != 1 {
 		t.Fatalf("minted login link: %d %q", resp.StatusCode, resp.Header.Get("Location"))
 	}
@@ -263,7 +263,7 @@ func TestServeHTTPSWithToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	cookies := resp.Cookies()
 	if resp.StatusCode != 303 || len(cookies) != 1 || !cookies[0].Secure {
 		t.Fatalf("login link: %d %+v", resp.StatusCode, cookies)
@@ -275,7 +275,7 @@ func TestServeHTTPSWithToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != 200 || !strings.Contains(string(b), "http-client") {
 		t.Errorf("/live with cookie: %d", resp.StatusCode)
 	}
@@ -287,7 +287,8 @@ func TestServeHTTPMutualTLS(t *testing.T) {
 	pki := newTestPKI(t)
 	base, _ := startHTTP(t, httpFlags{addr: "127.0.0.1:0", auth: "none", tlsCert: pki.serverCert, tlsKey: pki.serverKey, clientCA: pki.caCert})
 	noCert := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pki.pool}}}
-	if _, err := noCert.Get(base + "/live"); err == nil {
+	if resp, err := noCert.Get(base + "/live"); err == nil {
+		_ = resp.Body.Close()
 		t.Fatal("TLS handshake without a client certificate succeeded")
 	}
 	withCert := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pki.pool, Certificates: []tls.Certificate{pki.client}}}}

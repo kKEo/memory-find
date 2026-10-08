@@ -358,7 +358,7 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) error {
 		if err != nil {
 			return err
 		}
-		defer web.ln.Close()
+		defer func() { _ = web.ln.Close() }()
 	}
 	embedder, cleanup, err := buildEmbedder(ctx)
 	if err != nil {
