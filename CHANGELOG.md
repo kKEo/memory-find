@@ -33,6 +33,13 @@ All notable changes. Tags follow semantic versioning; each tag has an eval repor
   `--behind-proxy` for a TLS-terminating proxy, and `--public-url`. Plain HTTP on a
   non-loopback address and unauthenticated exposure are refused.
 - Fix MCP registry publishing: `server.json` no longer sets `registryBaseUrl` on the MCPB package.
+- **memo-tray**, an optional macOS menu-bar app (`tray/`, its own Go module; the only cgo build,
+  memo-mcp stays pure Go): lists the running `serve --http` servers from their run files with
+  the agents connected to each (● active, ○ quiet; the count next to the icon), opens a
+  server's **Live** page in a native window that logs itself in, and starts, stops and restarts
+  servers per knowledge base (`<MEMO_HOME>/tray.json`, logs in `<MEMO_HOME>/logs/`). Released
+  as `memo-tray_<version>_darwin_universal.zip` (unsigned) by a macOS job after the server
+  archives; `make tray`, `make tray-app`, `make tray-test`.
 - `GET /live.json` on `serve --http`: the Live page's clients and calls in flight as JSON
   (`schema` 1, plus the server's instance id and pid) for companion apps, and
   `POST /login-link` (token mode, `Authorization: Bearer` only) returning a single-use login

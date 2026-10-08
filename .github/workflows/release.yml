@@ -2,6 +2,8 @@
 # version from the tag, then the server.json gets the archive checksum and is
 # published to the MCP registry with GitHub OIDC (no stored secret; the
 # `mcp-name` marker in README.md proves ownership of io.github.kKEo/*).
+# Once the release exists, a macOS job adds memo-tray.app (zip + SHA-256);
+# it runs separately, so a tray failure never holds back the server.
 name: release
 on:
   push:
@@ -41,3 +43,22 @@ jobs:
         run: |
           mcp-publisher login github-oidc
           mcp-publisher publish dist/server.json
+  tray:
+    needs: release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tray/go.mod
+          cache-dependency-path: tray/go.sum
+      - name: tests
+        run: make tray-test
+      - name: build memo-tray.app
+        run: make tray-app VERSION="$GITHUB_REF_NAME"
+      - name: attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" tray/dist/*.zip tray/dist/*.sha256 --clobber

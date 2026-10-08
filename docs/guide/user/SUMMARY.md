@@ -12,6 +12,7 @@
   - [Keeping work separate](everyday/separate.md)
 - [Trust: who vouched for what](trust.md)
 - [Looking inside](looking-inside.md)
+- [The menu-bar app (macOS)](menu-bar.md)
 - [Keeping it tidy](keeping-tidy.md)
 - [Use cases](use-cases.md)
 - [Privacy and safety](privacy.md)

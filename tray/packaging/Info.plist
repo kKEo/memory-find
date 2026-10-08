@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- memo-tray.app. @SHORT_VERSION@ is filled in by scripts/build-app.sh. -->
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>memo-tray</string>
+	<key>CFBundleDisplayName</key>
+	<string>memo-tray</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.kkeo.memo-tray</string>
+	<key>CFBundleExecutable</key>
+	<string>memo-tray</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@SHORT_VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@SHORT_VERSION@</string>
+	<!-- The oldest macOS Go 1.26 supports. -->
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+	<!-- A menu-bar app: no Dock icon, no app menu. -->
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>MIT License · github.com/kKEo/memory-find</string>
+	<!-- Stats windows load memo-mcp's pages over plain HTTP on loopback. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

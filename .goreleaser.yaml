@@ -47,6 +47,9 @@ changelog:
 release:
   draft: false
   footer: |
-    Pure-Go binary, no runtime dependencies. On first start it downloads the
-    default embedding model (granite-embedding-small-english-r2, Apache-2.0).
+    memo-mcp is a pure-Go binary with no runtime dependencies. On first start
+    it downloads the default embedding model (granite-embedding-small-english-r2,
+    Apache-2.0). The optional macOS menu-bar app, memo-tray, is attached as
+    `memo-tray_{{ .Version }}_darwin_universal.zip` (unsigned: allow it under
+    System Settings > Privacy & Security on first open).
     Eval numbers for this tag: `docs/eval/v{{ .Version }}.md`.

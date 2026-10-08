@@ -14,6 +14,9 @@ Every tag `vX.Y.Z` publishes five archives and a checksum file on the
 
 Each archive contains the binary, `LICENSE`, `README.md` and `SKILL.md`.
 
+The optional macOS menu-bar app comes as one more asset, `memo-tray_X.Y.Z_darwin_universal.zip`,
+with its own `.sha256` file; see [memo-tray](tray.md).
+
 ## Install
 
 ```bash
@@ -42,7 +45,8 @@ directly.
 
 ## What the binary needs at runtime
 
-- No shared libraries, no CGo, no interpreter.
+- No shared libraries, no CGo, no interpreter. (This is the memo-mcp binary. memo-tray, the
+  separate macOS app, links AppKit and WebKit.)
 - A writable `MEMO_HOME`, by default `~/.memo-mcp`, and a writable `~/.cache/memo-mcp/models`.
 - About 200 MB of disk for the default model, plus the knowledge-base files. See
   [Capacity and performance](../operations/capacity.md).

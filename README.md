@@ -23,6 +23,8 @@ Claude (or any MCP client) gets ten tools over one knowledge base:
 | `submit` | Hand back a page, a conflict decision or a merge decision. Pages are stored as derived (`is_inference`) with the passages they cite; the omission check reports facts the page left out; `dry_run` shows the diff first |
 | `status` | Namespaces, the embedding model, pending vectors, background jobs, graph and page counts |
 
+On macOS, the optional menu-bar app **memo-tray** (`tray/`, a separate binary; the only part built with cgo) shows the clients connected to each `memo-mcp serve --http` server, opens a server's Live page in a window, and starts and stops servers. See [`docs/guide/user/menu-bar.md`](docs/guide/user/menu-bar.md).
+
 For a human there is `memo-mcp ui`: a read-only web page on loopback with the same search (and the same explain table the agent gets), documents and passages with provenance and history, the facts timeline, entity neighbourhoods, agent-written pages, status, lint and the query log. Nothing on it can change the knowledge base.
 
 The same addresses are readable as MCP resources (`memo://doc/{id}`, `memo://chunk/{id}`, `memo://source/{id}`, `memo://fact/{id}`), and `memo://index` or `memo://ns/{namespace}/index` give a one-line-per-document view under 8 KB for the start of a session. [`SKILL.md`](SKILL.md) tells an agent how to use the tools well; `memo-mcp export --index` prints the same index for an `AGENTS.md` or `CLAUDE.md` file.
@@ -189,7 +191,7 @@ memo-mcp exists as something different: a small, fully local, fully readable ret
 
 ## Project status
 
-1.0: the core knowledge base is complete and measured. What is stable, and what 1.x added (graph as an index, compaction and pages, a read-only web UI, local observability), is in [`docs/roadmap.md`](docs/roadmap.md). Not planned: HTTP transport, a server-side LLM, importing the v0 journal files. Contributions and issues welcome.
+1.0: the core knowledge base is complete and measured. What is stable, and what 1.x added (graph as an index, compaction and pages, a read-only web UI, local observability), is in [`docs/roadmap.md`](docs/roadmap.md). Not planned: a server-side LLM, importing the v0 journal files. Contributions and issues welcome.
 
 ## License
 

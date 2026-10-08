@@ -25,8 +25,8 @@ err()  { echo "docs-check: $*" >&2; fail=1; }
 warn() { echo "docs-check: warning: $*" >&2; }
 is_draft() { grep -qx '> Draft\.' "$1"; }
 
-# Non-test Go sources.
-go_sources() { find internal cmd -name '*.go' ! -name '*_test.go' -print0; }
+# Non-test Go sources, memo-tray's included.
+go_sources() { find internal cmd tray -name '*.go' ! -name '*_test.go' -print0; }
 
 # 1. Relative links.
 guide_root=$(cd "$GUIDE" && pwd -P)
@@ -55,7 +55,8 @@ env_ref=$OP/config/environment.md
 if is_draft "$env_ref"; then
   warn "$env_ref is a draft; skipping the environment-variable check"
 else
-  for v in $(go_sources | xargs -0 grep -hoE '"MEMO_[A-Z_]+"' | tr -d '"' | sort -u); do
+  # A name ends in a letter; "MEMO_HTTP_" and the like are prefixes.
+  for v in $(go_sources | xargs -0 grep -hoE '"MEMO_[A-Z_]*[A-Z]"' | tr -d '"' | sort -u); do
     grep -q "\`$v\`" "$env_ref" || err "$v is read by the code but missing from $env_ref"
   done
 fi

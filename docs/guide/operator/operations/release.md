@@ -6,9 +6,9 @@ For maintainers and for operators who build their own releases.
 
 | Workflow | Trigger | Does |
 |---|---|---|
-| `ci.yml` | Push, pull request | gofmt, `go vet`, tests under the race detector (these include the retrieval eval gate and the `tools/list` golden), a pure-Go build and smoke run on Linux and macOS (Windows is currently disabled in the test matrix), golangci-lint, and a GoReleaser snapshot that must produce five archives |
+| `ci.yml` | Push, pull request | gofmt, `go vet`, tests under the race detector (these include the retrieval eval gate and the `tools/list` golden), a pure-Go build and smoke run on Linux and macOS (Windows is currently disabled in the test matrix), golangci-lint, a GoReleaser snapshot that must produce five archives, and on macOS the memo-tray module: vet, race tests, an end-to-end run against a real memo-mcp, and the app bundle |
 | `nightly.yml` | Daily at 03:17 UTC | The eval with the hash embedder and `granite-small-r2`; uploads the report as an artifact |
-| `release.yml` | Tag `v*` | Tests, then GoReleaser (five archives, `checksums.txt`), then publishes `server.json` to the MCP registry with GitHub OIDC (no stored secret) |
+| `release.yml` | Tag `v*` | Tests, then GoReleaser (five archives, `checksums.txt`), then publishes `server.json` to the MCP registry with GitHub OIDC (no stored secret). A second job on macOS then builds `memo-tray.app` and attaches its zip and `.sha256` to the release; a failure there does not affect the server release |
 | `docs.yml` | Push to `master` touching `docs/guide/**`, pull requests (build only), manual | Builds these guides with mdBook, runs `scripts/docs-check.sh`, deploys to GitHub Pages |
 
 ## Gates a change must pass

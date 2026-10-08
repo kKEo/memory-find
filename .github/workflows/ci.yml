@@ -71,3 +71,31 @@ jobs:
           args: release --snapshot --clean --skip=publish
       - name: five archives
         run: test "$(ls dist/*.tar.gz dist/*.zip | wc -l)" -eq 5 && ls dist
+  tray:
+    # memo-tray (tray/, its own module) is macOS-only and the one cgo build:
+    # it is vetted, tested and bundled here, apart from the pure-Go gate.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tray/go.mod
+          cache-dependency-path: tray/go.sum
+      - name: gofmt
+        run: test -z "$(gofmt -l tray)" || (gofmt -l tray && exit 1)
+      - name: vet and test (race)
+        run: make tray-test
+      - name: links none of the server's dependencies
+        working-directory: tray
+        run: "! go list -deps ./cmd/memo-tray | grep -E 'modernc.org/sqlite|knights-analytics|modelcontextprotocol'"
+      - name: end to end with a real memo-mcp
+        run: make build && cd tray && MEMO_TRAY_E2E_BIN="$PWD/../memo-mcp" go test ./internal/supervisor/ -run E2E -count=1 -v
+      - name: app bundle
+        run: |
+          make tray-app
+          codesign --verify --strict tray/dist/memo-tray.app
+          lipo -archs tray/dist/memo-tray.app/Contents/MacOS/memo-tray | grep -q 'x86_64 arm64'
+          tray/dist/memo-tray.app/Contents/MacOS/memo-tray -version
+          ls tray/dist/*.zip tray/dist/*.sha256

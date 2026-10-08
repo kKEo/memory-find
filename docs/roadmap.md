@@ -239,7 +239,9 @@ them; they are not reopened.
 - **Trust is assigned by channel, not by claim.** Tool writes are capped at `agent`; raising trust
   needs a human through elicitation or the CLI, and is audited. [decision 6]
 - **Pure Go, `CGO_ENABLED=0`, no cloud, no telemetry.** Local, pull-only metrics on a loopback
-  address and logs on stderr are not telemetry: nothing leaves the machine. [D-P]
+  address and logs on stderr are not telemetry: nothing leaves the machine. [D-P] This binds the
+  memo-mcp binary. The optional macOS menu-bar app (`tray/`, its own module and release asset)
+  links AppKit and WebKit through cgo and never enters the server's build.
 - **Everything is measured with labelled recall/nDCG plus cost, never LLM-judge win rates.**
 - **One explain contract, three faces.** CLI, MCP and the UI render the same `Why` and `Trace`
   Go structs, and tests assert the numbers are identical.

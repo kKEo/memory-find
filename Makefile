@@ -2,7 +2,7 @@ BINARY = memo-mcp
 PKG = ./cmd/memo-mcp/
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: build snapshot test test-verbose test-race cover fmt vet lint check clean eval golden-update baseline-update spike docs docs-check docs-serve
+.PHONY: build snapshot test test-verbose test-race cover fmt vet lint check clean eval golden-update baseline-update spike docs docs-check docs-serve start-http tray tray-test tray-app
 
 build:
 	CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(VERSION)" -o $(BINARY) $(PKG)
@@ -94,10 +94,22 @@ lint:
 # the CI planned in docs/roadmap.md (P0 minimal, P6 full matrix).
 check: fmt vet lint test-race
 
-clean:
-	rm -f $(BINARY) coverage.out
-	rm -rf site
+# memo-tray, the macOS menu-bar app, is its own Go module under tray/ and
+# the only cgo build in the repository; memo-mcp itself stays pure Go.
+tray:
+	cd tray && CGO_ENABLED=1 go build -ldflags "-s -w -X main.version=$(VERSION)" -o memo-tray ./cmd/memo-tray
 
+tray-test:
+	cd tray && go vet ./... && go test ./... -race -count=1
+
+# tray-app builds tray/dist/memo-tray.app (universal, ad-hoc signed) and its
+# release zip.
+tray-app:
+	./tray/scripts/build-app.sh $(VERSION)
+
+clean:
+	rm -f $(BINARY) coverage.out tray/memo-tray
+	rm -rf site tray/dist
 
 start-http:
-	MEMO_KB=crportal memo-mcp serve  --http 127.0.0.1:8765 
+	MEMO_KB=crportal memo-mcp serve --http 127.0.0.1:8765

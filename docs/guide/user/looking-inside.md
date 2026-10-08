@@ -17,7 +17,8 @@ only reachable from your own computer. Press `Ctrl-C` in the terminal to stop it
 
 If you run memo-mcp as one shared server (`memo-mcp serve --http 127.0.0.1:8765`, see the
 operator guide), the same view is already at `http://127.0.0.1:8765/`, with an extra **Live**
-page.
+page. On a Mac, [the menu-bar app](menu-bar.md) shows who is connected at a glance and opens
+the Live page in a window.
 
 ## What you can do there
 

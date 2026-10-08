@@ -38,7 +38,7 @@ background backfill, and tool and ingest latency since start. The standalone `me
 reads the knowledge-base file alone and has no Live page.
 
 Start the server yourself (a terminal, `launchd` or a `systemd --user` unit), or from the macOS
-menu-bar app, memo-tray. Clients do not start it, and its logs go to its own
+menu-bar app, [memo-tray](tray.md). Clients do not start it, and its logs go to its own
 stderr.
 
 ### For companion apps
