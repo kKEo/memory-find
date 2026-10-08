@@ -18,7 +18,9 @@ import (
 
 	"github.com/kKEo/memory-find/internal/httpauth"
 	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memory-find/internal/live"
 	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memory-find/internal/runfile"
 	"github.com/kKEo/memory-find/internal/server"
 	"github.com/kKEo/memory-find/internal/ui"
 )
@@ -57,6 +59,7 @@ type httpSetup struct {
 	tokenFile   string
 	mtls        bool
 	behindProxy bool
+	runDir      string // where serveHTTP advertises the server (internal/runfile)
 }
 
 func defaultTokenFile(home string) string { return filepath.Join(home, "http-token") }
@@ -107,7 +110,7 @@ func prepareHTTP(f httpFlags, home string) (*httpSetup, error) {
 	default:
 		return nil, fmt.Errorf("--auth must be token or none, not %q", f.auth)
 	}
-	s := &httpSetup{scheme: "http", mtls: f.clientCA != "", behindProxy: f.behindProxy}
+	s := &httpSetup{scheme: "http", mtls: f.clientCA != "", behindProxy: f.behindProxy, runDir: runfile.Dir(home)}
 	if f.publicURL != "" {
 		u, err := url.Parse(f.publicURL)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
@@ -209,10 +212,41 @@ func serveHTTP(ctx context.Context, h *httpSetup, srv *server.Server, store *kb.
 	if h.guard != nil {
 		slog.Info("browser login link (single use, 15 minutes)", "url", base+"/login?code="+h.guard.LoginCode())
 	}
+	if path, err := runfile.Write(h.runDir, h.runInfo(srv.Live())); err != nil {
+		slog.Warn("cannot advertise the server to local apps", "dir", h.runDir, "err", err)
+	} else {
+		defer func() {
+			if err := runfile.Remove(path); err != nil {
+				slog.Warn("cannot remove run file", "file", path, "err", err)
+			}
+		}()
+	}
 	if err := hs.Serve(h.ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil
+}
+
+// runInfo is what a run file says about this server: where and how to
+// reach it, never a secret. Paths are absolute, so a reader in another
+// working directory finds the same files.
+func (s *httpSetup) runInfo(snap live.Snapshot) runfile.Info {
+	info := runfile.Info{PID: snap.PID, Instance: snap.Instance, Version: snap.Version, KB: snap.KB, KBPath: absPath(snap.KBPath),
+		URL: s.base(), Listen: s.ln.Addr().String(), Scheme: s.scheme, Auth: "none", MTLS: s.mtls, BehindProxy: s.behindProxy, Started: snap.Started}
+	if s.guard != nil {
+		info.Auth, info.TokenFile = "token", absPath(s.tokenFile)
+	}
+	return info
+}
+
+func absPath(p string) string {
+	if p == "" {
+		return ""
+	}
+	if abs, err := filepath.Abs(p); err == nil {
+		return abs
+	}
+	return p
 }
 
 // runHTTPToken prints the bearer token for `serve --http`, creating it when

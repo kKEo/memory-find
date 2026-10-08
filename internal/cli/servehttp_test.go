@@ -28,6 +28,7 @@ import (
 	"github.com/kKEo/memory-find/internal/kb"
 	"github.com/kKEo/memory-find/internal/live"
 	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memory-find/internal/runfile"
 	"github.com/kKEo/memory-find/internal/server"
 )
 
@@ -354,4 +355,62 @@ func newTestPKI(t *testing.T) testPKI {
 		t.Fatal(err)
 	}
 	return p
+}
+
+// A serving process advertises itself in <MEMO_HOME>/run while it runs:
+// how to reach it and which token file to read, never the token, and the
+// same instance id as /live.json. The file is gone once it stops.
+func TestServeHTTPRunFile(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	db, err := kb.Open(ctx, t.TempDir(), "live", kb.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := kb.NewStore(db, embedding.NewHashEmbedder(64))
+	svc := retrieve.New(store, retrieve.Default, false)
+	srv := server.New(store, svc, "test", server.WithKBPath(filepath.Join(t.TempDir(), "live.db")))
+	h, err := prepareHTTP(httpFlags{addr: "127.0.0.1:0", auth: "token"}, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- serveHTTP(ctx, h, srv, store, svc) }()
+
+	var entries []runfile.Entry
+	deadline := time.Now().Add(5 * time.Second)
+	for len(entries) == 0 && time.Now().Before(deadline) {
+		entries, _ = runfile.List(h.runDir)
+		time.Sleep(10 * time.Millisecond)
+	}
+	if len(entries) != 1 || entries[0].Err != nil {
+		t.Fatalf("run files = %+v", entries)
+	}
+	info := entries[0].Info
+	base := "http://" + h.ln.Addr().String()
+	if info.PID != os.Getpid() || info.URL != base || info.Listen != h.ln.Addr().String() || info.Scheme != "http" || info.KB != "live" ||
+		!filepath.IsAbs(info.KBPath) || info.Auth != "token" || !filepath.IsAbs(info.TokenFile) || info.Version != "test" || info.Started.IsZero() {
+		t.Errorf("run file = %+v", info)
+	}
+	tok, err := httpauth.Load(info.TokenFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if raw, _ := os.ReadFile(entries[0].Path); strings.Contains(string(raw), tok) {
+		t.Error("run file contains the token")
+	}
+	code, body := get(t, http.DefaultClient, info.URL+"/live.json", "Authorization", "Bearer "+tok)
+	var snap live.Snapshot
+	if err := json.Unmarshal([]byte(body), &snap); code != 200 || err != nil || snap.Instance != info.Instance || snap.PID != info.PID {
+		t.Errorf("/live.json (%d) does not match the run file: %+v vs %+v", code, snap, info)
+	}
+
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if entries, _ := runfile.List(h.runDir); len(entries) != 0 {
+		t.Errorf("run file left behind: %+v", entries)
+	}
 }

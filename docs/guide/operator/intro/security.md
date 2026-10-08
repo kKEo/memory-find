@@ -26,6 +26,8 @@ security properties come from being local, small and explicit.
 - One SQLite file per knowledge base, in **plaintext**. Directories are created `0700` and
   files `0600`. A pre-existing directory with wider permissions is not tightened; check it.
 - Use full-disk encryption if the file may hold sensitive material.
+- A running `serve --http` advertises itself in `$MEMO_HOME/run/serve-<pid>.json` (`0600`):
+  its URL, auth mode and the path of the token file, never the token itself.
 - `forget --redact` erases a record's text. Plain `forget` hides the record but keeps the text
   in history.
 
