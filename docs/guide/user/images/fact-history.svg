@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="272" viewBox="0 0 760 272" role="img" aria-labelledby="t d">
+<title id="t">A corrected fact keeps its history</title>
+<desc id="d">A timeline from January to June. The fact "API rate limit: 100 requests per minute" was saved on 12 January. On 3 April a new fact, "200 requests per minute", replaced it; the old fact is kept as history. Asking what the limit was in January answers 100; asking what it is now answers 200.</desc>
+<style>
+text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
+.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.h{font-weight:600}.lg{font-size:14px}.s{font-size:12px}.xs{font-size:11px}.cap{font-size:10.5px;font-weight:600;letter-spacing:.08em}
+.t2{fill:#4a4f57}.t3{fill:#6d727a}.tg{fill:#1f5c4f}.tc{fill:#8a4a24}.tb{fill:#36577a}.tw{fill:#fff}
+.bg{fill:#faf8f4;stroke:#e4e0d8}.bgk{fill:#faf8f4}.box{fill:#fff;stroke:#d3cec4}.gray{fill:#f3f0ea;stroke:#d3cec4}.sep{fill:none;stroke:#e4e0d8}
+.green{fill:#eef5f2;stroke:#3b8572}.clay{fill:#fbf1ea;stroke:#a85a2c}.blue{fill:#eef3f8;stroke:#5b7ea3}
+.fg{fill:#3b8572}.fc{fill:#b8693a}.fb{fill:#5b7ea3}.fn{fill:#c4c8cc}
+.zone{fill:none;stroke:#7fb3a3;stroke-width:1.5;stroke-dasharray:6 5}.zonec{fill:none;stroke:#d0a080;stroke-width:1.5;stroke-dasharray:6 5}
+.ln{fill:none;stroke:#8a8f96;stroke-width:1.5}.lgn{fill:none;stroke:#3b8572;stroke-width:1.5}.lcl{fill:none;stroke:#a85a2c;stroke-width:1.5}.lbl{fill:none;stroke:#5b7ea3;stroke-width:1.5}
+.dash{stroke-dasharray:4 4}
+.an{fill:#8a8f96}.ag{fill:#3b8572}.ac{fill:#a85a2c}.ab{fill:#5b7ea3}
+.ig,.ic,.ib,.in{fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ig{stroke:#1f5c4f}.ic{stroke:#a85a2c}.ib{stroke:#36577a}.in{stroke:#4a4f57}
+@media (prefers-color-scheme:dark){
+text{fill:#eceeec}
+.t2{fill:#b4bab7}.t3{fill:#8a918e}.tg{fill:#8fd1bd}.tc{fill:#e8a77f}.tb{fill:#a9c7e8}.tw{fill:#0f1214}
+.bg{fill:#161a1d;stroke:#2a3033}.bgk{fill:#161a1d}.box{fill:#1b2023;stroke:#3a4245}.gray{fill:#20262a;stroke:#3a4245}.sep{stroke:#2a3033}
+.green{fill:#142420;stroke:#4f9e88}.clay{fill:#2a1c14;stroke:#c97c4f}.blue{fill:#16202b;stroke:#6f93bb}
+.fg{fill:#5fb39c}.fc{fill:#d9895a}.fb{fill:#7fa3c9}.fn{fill:#4a5155}
+.zone{stroke:#3d7a6a}.zonec{stroke:#8a5a3a}
+.ln{stroke:#7d858a}.lgn{stroke:#5fb39c}.lcl{stroke:#d9895a}.lbl{stroke:#7fa3c9}
+.an{fill:#7d858a}.ag{fill:#5fb39c}.ac{fill:#d9895a}.ab{fill:#7fa3c9}
+.ig{stroke:#8fd1bd}.ic{stroke:#e8a77f}.ib{stroke:#a9c7e8}.in{stroke:#b4bab7}
+}
+</style>
+<defs>
+<marker id="an" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="an"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ag"/></marker>
+<marker id="ac" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ac"/></marker>
+<marker id="ab" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ab"/></marker>
+</defs>
+
+<rect class="bg" x="0.5" y="0.5" width="759" height="271" rx="14"/>
+
+<!-- old fact -->
+<rect class="gray" x="107" y="104" width="285" height="28" rx="7"/>
+<text class="s t2" x="142" y="122">Rate limit: 100 requests per minute</text>
+<text class="xs t3" x="107" y="150">kept as history</text>
+
+<!-- replaces -->
+<path class="lgn" d="M398,171 V137" marker-end="url(#ag)"/>
+<text class="xs tg" x="406" y="158">replaces it on 3 April</text>
+
+<!-- new fact -->
+<rect class="green" x="392" y="172" width="273" height="28" rx="7"/>
+<text class="s h tg" x="404" y="190">Rate limit: 200 requests per minute</text>
+<text class="xs tg" x="665" y="216" text-anchor="middle">current</text>
+
+<!-- time axis -->
+<path class="sep" d="M70,236.5 H700"/>
+<path class="sep" d="M70.5,231 V242 M175.5,231 V242 M280.5,231 V242 M385.5,231 V242 M490.5,231 V242 M595.5,231 V242 M700.5,231 V242"/>
+<text class="xs t3" x="122" y="256" text-anchor="middle">Jan</text>
+<text class="xs t3" x="227" y="256" text-anchor="middle">Feb</text>
+<text class="xs t3" x="332" y="256" text-anchor="middle">Mar</text>
+<text class="xs t3" x="437" y="256" text-anchor="middle">Apr</text>
+<text class="xs t3" x="542" y="256" text-anchor="middle">May</text>
+<text class="xs t3" x="647" y="256" text-anchor="middle">Jun</text>
+
+<!-- questions -->
+<rect class="clay" x="56" y="22" width="300" height="30" rx="15"/>
+<text class="s" x="74" y="41">“What was the limit in January?”</text>
+<text class="s h tg" x="338" y="41" text-anchor="end">→ 100</text>
+<path class="lcl dash" d="M128,53 V116"/>
+<circle class="fc" cx="128" cy="118" r="4.5"/>
+
+<rect class="clay" x="420" y="22" width="300" height="30" rx="15"/>
+<text class="s" x="438" y="41">“What is the limit now?”</text>
+<text class="s h tg" x="702" y="41" text-anchor="end">→ 200</text>
+<path class="lcl dash" d="M665,53 V184"/>
+<circle class="fc" cx="665" cy="186" r="4.5"/>
+
+</svg>

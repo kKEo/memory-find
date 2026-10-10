@@ -70,6 +70,8 @@ One shared secret, the **bearer token**, protects `/mcp`, the UI and `/metrics`.
 The server refuses any setup that would expose the knowledge base without authentication or
 send the token unencrypted over the network.
 
+![Four setups: loopback, the default, with no auth; behind a reverse proxy that terminates TLS, with a token; remote with TLS on the server, with a token; and mutual TLS, with a token or none. Exposing the knowledge base without authentication, or sending the token unencrypted, is refused at start.](../images/http-deployments.svg)
+
 **Claude Code** sends the token as a header:
 
 ```bash

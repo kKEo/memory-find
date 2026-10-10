@@ -8,6 +8,8 @@ and tells you exactly where the answer came from, who wrote it down, and when.
 
 Everything lives in one file on your own computer. Nothing is sent to a cloud service.
 
+![You tell and ask Claude; Claude saves to and searches memo-mcp, which keeps one memory file on your computer. Every result carries where it came from, who vouched for it, when it was saved and how strong the match is.](images/how-it-works.svg)
+
 ## Who this is for
 
 - **People who work with Claude every day** and are tired of explaining the same background in

@@ -6,6 +6,8 @@ A local [MCP](https://modelcontextprotocol.io) server that gives agents a measur
 
 It began as a Go rewrite of [obra/private-journal-mcp](https://github.com/obra/private-journal-mcp) and was rebuilt from scratch as a knowledge base in 2026-10. Version 1.0 fixes the contract: tool names and parameters, the `memo://` addresses, the explain fields and the export format. How search decides is written down in [`docs/architecture.md`](docs/architecture.md); the plan for the research layers (graph, compaction, web UI) is [`docs/roadmap.md`](docs/roadmap.md); the research behind it is [`docs/knowledge-base-sota.md`](docs/knowledge-base-sota.md).
 
+![MCP clients start memo-mcp serve over stdio, one per session; many clients can share one memo-mcp serve --http; an operator runs memo-mcp ui and memo-mcp commands. Every process opens the knowledge base, one SQLite file under $MEMO_HOME/kb, and embedding models are cached in ~/.cache/memo-mcp/models after a one-time download from Hugging Face.](docs/guide/operator/images/system-overview.svg)
+
 ## What it does
 
 Claude (or any MCP client) gets ten tools over one knowledge base:
@@ -32,6 +34,8 @@ The same addresses are readable as MCP resources (`memo://doc/{id}`, `memo://chu
 Everything is stored locally. There is exactly one outbound network call in the whole system: downloading the embedding model from Hugging Face on first start. After that, nothing leaves the machine. The server never fetches URLs; the agent fetches and passes the text.
 
 ## How search works
+
+![The scope filter runs inside every arm. Up to six arms rank candidates in parallel: keyword, exact, semantic, fact, and the routed entity and graph arms. Reciprocal rank fusion, recency, abstention, then cutoff, limit and token budget produce the results, with a trace and, on explain, a why per result.](docs/guide/operator/images/search-pipeline.svg)
 
 `search` runs up to three retrieval arms over the same pre-filtered set of live passages and fuses them:
 

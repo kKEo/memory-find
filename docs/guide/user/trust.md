@@ -12,6 +12,8 @@ this?*
 The level appears next to every search result, in the browser view and in what Claude tells
 you.
 
+![Three levels from low to high: Agent, where everything Claude saves starts; User, where your terminal saves start; and Curated. Only a person can raise trust, by accepting a dialog or running memo-mcp trust promote; Claude can only ask. A person can lower trust with memo-mcp trust demote.](images/trust-levels.svg)
+
 ## Why Claude cannot raise trust by itself
 
 If an assistant could mark its own notes as verified, the label would mean nothing. A

@@ -3,6 +3,8 @@
 memo-mcp gives you two ways to keep things apart: **shelves** inside one memory, and
 **separate memories**.
 
+![One memory, my-project.db, holds the shelves billing, infrastructure and grpc-docs, and a question searches all of them. A second memory, client-b.db, is its own file, searched on its own; nothing crosses between the two.](../images/shelves-and-memories.svg)
+
 ## Shelves: topics within one memory
 
 A shelf is a label for a group of documents, such as `billing`, `infrastructure` or

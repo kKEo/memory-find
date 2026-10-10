@@ -2,6 +2,8 @@
 
 ## The write path
 
+![Normalise and hash; if the hash and version match the current revision, nothing is written. Otherwise one SQLite transaction writes the new revision, the chunks, both FTS5 indexes and entity mentions, and the audit row. After the commit the passages are embedded in batches of 16, or queued as a job when no model is available.](../images/write-path.svg)
+
 1. **Normalise** line endings and whitespace, and hash the content (SHA-256).
 2. **Deduplicate.** If the source's current revision has the same hash, nothing happens and the
    result says `dedup: true`. If the content differs, a new revision is created. The previous
@@ -12,10 +14,10 @@
    a context header `title > section path` that the keyword index also sees.
 4. **Index.** Both FTS5 indexes are filled by triggers inside the transaction. Entity mentions
    are extracted and linked.
-5. **Embed** outside the transaction, in batches of 16. If no model is available, the
+5. **Audit**: one row per write, in the same transaction.
+6. **Embed** outside the transaction, in batches of 16. If no model is available, the
    passages are queued as a job, and `backfill` or the next server start embeds them. A write
    never reports success it did not get.
-6. **Audit**: one row per write.
 
 A **source** is identified by its URI, or by its file path for CLI ingests. Re-ingesting the
 same URI with changed content, or with a new `version`, creates a new revision of that source.

@@ -3,15 +3,7 @@
 One knowledge base is one SQLite file. Inside it, knowledge is stored in layers. Each layer
 points down to the one it was derived from, so every answer can be traced to its source.
 
-```
-L5  pages       markdown an agent wrote from passages; cites them; marked stale when a source changes
-L4  graph       entities, aliases, mentions (entity ↔ passage), merge candidates, typed edges
-L3  facts       one-sentence claims with a validity window and an evidence passage
-L2  chunks      passages of ~200 estimated tokens, indexed three ways (two FTS5 + vectors)
-L1  documents   the text as ingested, one row per revision
-L0  sources     where it came from: URI or file, library, version, hash, trust, origin
-    bookkeeping namespaces, models, jobs, audit, query_log, call_log
-```
+![Six layers in one file: L5 pages cite passages, L4 graph mentions and L3 fact evidence point at L2 chunks, chunks belong to an L1 document revision, and each revision to an L0 source. L0 to L2 and L4 are rebuildable; L3 facts and L5 pages are kept. Bookkeeping tables sit beside them.](../images/data-layers.svg)
 
 | Layer | Rebuildable? | Notes |
 |---|---|---|
@@ -60,9 +52,10 @@ transition is written to the `audit` table. See [Trust administration](../lifecy
 - **Recorded time**: when the knowledge base learned something.
 - **Valid time**: when a fact is true in the world (`valid_from`, `valid_to`).
 
-`as_of` queries ("what did we believe on 1 March?") filter on recorded time, and also on valid
-time for facts that have a window. Superseded revisions and replaced facts stay readable under
-`as_of`. Forgotten records are excluded in both views. See [Facts and time](../lifecycle/facts.md).
+`as_of` queries ("what did we believe on 1 March?") filter on recorded time. Valid time is
+stored and shown with each fact, and `memo-mcp lint` lists facts whose window has passed.
+Superseded revisions and replaced facts stay readable under `as_of`. Forgotten records are
+excluded in both views. See [Facts and time](../lifecycle/facts.md).
 
 Full column-by-column reference:
 [schema.md](https://github.com/kKEo/memory-find/blob/master/docs/schema.md).

@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="396" viewBox="0 0 760 396" role="img" aria-labelledby="t d">
+<title id="t">How memo-tray works</title>
+<desc id="d">memo-tray, the macOS menu-bar app, has a menu bar, a stats window, setup and settings pages it serves locally, and a supervisor. It polls GET /live.json on every running memo-mcp serve --http every 2 seconds, mints single-use login links with POST /login-link for its window, and starts and stops servers. It finds servers through the run files each server writes in $MEMO_HOME/run, keeps its settings in tray.json, and sends the output of the servers it started to $MEMO_HOME/logs. It contacts GitHub only on the setup assistant's Install step. MCP clients connect to the servers at /mcp.</desc>
+<style>
+text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
+.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.h{font-weight:600}.lg{font-size:14px}.s{font-size:12px}.xs{font-size:11px}.cap{font-size:10.5px;font-weight:600;letter-spacing:.08em}
+.t2{fill:#4a4f57}.t3{fill:#6d727a}.tg{fill:#1f5c4f}.tc{fill:#8a4a24}.tb{fill:#36577a}.tw{fill:#fff}
+.bg{fill:#faf8f4;stroke:#e4e0d8}.bgk{fill:#faf8f4}.box{fill:#fff;stroke:#d3cec4}.gray{fill:#f3f0ea;stroke:#d3cec4}.sep{fill:none;stroke:#e4e0d8}
+.green{fill:#eef5f2;stroke:#3b8572}.clay{fill:#fbf1ea;stroke:#a85a2c}.blue{fill:#eef3f8;stroke:#5b7ea3}
+.fg{fill:#3b8572}.fc{fill:#b8693a}.fb{fill:#5b7ea3}.fn{fill:#c4c8cc}
+.zone{fill:none;stroke:#7fb3a3;stroke-width:1.5;stroke-dasharray:6 5}.zonec{fill:none;stroke:#d0a080;stroke-width:1.5;stroke-dasharray:6 5}
+.ln{fill:none;stroke:#8a8f96;stroke-width:1.5}.lgn{fill:none;stroke:#3b8572;stroke-width:1.5}.lcl{fill:none;stroke:#a85a2c;stroke-width:1.5}.lbl{fill:none;stroke:#5b7ea3;stroke-width:1.5}
+.dash{stroke-dasharray:4 4}
+.an{fill:#8a8f96}.ag{fill:#3b8572}.ac{fill:#a85a2c}.ab{fill:#5b7ea3}
+.ig,.ic,.ib,.in{fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ig{stroke:#1f5c4f}.ic{stroke:#a85a2c}.ib{stroke:#36577a}.in{stroke:#4a4f57}
+@media (prefers-color-scheme:dark){
+text{fill:#eceeec}
+.t2{fill:#b4bab7}.t3{fill:#8a918e}.tg{fill:#8fd1bd}.tc{fill:#e8a77f}.tb{fill:#a9c7e8}.tw{fill:#0f1214}
+.bg{fill:#161a1d;stroke:#2a3033}.bgk{fill:#161a1d}.box{fill:#1b2023;stroke:#3a4245}.gray{fill:#20262a;stroke:#3a4245}.sep{stroke:#2a3033}
+.green{fill:#142420;stroke:#4f9e88}.clay{fill:#2a1c14;stroke:#c97c4f}.blue{fill:#16202b;stroke:#6f93bb}
+.fg{fill:#5fb39c}.fc{fill:#d9895a}.fb{fill:#7fa3c9}.fn{fill:#4a5155}
+.zone{stroke:#3d7a6a}.zonec{stroke:#8a5a3a}
+.ln{stroke:#7d858a}.lgn{stroke:#5fb39c}.lcl{stroke:#d9895a}.lbl{stroke:#7fa3c9}
+.an{fill:#7d858a}.ag{fill:#5fb39c}.ac{fill:#d9895a}.ab{fill:#7fa3c9}
+.ig{stroke:#8fd1bd}.ic{stroke:#e8a77f}.ib{stroke:#a9c7e8}.in{stroke:#b4bab7}
+}
+</style>
+<defs>
+<marker id="an" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="an"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ag"/></marker>
+<marker id="ac" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ac"/></marker>
+<marker id="ab" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ab"/></marker>
+</defs>
+
+<rect class="bg" x="0.5" y="0.5" width="759" height="395" rx="14"/>
+
+<!-- github -->
+<rect class="box" x="24" y="20" width="248" height="38" rx="9"/>
+<text class="s h" x="38" y="37">GitHub releases</text>
+<text class="xs t2" x="38" y="51">Install step only; checksum verified</text>
+<path class="ln dash" d="M148,59 V81" marker-end="url(#an)"/>
+
+<!-- memo-tray -->
+<rect class="green" x="24" y="84" width="248" height="216" rx="12"/>
+<text class="h lg tg" x="40" y="109">memo-tray</text>
+<text class="xs t2" x="118" y="109">macOS menu-bar app</text>
+<rect class="box" x="36" y="122" width="224" height="38" rx="8"/>
+<text class="s h" x="48" y="138">Menu bar</text>
+<text class="xs t2" x="48" y="152">servers and their agents ● ○</text>
+<rect class="box" x="36" y="166" width="224" height="38" rx="8"/>
+<text class="s h" x="48" y="182">Stats window</text>
+<text class="xs t2" x="48" y="196">the Live page, logged in</text>
+<rect class="box" x="36" y="210" width="224" height="38" rx="8"/>
+<text class="s h" x="48" y="226">Setup and settings</text>
+<text class="xs t2" x="48" y="240">pages it serves on 127.0.0.1</text>
+<rect class="box" x="36" y="254" width="224" height="38" rx="8"/>
+<text class="s h" x="48" y="270">Supervisor</text>
+<text class="xs t2" x="48" y="284">starts and stops servers</text>
+
+<!-- clients -->
+<rect class="blue" x="488" y="20" width="116" height="38" rx="9"/>
+<text class="s" x="546" y="43" text-anchor="middle">Claude Code</text>
+<rect class="blue" x="620" y="20" width="116" height="38" rx="9"/>
+<text class="s" x="678" y="43" text-anchor="middle">Cursor</text>
+<path class="ln" d="M546,59 V81" marker-end="url(#an)"/>
+<path class="ln" d="M678,59 V81" marker-end="url(#an)"/>
+<text class="xs t3" x="612" y="74" text-anchor="middle">/mcp</text>
+
+<!-- servers -->
+<rect class="box" x="488" y="84" width="248" height="86" rx="12"/>
+<text class="s h mono tg" x="502" y="106">memo-mcp serve --http</text>
+<text class="xs mono t2" x="502" y="124">work · 127.0.0.1:8770</text>
+<text class="xs t3" x="502" y="142">started in a terminal</text>
+<text class="xs t3" x="502" y="158">memo-tray stops it with SIGTERM only</text>
+
+<rect class="box" x="488" y="204" width="248" height="86" rx="12"/>
+<text class="s h mono tg" x="502" y="226">memo-mcp serve --http</text>
+<text class="xs mono t2" x="502" y="244">crportal · 127.0.0.1:8765</text>
+<text class="xs t3" x="502" y="262">started by memo-tray</text>
+<text class="xs t3" x="502" y="278">stop: SIGTERM, SIGKILL after 10 s</text>
+
+<!-- memo-tray to servers -->
+<text class="xs mono t2" x="284" y="142">GET /live.json · 2 s</text>
+<text class="xs mono t2" x="284" y="158">POST /login-link</text>
+<text class="xs t2" x="284" y="174">start · stop</text>
+<path class="ln" d="M273,190 H460 M460,127 V247"/>
+<path class="ln" d="M460,127 H485" marker-end="url(#an)"/>
+<path class="ln" d="M460,247 H485" marker-end="url(#an)"/>
+
+<!-- files -->
+<text class="cap t3" x="24" y="322">$MEMO_HOME</text>
+<path class="ln" d="M148,302 V328" marker-start="url(#an)" marker-end="url(#an)"/>
+<path class="ln" d="M240,302 L322,328" marker-end="url(#an)"/>
+<text class="xs t3" x="300" y="310">scans</text>
+<path class="ln" d="M540,292 L452,328" marker-end="url(#an)"/>
+<text class="xs t3" x="502" y="318">writes</text>
+<path class="ln" d="M672,292 V328" marker-end="url(#an)"/>
+
+<rect class="gray" x="24" y="330" width="232" height="46" rx="9"/>
+<text class="s h mono" x="38" y="349">tray.json</text>
+<text class="xs t2" x="38" y="366">settings; the window edits them</text>
+<rect class="gray" x="264" y="330" width="232" height="46" rx="9"/>
+<text class="s h mono" x="278" y="349">run/serve-&lt;pid&gt;.json</text>
+<text class="xs t2" x="278" y="366">one per running server</text>
+<rect class="gray" x="504" y="330" width="232" height="46" rx="9"/>
+<text class="s h mono" x="518" y="349">logs/serve-&lt;kb&gt;.log</text>
+<text class="xs t2" x="518" y="366">output of the servers it started</text>
+</svg>

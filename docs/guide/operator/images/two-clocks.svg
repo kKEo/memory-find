@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="312" viewBox="0 0 760 312" role="img" aria-labelledby="t d">
+<title id="t">Recorded time, valid time and as_of</title>
+<desc id="d">Fact A, "Production runs Postgres 15", was recorded on 2 March and has no validity window. Fact B, "Production runs Postgres 16", is valid from 1 May but was recorded only on 15 June, superseding A. as_of filters on recorded time: as_of May 20 returns A, because B was already true but not yet recorded; as_of July 20 returns B. Valid time is stored and shown with every fact, and memo-mcp lint lists facts whose valid_to has passed.</desc>
+<style>
+text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
+.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.h{font-weight:600}.lg{font-size:14px}.s{font-size:12px}.xs{font-size:11px}.cap{font-size:10.5px;font-weight:600;letter-spacing:.08em}
+.t2{fill:#4a4f57}.t3{fill:#6d727a}.tg{fill:#1f5c4f}.tc{fill:#8a4a24}.tb{fill:#36577a}.tw{fill:#fff}
+.bg{fill:#faf8f4;stroke:#e4e0d8}.bgk{fill:#faf8f4}.box{fill:#fff;stroke:#d3cec4}.gray{fill:#f3f0ea;stroke:#d3cec4}.sep{fill:none;stroke:#e4e0d8}
+.green{fill:#eef5f2;stroke:#3b8572}.clay{fill:#fbf1ea;stroke:#a85a2c}.blue{fill:#eef3f8;stroke:#5b7ea3}
+.fg{fill:#3b8572}.fc{fill:#b8693a}.fb{fill:#5b7ea3}.fn{fill:#c4c8cc}
+.zone{fill:none;stroke:#7fb3a3;stroke-width:1.5;stroke-dasharray:6 5}.zonec{fill:none;stroke:#d0a080;stroke-width:1.5;stroke-dasharray:6 5}
+.ln{fill:none;stroke:#8a8f96;stroke-width:1.5}.lgn{fill:none;stroke:#3b8572;stroke-width:1.5}.lcl{fill:none;stroke:#a85a2c;stroke-width:1.5}.lbl{fill:none;stroke:#5b7ea3;stroke-width:1.5}
+.dash{stroke-dasharray:4 4}
+.an{fill:#8a8f96}.ag{fill:#3b8572}.ac{fill:#a85a2c}.ab{fill:#5b7ea3}
+.ig,.ic,.ib,.in{fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ig{stroke:#1f5c4f}.ic{stroke:#a85a2c}.ib{stroke:#36577a}.in{stroke:#4a4f57}
+@media (prefers-color-scheme:dark){
+text{fill:#eceeec}
+.t2{fill:#b4bab7}.t3{fill:#8a918e}.tg{fill:#8fd1bd}.tc{fill:#e8a77f}.tb{fill:#a9c7e8}.tw{fill:#0f1214}
+.bg{fill:#161a1d;stroke:#2a3033}.bgk{fill:#161a1d}.box{fill:#1b2023;stroke:#3a4245}.gray{fill:#20262a;stroke:#3a4245}.sep{stroke:#2a3033}
+.green{fill:#142420;stroke:#4f9e88}.clay{fill:#2a1c14;stroke:#c97c4f}.blue{fill:#16202b;stroke:#6f93bb}
+.fg{fill:#5fb39c}.fc{fill:#d9895a}.fb{fill:#7fa3c9}.fn{fill:#4a5155}
+.zone{stroke:#3d7a6a}.zonec{stroke:#8a5a3a}
+.ln{stroke:#7d858a}.lgn{stroke:#5fb39c}.lcl{stroke:#d9895a}.lbl{stroke:#7fa3c9}
+.an{fill:#7d858a}.ag{fill:#5fb39c}.ac{fill:#d9895a}.ab{fill:#7fa3c9}
+.ig{stroke:#8fd1bd}.ic{stroke:#e8a77f}.ib{stroke:#a9c7e8}.in{stroke:#b4bab7}
+}
+</style>
+<defs>
+<marker id="an" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="an"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ag"/></marker>
+<marker id="ac" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ac"/></marker>
+<marker id="ab" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ab"/></marker>
+</defs>
+
+<rect class="bg" x="0.5" y="0.5" width="759" height="311" rx="14"/>
+
+<!-- recorded time -->
+<text class="s h" x="24" y="92">Recorded time</text>
+<text class="xs mono t3" x="24" y="109">recorded_at,</text>
+<text class="xs mono t3" x="24" y="123">invalidated_at</text>
+<rect class="box" x="160" y="58" width="560" height="80" rx="8"/>
+<rect class="gray" x="164" y="66" width="384" height="26" rx="6"/>
+<text class="xs h t2" x="174" y="83">A · Production runs Postgres 15</text>
+<rect class="green" x="548" y="102" width="168" height="26" rx="6"/>
+<text class="xs h tg" x="558" y="119">B · Postgres 16</text>
+<text class="xs t2" x="552" y="154">recorded 15 Jun, supersedes A</text>
+
+<!-- valid time -->
+<text class="s h" x="24" y="186">Valid time</text>
+<text class="xs mono t3" x="24" y="203">valid_from,</text>
+<text class="xs mono t3" x="24" y="217">valid_to</text>
+<rect class="box" x="160" y="166" width="560" height="46" rx="8"/>
+<text class="xs t3" x="174" y="193">A · no validity window</text>
+<rect class="green" x="383" y="176" width="333" height="26" rx="6"/>
+<text class="xs h tg" x="393" y="193">B · valid from 1 May</text>
+
+<!-- as_of -->
+<rect class="clay" x="396" y="18" width="114" height="22" rx="11"/>
+<text class="xs h" x="453" y="33" text-anchor="middle">as_of 20 May → A</text>
+<path class="lcl dash" d="M453,41 V76"/>
+<circle class="fc" cx="453" cy="79" r="4.5"/>
+<rect class="clay" x="618" y="18" width="116" height="22" rx="11"/>
+<text class="xs h" x="676" y="33" text-anchor="middle">as_of 20 Jul → B</text>
+<path class="lcl dash" d="M676,41 V112"/>
+<circle class="fc" cx="676" cy="115" r="4.5"/>
+
+<!-- axis -->
+<path class="sep" d="M160,230.5 H720 M160.5,226 V236 M273.5,226 V236 M383.5,226 V236 M496.5,226 V236 M606.5,226 V236 M719.5,226 V236"/>
+<text class="xs t3" x="217" y="250" text-anchor="middle">Mar</text>
+<text class="xs t3" x="328" y="250" text-anchor="middle">Apr</text>
+<text class="xs t3" x="440" y="250" text-anchor="middle">May</text>
+<text class="xs t3" x="552" y="250" text-anchor="middle">Jun</text>
+<text class="xs t3" x="663" y="250" text-anchor="middle">Jul</text>
+
+<text class="xs t2" x="24" y="278">as_of = T filters on recorded time. On 20 May, B was already true but not yet recorded, so the answer is A.</text>
+<text class="xs t2" x="24" y="295">Valid time is stored and shown with every fact; memo-mcp lint lists facts whose valid_to has passed.</text>
+</svg>

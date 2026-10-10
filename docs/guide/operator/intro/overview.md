@@ -11,15 +11,14 @@ binary runs in three roles, which are **separate processes** that share only the
 | **Web UI** (`memo-mcp ui`) | An operator | HTTP on a loopback port, GET only | Until Ctrl-C |
 | **CLI** (`memo-mcp <command>`) | An operator or a script | Terminal | One command |
 
-Each MCP client session usually starts its own server process. Several processes can hold the
-same file open at once; SQLite WAL mode and a 5-second busy timeout serialise writers.
+Each MCP client session usually starts its own server process. Alternatively,
+`memo-mcp serve --http` runs one long-lived server that many clients share over HTTP; an
+operator, a service manager or [memo-tray](../install/tray.md) starts it. See
+[One shared server over HTTP](../install/clients.md#one-shared-server-over-http). Several
+processes can hold the same file open at once; SQLite WAL mode and a 5-second busy timeout
+serialise writers.
 
-```
- MCP client ── stdio ──▶ memo-mcp serve ─┐
- operator ── browser ──▶ memo-mcp ui ────┼──▶ $MEMO_HOME/kb/<name>.db  (SQLite, WAL)
- operator ── shell ────▶ memo-mcp <cmd> ─┘
-                                          └─▶ ~/.cache/memo-mcp/models  (embedding models)
-```
+![MCP clients start memo-mcp serve over stdio, one per session; many clients can share one memo-mcp serve --http; an operator runs memo-mcp ui and memo-mcp commands. Every process opens the knowledge base, one SQLite file under $MEMO_HOME/kb, and embedding models are cached in ~/.cache/memo-mcp/models after a one-time download from Hugging Face.](../images/system-overview.svg)
 
 ## Inside the process
 

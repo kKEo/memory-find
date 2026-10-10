@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="376" viewBox="0 0 760 376" role="img" aria-labelledby="t d">
+<title id="t">The ingest write path</title>
+<desc id="d">Ingest normalises the text and hashes it. If the hash and version match the source's current revision, nothing is written and the result says dedup: true. Otherwise one SQLite transaction writes a new revision (the previous one is superseded and pages built on it go stale), splits it into chunks, fills both FTS5 indexes and links entity mentions, and writes an audit row. After the commit, passages are embedded in batches of 16; without a model they are queued as a job that backfill or the next start completes.</desc>
+<style>
+text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
+.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.h{font-weight:600}.lg{font-size:14px}.s{font-size:12px}.xs{font-size:11px}.cap{font-size:10.5px;font-weight:600;letter-spacing:.08em}
+.t2{fill:#4a4f57}.t3{fill:#6d727a}.tg{fill:#1f5c4f}.tc{fill:#8a4a24}.tb{fill:#36577a}.tw{fill:#fff}
+.bg{fill:#faf8f4;stroke:#e4e0d8}.bgk{fill:#faf8f4}.box{fill:#fff;stroke:#d3cec4}.gray{fill:#f3f0ea;stroke:#d3cec4}.sep{fill:none;stroke:#e4e0d8}
+.green{fill:#eef5f2;stroke:#3b8572}.clay{fill:#fbf1ea;stroke:#a85a2c}.blue{fill:#eef3f8;stroke:#5b7ea3}
+.fg{fill:#3b8572}.fc{fill:#b8693a}.fb{fill:#5b7ea3}.fn{fill:#c4c8cc}
+.zone{fill:none;stroke:#7fb3a3;stroke-width:1.5;stroke-dasharray:6 5}.zonec{fill:none;stroke:#d0a080;stroke-width:1.5;stroke-dasharray:6 5}
+.ln{fill:none;stroke:#8a8f96;stroke-width:1.5}.lgn{fill:none;stroke:#3b8572;stroke-width:1.5}.lcl{fill:none;stroke:#a85a2c;stroke-width:1.5}.lbl{fill:none;stroke:#5b7ea3;stroke-width:1.5}
+.dash{stroke-dasharray:4 4}
+.an{fill:#8a8f96}.ag{fill:#3b8572}.ac{fill:#a85a2c}.ab{fill:#5b7ea3}
+.ig,.ic,.ib,.in{fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ig{stroke:#1f5c4f}.ic{stroke:#a85a2c}.ib{stroke:#36577a}.in{stroke:#4a4f57}
+@media (prefers-color-scheme:dark){
+text{fill:#eceeec}
+.t2{fill:#b4bab7}.t3{fill:#8a918e}.tg{fill:#8fd1bd}.tc{fill:#e8a77f}.tb{fill:#a9c7e8}.tw{fill:#0f1214}
+.bg{fill:#161a1d;stroke:#2a3033}.bgk{fill:#161a1d}.box{fill:#1b2023;stroke:#3a4245}.gray{fill:#20262a;stroke:#3a4245}.sep{stroke:#2a3033}
+.green{fill:#142420;stroke:#4f9e88}.clay{fill:#2a1c14;stroke:#c97c4f}.blue{fill:#16202b;stroke:#6f93bb}
+.fg{fill:#5fb39c}.fc{fill:#d9895a}.fb{fill:#7fa3c9}.fn{fill:#4a5155}
+.zone{stroke:#3d7a6a}.zonec{stroke:#8a5a3a}
+.ln{stroke:#7d858a}.lgn{stroke:#5fb39c}.lcl{stroke:#d9895a}.lbl{stroke:#7fa3c9}
+.an{fill:#7d858a}.ag{fill:#5fb39c}.ac{fill:#d9895a}.ab{fill:#7fa3c9}
+.ig{stroke:#8fd1bd}.ic{stroke:#e8a77f}.ib{stroke:#a9c7e8}.in{stroke:#b4bab7}
+}
+</style>
+<defs>
+<marker id="an" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="an"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ag"/></marker>
+<marker id="ac" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ac"/></marker>
+<marker id="ab" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ab"/></marker>
+</defs>
+
+<rect class="bg" x="0.5" y="0.5" width="759" height="375" rx="14"/>
+
+<path class="ln" d="M40,44 V332"/>
+
+<!-- 1 -->
+<circle class="fg" cx="40" cy="44" r="11"/>
+<text class="xs h tw" x="40" y="48" text-anchor="middle">1</text>
+<text class="h" x="64" y="48">Normalise and hash</text>
+<text class="xs t2" x="196" y="41">line endings and whitespace normalised</text>
+<text class="xs t2" x="196" y="56">SHA-256 of the content</text>
+
+<!-- dedup -->
+<path class="gray" d="M40,75 L49,84 L40,93 L31,84 z"/>
+<text class="s t2" x="64" y="88">Same hash and version as the current revision?</text>
+<path class="ln" d="M384,84 H580" marker-end="url(#an)"/>
+<text class="xs t3" x="482" y="78" text-anchor="middle">yes</text>
+<rect class="gray" x="584" y="62" width="152" height="44" rx="9"/>
+<text class="s h mono" x="598" y="80">dedup: true</text>
+<text class="xs t2" x="598" y="96">nothing is written</text>
+
+<!-- transaction -->
+<rect class="zone" x="24" y="108" width="544" height="192" rx="12"/>
+<rect class="bgk" x="56" y="100" width="178" height="16"/>
+<text class="cap tg" x="62" y="112">ONE SQLITE TRANSACTION</text>
+
+<circle class="fg" cx="40" cy="140" r="11"/>
+<text class="xs h tw" x="40" y="144" text-anchor="middle">2</text>
+<text class="h" x="64" y="144">New revision</text>
+<text class="xs t2" x="196" y="137">the previous revision is marked superseded,</text>
+<text class="xs t2" x="196" y="152">readable with as_of; pages built on it go stale</text>
+
+<circle class="fg" cx="40" cy="188" r="11"/>
+<text class="xs h tw" x="40" y="192" text-anchor="middle">3</text>
+<text class="h" x="64" y="192">Chunk</text>
+<text class="xs t2" x="196" y="185">headings → paragraphs → sentences → hard split</text>
+<text class="xs t2" x="196" y="200">~200 tokens, cap 400, ~40 overlap; code fences kept whole</text>
+
+<circle class="fg" cx="40" cy="236" r="11"/>
+<text class="xs h tw" x="40" y="240" text-anchor="middle">4</text>
+<text class="h" x="64" y="240">Index</text>
+<text class="xs t2" x="196" y="233">both FTS5 indexes, filled by triggers</text>
+<text class="xs t2" x="196" y="248">entity mentions extracted and linked</text>
+
+<circle class="fg" cx="40" cy="276" r="11"/>
+<text class="xs h tw" x="40" y="280" text-anchor="middle">5</text>
+<text class="h" x="64" y="280">Audit</text>
+<text class="xs t2" x="196" y="280">one row: actor, channel, operation, record</text>
+
+<rect class="bgk" x="50" y="292" width="52" height="16"/>
+<text class="xs t3" x="56" y="304">commit</text>
+
+<!-- 6 -->
+<circle class="fg" cx="40" cy="332" r="11"/>
+<text class="xs h tw" x="40" y="336" text-anchor="middle">6</text>
+<text class="h" x="64" y="336">Embed</text>
+<text class="xs t2" x="196" y="329">outside the transaction, in batches of 16</text>
+<text class="xs t2" x="196" y="344">vectors for the configured model</text>
+<path class="ln" d="M460,334 H580" marker-end="url(#an)"/>
+<text class="xs t3" x="520" y="328" text-anchor="middle">no model yet</text>
+<rect class="clay" x="584" y="306" width="152" height="56" rx="9"/>
+<text class="s h tc" x="598" y="324">queued as a job</text>
+<text class="xs t2" x="598" y="340">backfill or the next</text>
+<text class="xs t2" x="598" y="354">start embeds them</text>
+</svg>

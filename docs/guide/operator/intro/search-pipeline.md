@@ -3,10 +3,7 @@
 Every `search`, from the MCP tool, the CLI or the UI, runs the same pipeline in
 `internal/retrieve`:
 
-```
-scope filter ─▶ arms (parallel ranked lists) ─▶ fusion ─▶ recency ─▶ abstention
-            ─▶ cutoff ─▶ limit ─▶ token budget ─▶ results + why + trace
-```
+![The scope filter runs inside every arm. Up to six arms rank candidates in parallel, up to 100 each: keyword, exact, semantic, fact, and the routed entity and graph arms, each with its weight. Reciprocal rank fusion, recency, abstention, then cutoff, limit and token budget produce the results, with a trace and, on explain, a why per result.](../images/search-pipeline.svg)
 
 ## 1. Scope filter
 

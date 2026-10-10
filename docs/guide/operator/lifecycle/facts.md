@@ -27,7 +27,10 @@ memo-mcp facts ls --as-of 2026-05-15 --history
 
 `as_of=T`, available on the `search` and `explore` tools and on `facts ls --as-of` and
 `explore --as-of` in the CLI, shows what was recorded on or before T and not superseded before
-T. For facts with a window, it also applies valid time.
+T. Valid time does not filter: it is stored and shown with each fact, and `memo-mcp lint` lists
+facts whose `valid_to` has passed.
+
+![Fact A, Postgres 15, recorded in March; fact B, Postgres 16, valid from 1 May but recorded on 15 June, superseding A. as_of 20 May returns A, because B was true but not yet recorded; as_of 20 July returns B.](../images/two-clocks.svg)
 
 ## Conflicts
 

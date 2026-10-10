@@ -9,6 +9,8 @@ memo-mcp binary stays pure Go.
 User-facing behaviour is described in the user guide (*The menu-bar app*). This page covers
 how it works and what to configure.
 
+![memo-tray polls GET /live.json on every running server, mints login links for its stats window and starts and stops servers. It finds servers through the run files they write, keeps settings in tray.json, logs the servers it started, and contacts GitHub only on the setup assistant's Install step.](../images/tray-architecture.svg)
+
 ## Install
 
 Release assets: `memo-tray_X.Y.Z_darwin_universal.zip` and its `.sha256`, next to the

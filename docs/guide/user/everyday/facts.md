@@ -29,6 +29,8 @@ When something changes, say so:
 Claude records the new fact as replacing the old one. The new fact is current from now on. The
 old one is not deleted; it is kept as history with the date it stopped being true.
 
+![A timeline: the fact "100 requests per minute" saved in January is replaced on 3 April by "200 requests per minute" and kept as history. Asking about January answers 100; asking about now answers 200.](../images/fact-history.svg)
+
 ## Looking back
 
 > What was the rate limit in January?

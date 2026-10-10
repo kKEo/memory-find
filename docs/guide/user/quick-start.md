@@ -71,6 +71,8 @@ background. Alternatively, you can run **one** memo-mcp yourself and let every s
 it over a local web address. Pick this if you want the **Live** page in the browser view,
 which shows which sessions are connected and what they are doing right now.
 
+![Left: each Claude Code session starts its own copy of memo-mcp, and all copies open the same memory file. Right: you start one memo-mcp server at 127.0.0.1:8765; every session connects to it, and your browser shows its Live page.](images/one-shared-server.svg)
+
 1. In a terminal, start the server and leave the terminal open:
 
    ```bash

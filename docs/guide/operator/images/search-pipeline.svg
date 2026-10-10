@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="436" viewBox="0 0 760 436" role="img" aria-labelledby="t d">
+<title id="t">The search pipeline</title>
+<desc id="d">A search request first goes through the scope filter, applied inside each arm's SQL before top-k. Up to six arms then produce ranked lists in parallel, up to 100 candidates each: keyword (weight 0.5), exact (0.3), semantic (0.5), fact (0.4), and the routed entity (0.4) and graph (0.5) arms. Reciprocal rank fusion sums weight divided by 60 plus rank. Then recency for notes and conversations, abstention, the cutoff, limit and token budget, and the results with why and trace.</desc>
+<style>
+text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
+.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.h{font-weight:600}.lg{font-size:14px}.s{font-size:12px}.xs{font-size:11px}.cap{font-size:10.5px;font-weight:600;letter-spacing:.08em}
+.t2{fill:#4a4f57}.t3{fill:#6d727a}.tg{fill:#1f5c4f}.tc{fill:#8a4a24}.tb{fill:#36577a}.tw{fill:#fff}
+.bg{fill:#faf8f4;stroke:#e4e0d8}.bgk{fill:#faf8f4}.box{fill:#fff;stroke:#d3cec4}.gray{fill:#f3f0ea;stroke:#d3cec4}.sep{fill:none;stroke:#e4e0d8}
+.green{fill:#eef5f2;stroke:#3b8572}.clay{fill:#fbf1ea;stroke:#a85a2c}.blue{fill:#eef3f8;stroke:#5b7ea3}
+.fg{fill:#3b8572}.fc{fill:#b8693a}.fb{fill:#5b7ea3}.fn{fill:#c4c8cc}
+.zone{fill:none;stroke:#7fb3a3;stroke-width:1.5;stroke-dasharray:6 5}.zonec{fill:none;stroke:#d0a080;stroke-width:1.5;stroke-dasharray:6 5}
+.ln{fill:none;stroke:#8a8f96;stroke-width:1.5}.lgn{fill:none;stroke:#3b8572;stroke-width:1.5}.lcl{fill:none;stroke:#a85a2c;stroke-width:1.5}.lbl{fill:none;stroke:#5b7ea3;stroke-width:1.5}
+.dash{stroke-dasharray:4 4}
+.an{fill:#8a8f96}.ag{fill:#3b8572}.ac{fill:#a85a2c}.ab{fill:#5b7ea3}
+.ig,.ic,.ib,.in{fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ig{stroke:#1f5c4f}.ic{stroke:#a85a2c}.ib{stroke:#36577a}.in{stroke:#4a4f57}
+@media (prefers-color-scheme:dark){
+text{fill:#eceeec}
+.t2{fill:#b4bab7}.t3{fill:#8a918e}.tg{fill:#8fd1bd}.tc{fill:#e8a77f}.tb{fill:#a9c7e8}.tw{fill:#0f1214}
+.bg{fill:#161a1d;stroke:#2a3033}.bgk{fill:#161a1d}.box{fill:#1b2023;stroke:#3a4245}.gray{fill:#20262a;stroke:#3a4245}.sep{stroke:#2a3033}
+.green{fill:#142420;stroke:#4f9e88}.clay{fill:#2a1c14;stroke:#c97c4f}.blue{fill:#16202b;stroke:#6f93bb}
+.fg{fill:#5fb39c}.fc{fill:#d9895a}.fb{fill:#7fa3c9}.fn{fill:#4a5155}
+.zone{stroke:#3d7a6a}.zonec{stroke:#8a5a3a}
+.ln{stroke:#7d858a}.lgn{stroke:#5fb39c}.lcl{stroke:#d9895a}.lbl{stroke:#7fa3c9}
+.an{fill:#7d858a}.ag{fill:#5fb39c}.ac{fill:#d9895a}.ab{fill:#7fa3c9}
+.ig{stroke:#8fd1bd}.ic{stroke:#e8a77f}.ib{stroke:#a9c7e8}.in{stroke:#b4bab7}
+}
+</style>
+<defs>
+<marker id="an" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="an"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ag"/></marker>
+<marker id="ac" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ac"/></marker>
+<marker id="ab" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ab"/></marker>
+</defs>
+
+<rect class="bg" x="0.5" y="0.5" width="759" height="435" rx="14"/>
+
+<!-- request and scope -->
+<rect class="blue" x="24" y="44" width="148" height="76" rx="10"/>
+<text class="s h mono tb" x="38" y="66">search</text>
+<text class="xs t2" x="38" y="84">query, mode, scope,</text>
+<text class="xs t2" x="38" y="99">as_of, max_tokens</text>
+<path class="ln" d="M98,121 V137" marker-end="url(#an)"/>
+<rect class="green" x="24" y="140" width="148" height="92" rx="10"/>
+<text class="s h tg" x="38" y="162">1 · Scope filter</text>
+<text class="xs t2" x="38" y="180">inside each arm's SQL,</text>
+<text class="xs t2" x="38" y="195">before top-k</text>
+<text class="xs t3" x="38" y="214">live only, or as_of</text>
+
+<!-- arms -->
+<text class="cap t3" x="204" y="32">2 · ARMS, IN PARALLEL (≤ 100 EACH)</text>
+<path class="ln" d="M172,186 H188 M188,64 V304"/>
+<path class="ln" d="M188,64 H201" marker-end="url(#an)"/>
+<path class="ln" d="M188,112 H201" marker-end="url(#an)"/>
+<path class="ln" d="M188,160 H201" marker-end="url(#an)"/>
+<path class="ln" d="M188,208 H201" marker-end="url(#an)"/>
+<path class="ln" d="M188,256 H201" marker-end="url(#an)"/>
+<path class="ln" d="M188,304 H201" marker-end="url(#an)"/>
+
+<rect class="box" x="204" y="44" width="292" height="40" rx="8"/>
+<text class="s h mono" x="218" y="61">keyword</text>
+<text class="xs t2" x="218" y="77">FTS5 · Porter stemmer · BM25 · always</text>
+<rect class="gray" x="446" y="55" width="40" height="18" rx="9"/>
+<text class="xs mono t2" x="466" y="68" text-anchor="middle">0.5</text>
+
+<rect class="box" x="204" y="92" width="292" height="40" rx="8"/>
+<text class="s h mono" x="218" y="109">exact</text>
+<text class="xs t2" x="218" y="125">FTS5, identifiers whole · code-like queries</text>
+<rect class="gray" x="446" y="103" width="40" height="18" rx="9"/>
+<text class="xs mono t2" x="466" y="116" text-anchor="middle">0.3</text>
+
+<rect class="box" x="204" y="140" width="292" height="40" rx="8"/>
+<text class="s h mono" x="218" y="157">semantic</text>
+<text class="xs t2" x="218" y="173">cosine similarity · when a model is loaded</text>
+<rect class="gray" x="446" y="151" width="40" height="18" rx="9"/>
+<text class="xs mono t2" x="466" y="164" text-anchor="middle">0.5</text>
+
+<rect class="box" x="204" y="188" width="292" height="40" rx="8"/>
+<text class="s h mono" x="218" y="205">fact</text>
+<text class="xs t2" x="218" y="221">facts vote for their passage · always</text>
+<rect class="gray" x="446" y="199" width="40" height="18" rx="9"/>
+<text class="xs mono t2" x="466" y="212" text-anchor="middle">0.4</text>
+
+<rect class="box" x="204" y="236" width="292" height="40" rx="8" style="stroke-dasharray:4 3"/>
+<text class="s h mono" x="218" y="253">entity</text>
+<text class="xs t2" x="218" y="269">passages that name its entities · routed</text>
+<rect class="gray" x="446" y="247" width="40" height="18" rx="9"/>
+<text class="xs mono t2" x="466" y="260" text-anchor="middle">0.4</text>
+
+<rect class="box" x="204" y="284" width="292" height="40" rx="8" style="stroke-dasharray:4 3"/>
+<text class="s h mono" x="218" y="301">graph</text>
+<text class="xs t2" x="218" y="317">personalised PageRank walks · routed</text>
+<rect class="gray" x="446" y="295" width="40" height="18" rx="9"/>
+<text class="xs mono t2" x="466" y="308" text-anchor="middle">0.5</text>
+
+<rect class="box" x="204" y="343" width="18" height="11" rx="3" style="stroke-dasharray:3 2"/>
+<text class="xs t2" x="230" y="353">routed: the query names 2+ known entities,</text>
+<text class="xs t2" x="230" y="368">or one, with relational phrasing</text>
+<text class="xs t2" x="204" y="391">no model yet: semantic skipped, degraded flag set</text>
+<text class="xs t3" x="204" y="411">pill: the arm's weight in the default profile</text>
+
+<path class="ln" d="M496,64 H516 M496,112 H516 M496,160 H516 M496,208 H516 M496,256 H516 M496,304 H516 M516,64 V304"/>
+<path class="ln" d="M516,74 H533" marker-end="url(#an)"/>
+
+<!-- fusion to results -->
+<rect class="green" x="536" y="44" width="200" height="60" rx="10"/>
+<text class="s h tg" x="550" y="66">3 · Fusion (RRF)</text>
+<text class="xs mono t2" x="550" y="86">Σ weight ÷ (60 + rank)</text>
+<path class="ln" d="M636,105 V121" marker-end="url(#an)"/>
+
+<rect class="green" x="536" y="124" width="200" height="60" rx="10"/>
+<text class="s h tg" x="550" y="146">4 · Recency</text>
+<text class="xs t2" x="550" y="163">notes and conversations only</text>
+<text class="xs t2" x="550" y="177">× 0.8 to 1.0, halves in 90 d</text>
+<path class="ln" d="M636,185 V201" marker-end="url(#an)"/>
+
+<rect class="green" x="536" y="204" width="200" height="60" rx="10"/>
+<text class="s h tg" x="550" y="226">5 · Abstention</text>
+<text class="xs t2" x="550" y="243">drops weak semantic-only hits</text>
+<text class="xs t2" x="550" y="257">none left: reason + hint</text>
+<path class="ln" d="M636,265 V281" marker-end="url(#an)"/>
+
+<rect class="green" x="536" y="284" width="200" height="60" rx="10"/>
+<text class="s h tg" x="550" y="306">6 · Cutoff, limit, budget</text>
+<text class="xs t2" x="550" y="323">cut at a drop &gt; ½ (keeps 3+)</text>
+<text class="xs t2" x="550" y="337">limit 10, then max_tokens</text>
+<path class="ln" d="M636,345 V361" marker-end="url(#an)"/>
+
+<rect class="blue" x="536" y="364" width="200" height="48" rx="10"/>
+<text class="s h tb" x="550" y="384">Results</text>
+<text class="xs t2" x="550" y="400">trace always; why on explain</text>
+</svg>

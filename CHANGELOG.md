@@ -12,6 +12,13 @@ All notable changes. Tags follow semantic versioning; each tag has an eval repor
   GitHub Pages from `master` by `.github/workflows/docs.yml`.
 - `scripts/docs-check.sh`: fails when a `MEMO_*` variable, a command or a metric in the code is
   missing from the operator guide, or a guide link is broken.
+- Documentation: twelve diagrams (SVG, following the reader's light or dark setting). The user
+  guide shows how memo-mcp fits in, a copy per session against one shared server, a corrected
+  fact's history, trust levels, and shelves against separate memories. The operator guide and
+  the README show the processes and files, the data layers, the search pipeline, the ingest
+  write path, the two clocks, the `serve --http` setups and memo-tray. The operator guide now
+  says that `as_of` filters on recorded time only, as the code does; valid time is shown, and
+  `lint` flags expired facts.
 - CI: the Windows test job is disabled for now; release archives for Windows are still built.
 - Web UI ingest console (`/ingest`, `/ingest/{id}`): every `memo-mcp ingest` batch and MCP
   `ingest` call is recorded as a run with live progress (running / done / failed / stalled) and

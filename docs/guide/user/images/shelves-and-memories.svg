@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="272" viewBox="0 0 760 272" role="img" aria-labelledby="t d">
+<title id="t">Shelves and separate memories</title>
+<desc id="d">The memory my-project.db holds three shelves: billing, infrastructure and grpc-docs. A question searches every shelf. A second memory, client-b.db, is its own file with its own shelves; nothing crosses between the two memories.</desc>
+<style>
+text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
+.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.h{font-weight:600}.lg{font-size:14px}.s{font-size:12px}.xs{font-size:11px}.cap{font-size:10.5px;font-weight:600;letter-spacing:.08em}
+.t2{fill:#4a4f57}.t3{fill:#6d727a}.tg{fill:#1f5c4f}.tc{fill:#8a4a24}.tb{fill:#36577a}.tw{fill:#fff}
+.bg{fill:#faf8f4;stroke:#e4e0d8}.bgk{fill:#faf8f4}.box{fill:#fff;stroke:#d3cec4}.gray{fill:#f3f0ea;stroke:#d3cec4}.sep{fill:none;stroke:#e4e0d8}
+.green{fill:#eef5f2;stroke:#3b8572}.clay{fill:#fbf1ea;stroke:#a85a2c}.blue{fill:#eef3f8;stroke:#5b7ea3}
+.fg{fill:#3b8572}.fc{fill:#b8693a}.fb{fill:#5b7ea3}.fn{fill:#c4c8cc}
+.zone{fill:none;stroke:#7fb3a3;stroke-width:1.5;stroke-dasharray:6 5}.zonec{fill:none;stroke:#d0a080;stroke-width:1.5;stroke-dasharray:6 5}
+.ln{fill:none;stroke:#8a8f96;stroke-width:1.5}.lgn{fill:none;stroke:#3b8572;stroke-width:1.5}.lcl{fill:none;stroke:#a85a2c;stroke-width:1.5}.lbl{fill:none;stroke:#5b7ea3;stroke-width:1.5}
+.dash{stroke-dasharray:4 4}
+.an{fill:#8a8f96}.ag{fill:#3b8572}.ac{fill:#a85a2c}.ab{fill:#5b7ea3}
+.ig,.ic,.ib,.in{fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ig{stroke:#1f5c4f}.ic{stroke:#a85a2c}.ib{stroke:#36577a}.in{stroke:#4a4f57}
+@media (prefers-color-scheme:dark){
+text{fill:#eceeec}
+.t2{fill:#b4bab7}.t3{fill:#8a918e}.tg{fill:#8fd1bd}.tc{fill:#e8a77f}.tb{fill:#a9c7e8}.tw{fill:#0f1214}
+.bg{fill:#161a1d;stroke:#2a3033}.bgk{fill:#161a1d}.box{fill:#1b2023;stroke:#3a4245}.gray{fill:#20262a;stroke:#3a4245}.sep{stroke:#2a3033}
+.green{fill:#142420;stroke:#4f9e88}.clay{fill:#2a1c14;stroke:#c97c4f}.blue{fill:#16202b;stroke:#6f93bb}
+.fg{fill:#5fb39c}.fc{fill:#d9895a}.fb{fill:#7fa3c9}.fn{fill:#4a5155}
+.zone{stroke:#3d7a6a}.zonec{stroke:#8a5a3a}
+.ln{stroke:#7d858a}.lgn{stroke:#5fb39c}.lcl{stroke:#d9895a}.lbl{stroke:#7fa3c9}
+.an{fill:#7d858a}.ag{fill:#5fb39c}.ac{fill:#d9895a}.ab{fill:#7fa3c9}
+.ig{stroke:#8fd1bd}.ic{stroke:#e8a77f}.ib{stroke:#a9c7e8}.in{stroke:#b4bab7}
+}
+</style>
+<defs>
+<marker id="an" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="an"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ag"/></marker>
+<marker id="ac" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ac"/></marker>
+<marker id="ab" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ab"/></marker>
+</defs>
+
+<rect class="bg" x="0.5" y="0.5" width="759" height="271" rx="14"/>
+
+<!-- my-project.db -->
+<rect class="box" x="24" y="20" width="348" height="232" rx="12"/>
+<ellipse class="in" cx="52" cy="40" rx="9" ry="3.5"/>
+<path class="in" d="M43,40 v12 c0,2 4,3.5 9,3.5 s9,-1.5 9,-3.5 v-12"/>
+<text class="s h mono" x="70" y="52">my-project.db</text>
+
+<rect class="gray" x="44" y="68" width="196" height="32" rx="7"/>
+<text class="s h" x="56" y="88">billing</text>
+<rect class="box" x="204" y="77" width="10" height="14" rx="1.5"/><rect class="box" x="218" y="77" width="10" height="14" rx="1.5"/>
+<rect class="gray" x="44" y="110" width="196" height="32" rx="7"/>
+<text class="s h" x="56" y="130">infrastructure</text>
+<rect class="box" x="190" y="119" width="10" height="14" rx="1.5"/><rect class="box" x="204" y="119" width="10" height="14" rx="1.5"/><rect class="box" x="218" y="119" width="10" height="14" rx="1.5"/>
+<rect class="gray" x="44" y="152" width="196" height="32" rx="7"/>
+<text class="s h" x="56" y="172">grpc-docs</text>
+<rect class="box" x="218" y="161" width="10" height="14" rx="1.5"/>
+
+<path class="lgn" d="M252,70 h6 v112 h-6"/>
+<path class="lgn" d="M258,126 h8"/>
+<circle class="ig" cx="284" cy="104" r="7"/>
+<path class="ig" d="M289,109 l5,5"/>
+<text class="s h tg" x="274" y="134">A question</text>
+<text class="xs t2" x="274" y="150">searches every</text>
+<text class="xs t2" x="274" y="164">shelf</text>
+
+<text class="s h" x="44" y="222">A shelf</text>
+<text class="xs t2" x="44" y="238">topics that may be searched together</text>
+
+<!-- nothing crosses -->
+<path class="ln dash" d="M380,126 H458"/>
+<path class="lcl" d="M413,119 l14,14 M427,119 l-14,14" style="stroke-width:2"/>
+<text class="xs t3" x="420" y="156" text-anchor="middle">nothing</text>
+<text class="xs t3" x="420" y="170" text-anchor="middle">crosses</text>
+
+<!-- client-b.db -->
+<rect class="box" x="468" y="20" width="268" height="232" rx="12"/>
+<ellipse class="in" cx="496" cy="40" rx="9" ry="3.5"/>
+<path class="in" d="M487,40 v12 c0,2 4,3.5 9,3.5 s9,-1.5 9,-3.5 v-12"/>
+<text class="s h mono" x="514" y="52">client-b.db</text>
+
+<rect class="gray" x="488" y="68" width="196" height="32" rx="7"/>
+<text class="s h" x="500" y="88">contracts</text>
+<rect class="box" x="648" y="77" width="10" height="14" rx="1.5"/><rect class="box" x="662" y="77" width="10" height="14" rx="1.5"/>
+<rect class="gray" x="488" y="110" width="196" height="32" rx="7"/>
+<text class="s h" x="500" y="130">notes</text>
+<rect class="box" x="662" y="119" width="10" height="14" rx="1.5"/>
+
+<circle class="ig" cx="498" cy="168" r="7"/>
+<path class="ig" d="M503,173 l5,5"/>
+<text class="xs t2" x="516" y="172">searched on its own</text>
+
+<text class="s h" x="488" y="222">A separate memory</text>
+<text class="xs t2" x="488" y="238">its own file: contents that must never mix</text>
+</svg>

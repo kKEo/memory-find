@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="400" viewBox="0 0 760 400" role="img" aria-labelledby="t d">
+<title id="t">memo-mcp processes and files</title>
+<desc id="d">One binary runs as separate processes that share only the knowledge-base file. An MCP client starts memo-mcp serve over stdio, one per session. Many MCP clients can share one memo-mcp serve --http server, which also serves the web UI and the Live page. An operator runs memo-mcp ui in a browser, read-only, and memo-mcp commands from a shell. All of them open $MEMO_HOME/kb/name.db, one SQLite file per knowledge base in WAL mode. Embedding models are cached in ~/.cache/memo-mcp/models, downloaded once from Hugging Face.</desc>
+<style>
+text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
+.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.h{font-weight:600}.lg{font-size:14px}.s{font-size:12px}.xs{font-size:11px}.cap{font-size:10.5px;font-weight:600;letter-spacing:.08em}
+.t2{fill:#4a4f57}.t3{fill:#6d727a}.tg{fill:#1f5c4f}.tc{fill:#8a4a24}.tb{fill:#36577a}.tw{fill:#fff}
+.bg{fill:#faf8f4;stroke:#e4e0d8}.bgk{fill:#faf8f4}.box{fill:#fff;stroke:#d3cec4}.gray{fill:#f3f0ea;stroke:#d3cec4}.sep{fill:none;stroke:#e4e0d8}
+.green{fill:#eef5f2;stroke:#3b8572}.clay{fill:#fbf1ea;stroke:#a85a2c}.blue{fill:#eef3f8;stroke:#5b7ea3}
+.fg{fill:#3b8572}.fc{fill:#b8693a}.fb{fill:#5b7ea3}.fn{fill:#c4c8cc}
+.zone{fill:none;stroke:#7fb3a3;stroke-width:1.5;stroke-dasharray:6 5}.zonec{fill:none;stroke:#d0a080;stroke-width:1.5;stroke-dasharray:6 5}
+.ln{fill:none;stroke:#8a8f96;stroke-width:1.5}.lgn{fill:none;stroke:#3b8572;stroke-width:1.5}.lcl{fill:none;stroke:#a85a2c;stroke-width:1.5}.lbl{fill:none;stroke:#5b7ea3;stroke-width:1.5}
+.dash{stroke-dasharray:4 4}
+.an{fill:#8a8f96}.ag{fill:#3b8572}.ac{fill:#a85a2c}.ab{fill:#5b7ea3}
+.ig,.ic,.ib,.in{fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ig{stroke:#1f5c4f}.ic{stroke:#a85a2c}.ib{stroke:#36577a}.in{stroke:#4a4f57}
+@media (prefers-color-scheme:dark){
+text{fill:#eceeec}
+.t2{fill:#b4bab7}.t3{fill:#8a918e}.tg{fill:#8fd1bd}.tc{fill:#e8a77f}.tb{fill:#a9c7e8}.tw{fill:#0f1214}
+.bg{fill:#161a1d;stroke:#2a3033}.bgk{fill:#161a1d}.box{fill:#1b2023;stroke:#3a4245}.gray{fill:#20262a;stroke:#3a4245}.sep{stroke:#2a3033}
+.green{fill:#142420;stroke:#4f9e88}.clay{fill:#2a1c14;stroke:#c97c4f}.blue{fill:#16202b;stroke:#6f93bb}
+.fg{fill:#5fb39c}.fc{fill:#d9895a}.fb{fill:#7fa3c9}.fn{fill:#4a5155}
+.zone{stroke:#3d7a6a}.zonec{stroke:#8a5a3a}
+.ln{stroke:#7d858a}.lgn{stroke:#5fb39c}.lcl{stroke:#d9895a}.lbl{stroke:#7fa3c9}
+.an{fill:#7d858a}.ag{fill:#5fb39c}.ac{fill:#d9895a}.ab{fill:#7fa3c9}
+.ig{stroke:#8fd1bd}.ic{stroke:#e8a77f}.ib{stroke:#a9c7e8}.in{stroke:#b4bab7}
+}
+</style>
+<defs>
+<marker id="an" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="an"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ag"/></marker>
+<marker id="ac" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ac"/></marker>
+<marker id="ab" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L8.5,5 L1,8.5 z" class="ab"/></marker>
+</defs>
+
+<rect class="bg" x="0.5" y="0.5" width="759" height="399" rx="14"/>
+
+<!-- outside: the one download -->
+<rect class="box" x="512" y="14" width="216" height="40" rx="10"/>
+<text class="s h" x="620" y="31" text-anchor="middle">Hugging Face</text>
+<text class="xs t2" x="620" y="46" text-anchor="middle">one-time model download</text>
+<path class="ln dash" d="M620,55 V93" marker-end="url(#an)"/>
+
+<rect class="zone" x="16" y="64" width="728" height="320" rx="14"/>
+<text class="cap tg" x="32" y="86">THIS MACHINE</text>
+
+<!-- row 1: stdio -->
+<rect class="blue" x="32" y="100" width="144" height="52" rx="10"/>
+<text class="s" x="104" y="122" text-anchor="middle">Claude Code,</text>
+<text class="s" x="104" y="138" text-anchor="middle">Claude Desktop</text>
+<path class="ln" d="M178,126 H232" marker-end="url(#an)"/>
+<text class="xs t2" x="205" y="119" text-anchor="middle">stdio</text>
+<rect class="green" x="236" y="100" width="216" height="52" rx="10"/>
+<text class="s h mono tg" x="344" y="122" text-anchor="middle">memo-mcp serve</text>
+<text class="xs t2" x="344" y="139" text-anchor="middle">one per client session</text>
+
+<!-- row 2: shared http -->
+<rect class="blue" x="32" y="172" width="144" height="52" rx="10"/>
+<text class="s" x="104" y="194" text-anchor="middle">Many MCP clients</text>
+<text class="xs t2" x="104" y="210" text-anchor="middle">sharing one URL</text>
+<path class="ln" d="M178,198 H232" marker-end="url(#an)"/>
+<text class="xs t2" x="205" y="191" text-anchor="middle">HTTP</text>
+<rect class="green" x="236" y="172" width="216" height="52" rx="10"/>
+<text class="s h mono tg" x="344" y="194" text-anchor="middle">memo-mcp serve --http</text>
+<text class="xs t2" x="344" y="211" text-anchor="middle">shared: /mcp, web UI, Live</text>
+
+<!-- row 3: ui -->
+<rect class="clay" x="32" y="244" width="144" height="52" rx="10"/>
+<text class="s" x="104" y="266" text-anchor="middle">Browser</text>
+<text class="xs t2" x="104" y="282" text-anchor="middle">an operator</text>
+<path class="ln" d="M178,270 H232" marker-end="url(#an)"/>
+<text class="xs t2" x="205" y="263" text-anchor="middle">HTTP GET</text>
+<rect class="green" x="236" y="244" width="216" height="52" rx="10"/>
+<text class="s h mono tg" x="344" y="266" text-anchor="middle">memo-mcp ui</text>
+<text class="xs t2" x="344" y="283" text-anchor="middle">read-only web UI on loopback</text>
+
+<!-- row 4: cli -->
+<rect class="clay" x="32" y="316" width="144" height="52" rx="10"/>
+<text class="s" x="104" y="338" text-anchor="middle">Shell or script</text>
+<text class="xs t2" x="104" y="354" text-anchor="middle">an operator</text>
+<path class="ln" d="M178,342 H232" marker-end="url(#an)"/>
+<text class="xs t2" x="205" y="335" text-anchor="middle">runs</text>
+<rect class="green" x="236" y="316" width="216" height="52" rx="10"/>
+<text class="s h mono tg" x="344" y="338" text-anchor="middle">memo-mcp &lt;command&gt;</text>
+<text class="xs t2" x="344" y="355" text-anchor="middle">one command, then exits</text>
+
+<!-- storage -->
+<rect class="gray" x="512" y="96" width="216" height="52" rx="10"/>
+<text class="xs h mono" x="620" y="117" text-anchor="middle">~/.cache/memo-mcp/models</text>
+<text class="xs t2" x="620" y="134" text-anchor="middle">embedding models, shared</text>
+
+<rect class="box" x="512" y="172" width="216" height="196" rx="12"/>
+<ellipse class="in" cx="620" cy="200" rx="22" ry="7"/>
+<path class="in" d="M598,200 v32 c0,4 10,7 22,7 s22,-3 22,-7 v-32 M598,216 c0,4 10,7 22,7 s22,-3 22,-7"/>
+<text class="s h mono" x="620" y="268" text-anchor="middle">$MEMO_HOME/kb/&lt;name&gt;.db</text>
+<text class="xs t2" x="620" y="287" text-anchor="middle">one SQLite file per knowledge base</text>
+<text class="xs t2" x="620" y="303" text-anchor="middle">WAL: processes share it safely</text>
+<text class="xs t3" x="620" y="319" text-anchor="middle">writers wait up to 5 s</text>
+
+<path class="ln" d="M454,126 L508,204" marker-end="url(#an)"/>
+<path class="ln" d="M454,198 L508,244" marker-end="url(#an)"/>
+<path class="ln" d="M454,270 L508,284" marker-end="url(#an)"/>
+<path class="ln" d="M454,342 L508,324" marker-end="url(#an)"/>
+</svg>
