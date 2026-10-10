@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="400" viewBox="0 0 760 400" role="img" aria-labelledby="t d">
-<title id="t">memo-mcp processes and files</title>
-<desc id="d">One binary runs as separate processes that share only the knowledge-base file. An MCP client starts memo-mcp serve over stdio, one per session. Many MCP clients can share one memo-mcp serve --http server, which also serves the web UI and the Live page. An operator runs memo-mcp ui in a browser, read-only, and memo-mcp commands from a shell. All of them open $MEMO_HOME/kb/name.db, one SQLite file per knowledge base in WAL mode. Embedding models are cached in ~/.cache/memo-mcp/models, downloaded once from Hugging Face.</desc>
+<title id="t">memors-mcp processes and files</title>
+<desc id="d">One binary runs as separate processes that share only the knowledge-base file. An MCP client starts memors-mcp serve over stdio, one per session. Many MCP clients can share one memors-mcp serve --http server, which also serves the web UI and the Live page. An operator runs memors-mcp ui in a browser, read-only, and memors-mcp commands from a shell. All of them open $MEMORS_HOME/kb/name.db, one SQLite file per knowledge base in WAL mode. Embedding models are cached in ~/.cache/memors-mcp/models, downloaded once from Hugging Face.</desc>
 <style>
 text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
 .mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -52,7 +52,7 @@ text{fill:#eceeec}
 <path class="ln" d="M178,126 H232" marker-end="url(#an)"/>
 <text class="xs t2" x="205" y="119" text-anchor="middle">stdio</text>
 <rect class="green" x="236" y="100" width="216" height="52" rx="10"/>
-<text class="s h mono tg" x="344" y="122" text-anchor="middle">memo-mcp serve</text>
+<text class="s h mono tg" x="344" y="122" text-anchor="middle">memors-mcp serve</text>
 <text class="xs t2" x="344" y="139" text-anchor="middle">one per client session</text>
 
 <!-- row 2: shared http -->
@@ -62,7 +62,7 @@ text{fill:#eceeec}
 <path class="ln" d="M178,198 H232" marker-end="url(#an)"/>
 <text class="xs t2" x="205" y="191" text-anchor="middle">HTTP</text>
 <rect class="green" x="236" y="172" width="216" height="52" rx="10"/>
-<text class="s h mono tg" x="344" y="194" text-anchor="middle">memo-mcp serve --http</text>
+<text class="s h mono tg" x="344" y="194" text-anchor="middle">memors-mcp serve --http</text>
 <text class="xs t2" x="344" y="211" text-anchor="middle">shared: /mcp, web UI, Live</text>
 
 <!-- row 3: ui -->
@@ -72,7 +72,7 @@ text{fill:#eceeec}
 <path class="ln" d="M178,270 H232" marker-end="url(#an)"/>
 <text class="xs t2" x="205" y="263" text-anchor="middle">HTTP GET</text>
 <rect class="green" x="236" y="244" width="216" height="52" rx="10"/>
-<text class="s h mono tg" x="344" y="266" text-anchor="middle">memo-mcp ui</text>
+<text class="s h mono tg" x="344" y="266" text-anchor="middle">memors-mcp ui</text>
 <text class="xs t2" x="344" y="283" text-anchor="middle">read-only web UI on loopback</text>
 
 <!-- row 4: cli -->
@@ -82,18 +82,18 @@ text{fill:#eceeec}
 <path class="ln" d="M178,342 H232" marker-end="url(#an)"/>
 <text class="xs t2" x="205" y="335" text-anchor="middle">runs</text>
 <rect class="green" x="236" y="316" width="216" height="52" rx="10"/>
-<text class="s h mono tg" x="344" y="338" text-anchor="middle">memo-mcp &lt;command&gt;</text>
+<text class="s h mono tg" x="344" y="338" text-anchor="middle">memors-mcp &lt;command&gt;</text>
 <text class="xs t2" x="344" y="355" text-anchor="middle">one command, then exits</text>
 
 <!-- storage -->
 <rect class="gray" x="512" y="96" width="216" height="52" rx="10"/>
-<text class="xs h mono" x="620" y="117" text-anchor="middle">~/.cache/memo-mcp/models</text>
+<text class="xs h mono" x="620" y="117" text-anchor="middle">~/.cache/memors-mcp/models</text>
 <text class="xs t2" x="620" y="134" text-anchor="middle">embedding models, shared</text>
 
 <rect class="box" x="512" y="172" width="216" height="196" rx="12"/>
 <ellipse class="in" cx="620" cy="200" rx="22" ry="7"/>
 <path class="in" d="M598,200 v32 c0,4 10,7 22,7 s22,-3 22,-7 v-32 M598,216 c0,4 10,7 22,7 s22,-3 22,-7"/>
-<text class="s h mono" x="620" y="268" text-anchor="middle">$MEMO_HOME/kb/&lt;name&gt;.db</text>
+<text class="s h mono" x="620" y="268" text-anchor="middle">$MEMORS_HOME/kb/&lt;name&gt;.db</text>
 <text class="xs t2" x="620" y="287" text-anchor="middle">one SQLite file per knowledge base</text>
 <text class="xs t2" x="620" y="303" text-anchor="middle">WAL: processes share it safely</text>
 <text class="xs t3" x="620" y="319" text-anchor="middle">writers wait up to 5 s</text>

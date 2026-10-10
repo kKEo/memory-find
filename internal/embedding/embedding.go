@@ -174,7 +174,7 @@ func loadPipelineWithRecovery(ctx context.Context, session *hugot.Session, info 
 		}
 		pipe, err := hugot.NewPipeline(session, hugot.FeatureExtractionConfig{
 			ModelPath:    modelPath,
-			Name:         "memo-embeddings-" + info.ID,
+			Name:         "memors-embeddings-" + info.ID,
 			OnnxFilename: filepath.Base(info.OnnxPath),
 			Options:      opts,
 		})
@@ -346,7 +346,7 @@ func DefaultModelDir() string {
 	if err != nil {
 		home = os.TempDir()
 	}
-	return filepath.Join(home, ".cache", "memo-mcp", "models")
+	return filepath.Join(home, ".cache", "memors-mcp", "models")
 }
 
 // EnsureModelFiles downloads a registry model's files once and returns the

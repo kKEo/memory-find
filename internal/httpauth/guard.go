@@ -16,7 +16,7 @@ import (
 
 const (
 	// CookieName is the browser session cookie.
-	CookieName = "memo_session"
+	CookieName = "memors_session"
 	cookieAge  = 30 * 24 * time.Hour
 	// codeTTL is how long a printed one-time login link stays valid.
 	codeTTL = 15 * time.Minute
@@ -39,7 +39,7 @@ type Guard struct {
 // browser reaches the server over HTTPS (directly or through a proxy).
 func New(token string, secure bool) *Guard {
 	mac := hmac.New(sha256.New, []byte(token))
-	mac.Write([]byte("memo-mcp ui session v1"))
+	mac.Write([]byte("memors-mcp ui session v1"))
 	return &Guard{
 		token:   []byte(token),
 		session: base64.RawURLEncoding.EncodeToString(mac.Sum(nil)),
@@ -136,14 +136,14 @@ func (g *Guard) Wrap(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/login?next="+safeNext(r.URL.RequestURI()), http.StatusSeeOther)
 			return
 		}
-		w.Header().Set("WWW-Authenticate", `Bearer realm="memo-mcp"`)
-		http.Error(w, "unauthorized: send Authorization: Bearer <token> (memo-mcp http-token prints it)", http.StatusUnauthorized)
+		w.Header().Set("WWW-Authenticate", `Bearer realm="memors-mcp"`)
+		http.Error(w, "unauthorized: send Authorization: Bearer <token> (memors-mcp http-token prints it)", http.StatusUnauthorized)
 	})
 }
 
 // loginLink answers POST /login-link?next=<path> with a single-use login
 // link, for an app that holds the token and opens the UI in a window of its
-// own (memo-tray), so the token never reaches the browser or a URL. Only the
+// own (memors-tray), so the token never reaches the browser or a URL. Only the
 // Authorization header counts: a browser session cannot mint more sessions.
 func (g *Guard) loginLink(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -153,8 +153,8 @@ func (g *Guard) loginLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !g.bearerOK(r) {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="memo-mcp"`)
-		http.Error(w, "unauthorized: send Authorization: Bearer <token> (memo-mcp http-token prints it)", http.StatusUnauthorized)
+		w.Header().Set("WWW-Authenticate", `Bearer realm="memors-mcp"`)
+		http.Error(w, "unauthorized: send Authorization: Bearer <token> (memors-mcp http-token prints it)", http.StatusUnauthorized)
 		return
 	}
 	code, exp := g.mintCode()
@@ -226,11 +226,11 @@ func (g *Guard) login(w http.ResponseWriter, r *http.Request) {
 
 var loginTmpl = template.Must(template.New("login").Parse(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Log in · memo-mcp</title><link rel="stylesheet" href="/style.css"></head><body>
-<header><span class="brand">memo-mcp</span></header><main>
+<title>Log in · memors-mcp</title><link rel="stylesheet" href="/style.css"></head><body>
+<header><span class="brand">memors-mcp</span></header><main>
 <h1>Log in</h1>
 {{if .Error}}<p class="warn">{{.Error}}</p>{{end}}
-<p class="muted">Use the login link the server printed at startup, or paste the token: run <code>memo-mcp http-token</code> on the server machine.</p>
+<p class="muted">Use the login link the server printed at startup, or paste the token: run <code>memors-mcp http-token</code> on the server machine.</p>
 <form method="post" action="/login"><input type="hidden" name="next" value="{{.Next}}">
 <input type="password" name="token" autocomplete="current-password" placeholder="token" required autofocus> <button>Log in</button></form>
 </main></body></html>`))

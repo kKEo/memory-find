@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/rerank"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/rerank"
 )
 
 // A fake cross-encoder that prefers passages mentioning "ducks" moves the

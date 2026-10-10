@@ -1,5 +1,7 @@
 # The knowledge-base schema, in plain words
 
+> **Renamed.** This document predates the rename to memors (2026-10-10): `memo-mcp` is now `memors-mcp`, `memo-tray` is `memors-tray`, `MEMO_*` is `MEMORS_*` and `~/.memo-mcp` is `~/.memors-mcp`. `memo://` addresses are unchanged.
+
 *Roadmap P1 review checkpoint. Written 2026-10-02 for owner sign-off before migration 1 is coded.
 This document describes the whole target layout (layers L0–L5); migration 1 creates L0–L3 plus
 bookkeeping, migration 2 (P7) adds the graph, migration 3 (P8) adds pages.*

@@ -1,4 +1,4 @@
-// Package client talks to a running memo-mcp HTTP server: its live
+// Package client talks to a running memors-mcp HTTP server: its live
 // snapshot (GET /live.json) and single-use login links for the stats
 // window (POST /login-link).
 package client
@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/httpauth"
-	"github.com/kKEo/memory-find/internal/live"
-	"github.com/kKEo/memory-find/internal/runfile"
+	"github.com/kKEo/memors/internal/httpauth"
+	"github.com/kKEo/memors/internal/live"
+	"github.com/kKEo/memors/internal/runfile"
 )
 
 var (
@@ -26,8 +26,8 @@ var (
 	// ErrUnauthorized: the server refused the token (rotated since it started?).
 	ErrUnauthorized = errors.New("token refused: restart the server after rotating it")
 	// ErrNotSupported: the server predates /live.json.
-	ErrNotSupported = errors.New("this memo-mcp is too old for memo-tray: upgrade it")
-	// ErrMTLS: the server wants a client certificate, which memo-tray has not got.
+	ErrNotSupported = errors.New("this memors-mcp is too old for memors-tray: upgrade it")
+	// ErrMTLS: the server wants a client certificate, which memors-tray has not got.
 	ErrMTLS = errors.New("needs a client certificate (mTLS); open it in a browser that has one")
 	// ErrInsecure: the token would cross the network unencrypted.
 	ErrInsecure = errors.New("refusing to send the token over plain HTTP to another machine")
@@ -77,7 +77,7 @@ func (c *Client) Live(ctx context.Context, t Target) (live.Snapshot, error) {
 		return snap, err
 	}
 	if snap.Schema != live.Schema {
-		return snap, fmt.Errorf("unknown /live.json schema %d: upgrade memo-tray", snap.Schema)
+		return snap, fmt.Errorf("unknown /live.json schema %d: upgrade memors-tray", snap.Schema)
 	}
 	return snap, nil
 }

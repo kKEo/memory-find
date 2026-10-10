@@ -1,18 +1,18 @@
 {{define "wizard_welcome.html"}}{{template "head" .}}{{with .Data}}
-<h1>Set up memo-mcp</h1>
-<p class="lede">memo-tray runs memo-mcp, the knowledge-base server your agents connect to. This assistant installs it, sets up a knowledge base and shows how to connect Claude Code. Everything stays on this Mac.</p>
+<h1>Set up memors-mcp</h1>
+<p class="lede">memors-tray runs memors-mcp, the knowledge-base server your agents connect to. This assistant installs it, sets up a knowledge base and shows how to connect Claude Code. Everything stays on this Mac.</p>
 <section class="group"><h2>On this Mac</h2>
-<div class="row"><div class="status"><span class="dot{{if not .MemoOK}} bad{{end}}"></span><span>{{tilde .MemoStatus}}</span></div></div>
+<div class="row"><div class="status"><span class="dot{{if not .MemorsOK}} bad{{end}}"></span><span>{{tilde .MemorsStatus}}</span></div></div>
 </section>
 <div class="actions">
-{{- if .MemoOK}}<a class="button" href="/wizard/kb">Skip to knowledge base</a><a class="button primary" href="/wizard/install">Check for updates</a>
-{{- else}}<a class="button primary" href="/wizard/install">Install memo-mcp</a>{{end}}
+{{- if .MemorsOK}}<a class="button" href="/wizard/kb">Skip to knowledge base</a><a class="button primary" href="/wizard/install">Check for updates</a>
+{{- else}}<a class="button primary" href="/wizard/install">Install memors-mcp</a>{{end}}
 </div>
 {{end}}{{template "foot" .}}{{end}}
 
 {{define "wizard_install.html"}}{{template "head" .}}{{with .Data}}
-<h1>Install memo-mcp</h1>
-<p class="lede">memo-tray downloads the release for this Mac from GitHub, checks it against the SHA-256 checksums published with the release, makes sure it runs, and only then installs it: one file, nothing else on your Mac changes.</p>
+<h1>Install memors-mcp</h1>
+<p class="lede">memors-tray downloads the release for this Mac from GitHub, checks it against the SHA-256 checksums published with the release, makes sure it runs, and only then installs it: one file, nothing else on your Mac changes.</p>
 {{- if .Err}}
 <div class="banner err">Could not look up the latest release: {{.Err}}</div>
 <div class="actions"><a class="button" href="/wizard">Back</a><a class="button primary" href="/wizard/install?refresh=1">Try again</a></div>
@@ -21,7 +21,7 @@
 <dl class="kv">
 <dt>Version</dt><dd>{{.Release.Tag}}{{with date .Release.Published}} · published {{.}}{{end}}{{if .Release.PageURL}} · <a href="{{.Release.PageURL}}">release notes</a>{{end}}</dd>
 <dt>Download</dt><dd>{{if .HasAsset}}<code>{{.Archive.Name}}</code> · {{mb .Archive.Size}}{{else}}<span class="bad">this release has no archive for this Mac</span>{{end}}</dd>
-<dt>Installed now</dt><dd>{{if .Installed}}{{.Installed}} at <code>{{tilde .MemoPath}}</code>{{else}}not installed{{end}}</dd>
+<dt>Installed now</dt><dd>{{if .Installed}}{{.Installed}} at <code>{{tilde .MemorsPath}}</code>{{else}}not installed{{end}}</dd>
 </dl>
 </section>
 {{- if .HasAsset}}
@@ -29,7 +29,7 @@
 <section class="group"><h2>Where</h2>
 <div class="row stack"><label class="label" for="dir">Install folder</label>
 <input type="text" id="dir" name="dir" value="{{.Dir}}" class="wide">
-<div class="hint">memo-tray runs memo-mcp from this folder. To use it in a terminal as well, the folder must be on your PATH; for <code>~/.local/bin</code> add <code>export PATH="$HOME/.local/bin:$PATH"</code> to <code>~/.zprofile</code>.</div></div>
+<div class="hint">memors-tray runs memors-mcp from this folder. To use it in a terminal as well, the folder must be on your PATH; for <code>~/.local/bin</code> add <code>export PATH="$HOME/.local/bin:$PATH"</code> to <code>~/.zprofile</code>.</div></div>
 </section>
 <div class="actions"><a class="button" href="/wizard">Back</a>
 {{- if .Current}}<a class="button" href="/wizard/kb">Keep {{.Installed}}</a>{{end}}
@@ -43,7 +43,7 @@
 
 {{define "wizard_progress.html"}}{{template "head" .}}{{with .Data}}
 {{- if .Running}}
-<h1>Installing memo-mcp {{.Release.Version}}</h1>
+<h1>Installing memors-mcp {{.Release.Version}}</h1>
 <p class="lede">{{if eq .Phase "verifying"}}Checking the SHA-256 checksum…{{else if eq .Phase "installing"}}Unpacking, trying it out and installing…{{else}}Downloading from GitHub…{{end}}</p>
 <section class="group"><div class="row stack">
 <progress value="{{pct .Done .Total}}" max="100"></progress>
@@ -52,13 +52,13 @@
 {{- else if .Err}}
 <h1>The installation did not finish</h1>
 <div class="banner err">{{.Err}}</div>
-<p class="lede">Nothing was changed: a memo-mcp that was installed before stays as it was.</p>
+<p class="lede">Nothing was changed: a memors-mcp that was installed before stays as it was.</p>
 <div class="actions"><a class="button" href="/wizard">Back</a><a class="button primary" href="/wizard/install?refresh=1">Try again</a></div>
 {{- else}}
-<h1>memo-mcp {{.Version}} is installed</h1>
-<div class="banner ok">Installed at <code>{{tilde .Path}}</code>. memo-tray uses it from now on.</div>
+<h1>memors-mcp {{.Version}} is installed</h1>
+<div class="banner ok">Installed at <code>{{tilde .Path}}</code>. memors-tray uses it from now on.</div>
 <section class="group"><h2>Running servers</h2>
-<div class="row"><div><div class="label">Servers memo-tray started run the previous version until they restart.</div>
+<div class="row"><div><div class="label">Servers memors-tray started run the previous version until they restart.</div>
 {{- if .Restarted}}<div class="hint">Restarting them now; watch the menu bar.</div>{{end}}</div>
 <form method="post" action="/wizard/restart"><button>Restart them</button></form></div>
 </section>
@@ -68,9 +68,9 @@
 
 {{define "wizard_kb.html"}}{{template "head" .}}{{with .Data}}
 <h1>Your knowledge base</h1>
-<p class="lede">A knowledge base is one file of documents and facts that your agents share, for example one per project. memo-tray runs a server for it on this Mac and starts it now.</p>
+<p class="lede">A knowledge base is one file of documents and facts that your agents share, for example one per project. memors-tray runs a server for it on this Mac and starts it now.</p>
 {{- if .Err}}<div class="banner err">{{.Err}}</div>{{end}}
-{{- if not .MemoOK}}<div class="banner warn">memo-mcp is not installed yet. <a href="/wizard/install">Install it first.</a></div>{{end}}
+{{- if not .MemorsOK}}<div class="banner warn">memors-mcp is not installed yet. <a href="/wizard/install">Install it first.</a></div>{{end}}
 <form method="post" action="/wizard/kb">
 <section class="group">
 <div class="row"><div><label class="label" for="name">Name</label><div class="hint">Choose an existing one or type a new name.</div></div>
@@ -81,9 +81,9 @@
 <div class="row"><div><div class="label">Access</div><div class="hint">Only this Mac can reach the server either way. A token also keeps other users of this Mac out.</div></div>
 <div class="choices"><label class="check"><input type="radio" name="auth" value="none"{{if ne .Auth "token"}} checked{{end}}> Open on this Mac</label>
 <label class="check"><input type="radio" name="auth" value="token"{{if eq .Auth "token"}} checked{{end}}> Require a token</label></div></div>
-<div class="row"><label class="check"><input type="checkbox" name="autostart"{{if .Autostart}} checked{{end}}> Start this server whenever memo-tray starts</label></div>
+<div class="row"><label class="check"><input type="checkbox" name="autostart"{{if .Autostart}} checked{{end}}> Start this server whenever memors-tray starts</label></div>
 </section>
-<div class="actions"><a class="button" href="/wizard/install">Back</a><button class="primary"{{if not .MemoOK}} disabled{{end}}>Save and start</button></div>
+<div class="actions"><a class="button" href="/wizard/install">Back</a><button class="primary"{{if not .MemorsOK}} disabled{{end}}>Save and start</button></div>
 </form>
 {{end}}{{template "foot" .}}{{end}}
 
@@ -99,7 +99,7 @@
 <form method="post" action="/wizard/copy"><input type="hidden" name="kb" value="{{.KB}}"><button>{{if .Copied}}Copied ✓{{else}}Copy command{{end}}</button></form></div>
 </section>
 <section class="group"><h2>Next</h2>
-<div class="row stack"><div>In the menu bar, <b>memo-tray › {{.KB}} › Open Stats Window</b> shows the connected agents and what they are doing. To change any of this later, choose <b>Settings…</b> in the same menu.</div></div>
+<div class="row stack"><div>In the menu bar, <b>memors-tray › {{.KB}} › Open Stats Window</b> shows the connected agents and what they are doing. To change any of this later, choose <b>Settings…</b> in the same menu.</div></div>
 </section>
 <div class="actions"><span class="muted">Close this window with ⌘W.</span><a class="button" href="/settings">Open Settings</a></div>
 {{end}}{{template "foot" .}}{{end}}

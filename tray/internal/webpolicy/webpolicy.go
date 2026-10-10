@@ -1,5 +1,5 @@
 // Package webpolicy decides where a stats window may go. The window shows
-// one memo-mcp server's pages; documents on those pages can link anywhere
+// one memors-mcp server's pages; documents on those pages can link anywhere
 // (their text comes from the knowledge base), so anything off that server
 // either opens in the default browser, when the user clicked it, or is
 // refused.

@@ -18,17 +18,17 @@
 | **Embedding** | A vector representing a text's meaning; compared with cosine similarity |
 | **Entity** | A named thing (system, person, identifier) extracted from passages into the graph layer |
 | **Fact** | One-sentence claim with evidence, a subject list and a validity window |
-| **FTS5** | SQLite's full-text search extension; memo-mcp keeps two indexes (stemmed, and identifier-preserving) |
+| **FTS5** | SQLite's full-text search extension; memors-mcp keeps two indexes (stemmed, and identifier-preserving) |
 | **Fusion** | Combining arm lists into one ranking: RRF (rank-based) or min-max (score-based) |
 | **Granularity** | What a search returns: `chunk`, `document`, `fact` or `page` |
-| **Knowledge base (KB)** | One SQLite file, selected by `MEMO_KB`; the isolation boundary |
+| **Knowledge base (KB)** | One SQLite file, selected by `MEMORS_KB`; the isolation boundary |
 | **MCP** | Model Context Protocol: the JSON-RPC protocol between AI clients and tool servers |
 | **Merge candidate** | Two entity names similar enough to possibly be the same thing; queued for a human |
 | **Namespace** | A label grouping sources inside one knowledge base; searches span all by default |
 | **Origin** | Declared provenance class: `web`, `user-said`, `agent-derived` |
 | **Page** | Agent-written markdown about an entity, stored as an inference with its cited passages |
 | **PPR** | Personalised PageRank: the random walk the graph arm runs from each named entity |
-| **Profile** | A named set of ranking constants (`MEMO_PROFILE`) |
+| **Profile** | A named set of ranking constants (`MEMORS_PROFILE`) |
 | **Recency** | A multiplicative score factor that decays with age for kinds that age |
 | **Revision** | One version of a source's document; changed content creates a new revision |
 | **RRF** | Reciprocal rank fusion: sum of `weight / (k + rank)` over arms |

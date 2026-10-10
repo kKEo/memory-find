@@ -2,15 +2,17 @@ package loginitem
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestEnableDisable(t *testing.T) {
-	a := Agent{Home: t.TempDir(), Executable: "/Applications/memo-tray & co.app/Contents/MacOS/memo-tray"}
+	a := Agent{Home: t.TempDir(), Executable: "/Applications/memors-tray & co.app/Contents/MacOS/memors-tray"}
 	if a.Enabled() || a.Program() != "" {
 		t.Fatal("enabled before Enable")
 	}
@@ -21,7 +23,7 @@ func TestEnableDisable(t *testing.T) {
 		t.Fatalf("after Enable: enabled=%v program=%q", a.Enabled(), a.Program())
 	}
 	b, _ := os.ReadFile(a.Path())
-	for _, want := range []string{"<string>io.github.kkeo.memo-tray</string>", "memo-tray &amp; co.app", "<key>RunAtLoad</key>\n\t<true/>"} {
+	for _, want := range []string{"<string>io.github.kkeo.memors-tray</string>", "memors-tray &amp; co.app", "<key>RunAtLoad</key>\n\t<true/>"} {
 		if !strings.Contains(string(b), want) {
 			t.Errorf("plist lacks %q:\n%s", want, b)
 		}
@@ -35,7 +37,7 @@ func TestEnableDisable(t *testing.T) {
 		}
 	}
 
-	moved := Agent{Home: a.Home, Executable: "/Users/me/Applications/memo-tray.app/Contents/MacOS/memo-tray"}
+	moved := Agent{Home: a.Home, Executable: "/Users/me/Applications/memors-tray.app/Contents/MacOS/memors-tray"}
 	if err := moved.Repair(); err != nil || moved.Program() != moved.Executable {
 		t.Errorf("Repair: %v, program %q", err, moved.Program())
 	}
@@ -51,11 +53,44 @@ func TestEnableDisable(t *testing.T) {
 }
 
 func TestEnableRefusesTemporaryLocations(t *testing.T) {
-	a := Agent{Home: t.TempDir(), Executable: "/private/var/folders/x/AppTranslocation/ABC/d/memo-tray.app/Contents/MacOS/memo-tray"}
+	a := Agent{Home: t.TempDir(), Executable: "/private/var/folders/x/AppTranslocation/ABC/d/memors-tray.app/Contents/MacOS/memors-tray"}
 	if err := a.Enable(); !errors.Is(err, ErrTranslocated) || a.Enabled() {
 		t.Errorf("translocated: %v", err)
 	}
-	if err := (Agent{Home: t.TempDir(), Executable: "memo-tray"}).Enable(); err == nil {
+	if err := (Agent{Home: t.TempDir(), Executable: "memors-tray"}).Enable(); err == nil {
 		t.Error("relative path accepted")
+	}
+}
+
+// memo-tray's LaunchAgent gives way to memors-tray's, keeping "open at login" on.
+func TestAdoptLegacy(t *testing.T) {
+	a := Agent{Home: t.TempDir(), Executable: "/Applications/memors-tray.app/Contents/MacOS/memors-tray"}
+	if err := a.AdoptLegacy(); err != nil || a.Enabled() {
+		t.Fatalf("without a legacy agent: %v, enabled=%v", err, a.Enabled())
+	}
+	old := filepath.Join(a.Home, "Library", "LaunchAgents", LegacyLabel+".plist")
+	if err := os.MkdirAll(filepath.Dir(old), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(old, []byte("<plist/>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	translocated := Agent{Home: a.Home, Executable: "/private/var/folders/x/AppTranslocation/ABC/d/memors-tray.app/Contents/MacOS/memors-tray"}
+	if err := translocated.AdoptLegacy(); err != nil || a.Enabled() {
+		t.Fatalf("translocated: %v, enabled=%v", err, a.Enabled())
+	}
+	if _, err := os.Stat(old); err != nil {
+		t.Fatalf("a translocated start removed the old agent: %v", err)
+	}
+
+	if err := a.AdoptLegacy(); err != nil {
+		t.Fatal(err)
+	}
+	if !a.Enabled() || a.Program() != a.Executable {
+		t.Errorf("after adopting: enabled=%v program=%q", a.Enabled(), a.Program())
+	}
+	if _, err := os.Stat(old); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("old agent still there: %v", err)
 	}
 }

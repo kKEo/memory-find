@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kKEo/memory-find/tray/internal/config"
-	"github.com/kKEo/memory-find/tray/internal/home"
+	"github.com/kKEo/memors/tray/internal/config"
+	"github.com/kKEo/memors/tray/internal/home"
 )
 
 // serverRow is one knowledge base in the settings table.
@@ -29,10 +29,10 @@ type settingsData struct {
 	Errors       []string
 	Login        bool
 	StopOnQuit   bool
-	MemoMode     string // auto or path
-	MemoPath     string
-	MemoStatus   string
-	MemoOK       bool
+	MemorsMode   string // auto or path
+	MemorsPath   string
+	MemorsStatus string
+	MemorsOK     bool
 	Model        string
 	Models       []Model
 	DefaultModel string
@@ -72,7 +72,7 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	if r.PostForm.Get("rev") != rev {
 		d := s.settingsFrom(r.Context(), cur)
 		d.Rev = rev
-		d.Notice = "tray.json changed while this form was open (memo-tray adds a server when you start a new knowledge base). Nothing was saved: check the values below and save again."
+		d.Notice = "tray.json changed while this form was open (memors-tray adds a server when you start a new knowledge base). Nothing was saved: check the values below and save again."
 		w.WriteHeader(http.StatusConflict)
 		s.render(w, "settings.html", page{Title: "Settings", Data: d})
 		return
@@ -92,7 +92,7 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 	if len(errs) > 0 {
 		d := s.settingsFrom(r.Context(), next)
 		d.Rev, d.Errors = rev, errs
-		d.MemoMode, d.MemoPath = r.PostForm.Get("memo_mode"), r.PostForm.Get("memo_path")
+		d.MemorsMode, d.MemorsPath = r.PostForm.Get("memors_mode"), r.PostForm.Get("memors_path")
 		d.Env = r.PostForm.Get("env")
 		d.NewKB, d.NewAddr, d.NewAuth = r.PostForm.Get("new_kb"), r.PostForm.Get("new_addr"), r.PostForm.Get("new_auth")
 		d.NewAutostart = r.PostForm.Get("new_autostart") == "on"
@@ -122,20 +122,20 @@ func (s *Server) fromForm(f url.Values, cur *config.Config) (*config.Config, []s
 		no := false
 		next.StopOnQuit = &no
 	}
-	if f.Get("memo_mode") == "path" {
-		p := expandHome(strings.TrimSpace(f.Get("memo_path")))
+	if f.Get("memors_mode") == "path" {
+		p := expandHome(strings.TrimSpace(f.Get("memors_path")))
 		if !filepath.IsAbs(p) {
-			errs = append(errs, "memo-mcp location: give the full path to the memo-mcp file, or choose Find automatically")
-		} else if _, err := s.d.FindMemo(p); err != nil {
-			errs = append(errs, "memo-mcp location: "+err.Error())
+			errs = append(errs, "memors-mcp location: give the full path to the memors-mcp file, or choose Find automatically")
+		} else if _, err := s.d.FindMemors(p); err != nil {
+			errs = append(errs, "memors-mcp location: "+err.Error())
 		}
-		next.MemoBinary = p
+		next.MemorsBinary = p
 	}
 
 	env, envErrs := parseEnv(f.Get("env"))
 	errs = append(errs, envErrs...)
 	if m := strings.TrimSpace(f.Get("model")); m != "" {
-		env["MEMO_MODEL"] = m
+		env["MEMORS_MODEL"] = m
 	}
 	if len(env) > 0 {
 		next.Env = env
@@ -182,22 +182,22 @@ func (s *Server) settingsFrom(ctx context.Context, cfg *config.Config) settingsD
 	d := settingsData{
 		Login:        s.d.Login.Enabled(),
 		StopOnQuit:   cfg.StopsOnQuit(),
-		MemoMode:     "auto",
-		MemoPath:     cfg.MemoBinary,
-		Model:        cfg.Env["MEMO_MODEL"],
+		MemorsMode:   "auto",
+		MemorsPath:   cfg.MemorsBinary,
+		Model:        cfg.Env["MEMORS_MODEL"],
 		Debug:        cfg.Debug,
 		NewAuth:      "none",
 		NewAutostart: true,
 		ConfigPath:   config.Path(s.d.Home),
 		LogsDir:      home.LogDir(s.d.Home),
 	}
-	if cfg.MemoBinary != "" {
-		d.MemoMode = "path"
+	if cfg.MemorsBinary != "" {
+		d.MemorsMode = "path"
 	}
-	bin, version, err := s.memo(ctx, cfg)
-	d.MemoOK = err == nil
-	d.MemoStatus = memoLine(bin, version, err)
-	if d.MemoOK {
+	bin, version, err := s.memors(ctx, cfg)
+	d.MemorsOK = err == nil
+	d.MemorsStatus = memorsLine(bin, version, err)
+	if d.MemorsOK {
 		d.Models, _ = s.d.Models(ctx, bin)
 		for _, m := range d.Models {
 			if m.Default {
@@ -211,7 +211,7 @@ func (s *Server) settingsFrom(ctx context.Context, cfg *config.Config) settingsD
 	d.KBs, _ = home.KBs(s.d.Home)
 	var lines []string
 	for k, v := range cfg.Env {
-		if k != "MEMO_MODEL" {
+		if k != "MEMORS_MODEL" {
 			lines = append(lines, k+"="+v)
 		}
 	}
@@ -256,23 +256,23 @@ func (s *Server) loadConfig() (*config.Config, string, error) {
 	return cfg, rev, nil
 }
 
-// memo finds memo-mcp the way the menu does, and asks its version.
-func (s *Server) memo(ctx context.Context, cfg *config.Config) (bin, version string, err error) {
-	bin, err = s.d.FindMemo(cfg.MemoBinary)
+// memors finds memors-mcp the way the menu does, and asks its version.
+func (s *Server) memors(ctx context.Context, cfg *config.Config) (bin, version string, err error) {
+	bin, err = s.d.FindMemors(cfg.MemorsBinary)
 	if err == nil {
-		version, _ = s.d.MemoVersion(ctx, bin)
+		version, _ = s.d.MemorsVersion(ctx, bin)
 	}
 	return bin, version, err
 }
 
-func memoLine(bin, version string, err error) string {
+func memorsLine(bin, version string, err error) string {
 	if err != nil {
 		return err.Error()
 	}
 	if version == "" {
 		version = "(version unknown)"
 	}
-	return "memo-mcp " + version + " at " + bin
+	return "memors-mcp " + version + " at " + bin
 }
 
 // parseEnv reads KEY=value lines; blank lines and # comments are skipped.
@@ -289,8 +289,8 @@ func parseEnv(text string) (map[string]string, []string) {
 		switch {
 		case !ok || k == "":
 			errs = append(errs, fmt.Sprintf("Environment, line %d: write NAME=value", i+1))
-		case k == "MEMO_MODEL":
-			errs = append(errs, "Environment: choose the embedding model with the field above, not MEMO_MODEL here")
+		case k == "MEMORS_MODEL":
+			errs = append(errs, "Environment: choose the embedding model with the field above, not MEMORS_MODEL here")
 		default:
 			env[k] = strings.TrimSpace(v)
 		}

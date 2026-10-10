@@ -1,4 +1,4 @@
-module github.com/kKEo/memory-find
+module github.com/kKEo/memors
 
 go 1.26.0
 

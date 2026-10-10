@@ -11,10 +11,10 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/obs"
-	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/obs"
+	"github.com/kKEo/memors/internal/retrieve"
 )
 
 // newObservedSession is newTestSession with a private registry so counters
@@ -92,31 +92,31 @@ func TestMiddlewareCountsToolCallsAndErrors(t *testing.T) {
 	if !res.IsError {
 		t.Fatal("expected a tool error")
 	}
-	if v := counter(reg, "memo_mcp_tool_calls_total", "search", "ok"); v != 2 {
+	if v := counter(reg, "memors_mcp_tool_calls_total", "search", "ok"); v != 2 {
 		t.Fatalf("search ok = %v", v)
 	}
-	if v := counter(reg, "memo_mcp_tool_calls_total", "read", "tool_error"); v != 1 {
+	if v := counter(reg, "memors_mcp_tool_calls_total", "read", "tool_error"); v != 1 {
 		t.Fatalf("read tool_error = %v", v)
 	}
-	if v := counter(reg, "memo_mcp_tool_errors_total", "read", "not_found"); v != 1 {
+	if v := counter(reg, "memors_mcp_tool_errors_total", "read", "not_found"); v != 1 {
 		t.Fatalf("read not_found = %v", v)
 	}
-	if n := histCount(reg, "memo_mcp_tool_call_duration_seconds", "search"); n != 2 {
+	if n := histCount(reg, "memors_mcp_tool_call_duration_seconds", "search"); n != 2 {
 		t.Fatalf("search latency observations = %d", n)
 	}
-	if v := counter(reg, "memo_mcp_requests_in_flight"); v != 0 {
+	if v := counter(reg, "memors_mcp_requests_in_flight"); v != 0 {
 		t.Fatalf("in flight after calls = %v", v)
 	}
-	if v := counter(reg, "memo_mcp_requests_total", "tools/call", "ok"); v != 4 {
+	if v := counter(reg, "memors_mcp_requests_total", "tools/call", "ok"); v != 4 {
 		t.Fatalf("requests tools/call ok = %v", v)
 	}
-	if v := counter(reg, "memo_mcp_sessions_total", "test-client"); v != 1 {
+	if v := counter(reg, "memors_mcp_sessions_total", "test-client"); v != 1 {
 		t.Fatalf("sessions = %v", v)
 	}
 	if _, err := cs.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: "memo://index"}); err != nil {
 		t.Fatal(err)
 	}
-	if v := counter(reg, "memo_mcp_resource_reads_total", "index", "ok"); v != 1 {
+	if v := counter(reg, "memors_mcp_resource_reads_total", "index", "ok"); v != 1 {
 		t.Fatalf("resource reads = %v", v)
 	}
 }
@@ -146,7 +146,7 @@ func TestToolCallsWriteNothingToStdout(t *testing.T) {
 	os.Stdout = w
 	defer func() { os.Stdout = old }()
 	var logBuf strings.Builder
-	obs.SetupLogging(&logBuf, func(k string) string { return map[string]string{"MEMO_LOG_LEVEL": "debug"}[k] })
+	obs.SetupLogging(&logBuf, func(k string) string { return map[string]string{"MEMORS_LOG_LEVEL": "debug"}[k] })
 	cs, _, _ := newObservedSession(t)
 	ingestDoc(t, cs)
 	callTool(t, cs, "search", map[string]any{"query": "ERR_CONN_RESET", "response_format": "explain"})

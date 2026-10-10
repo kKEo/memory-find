@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/obs"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/obs"
 )
 
 func metric(reg *obs.Registry, name string, labels ...string) (float64, uint64) {
@@ -50,13 +50,13 @@ func TestSearchMetrics(t *testing.T) {
 	if _, err := svc.Search(ctx, Request{Query: "ERR_CONN_RESET retry"}); err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := metric(reg, "memo_search_total", "auto", "semantic+keyword+exact+fact", "chunk", "results"); v != 1 {
+	if v, _ := metric(reg, "memors_search_total", "auto", "semantic+keyword+exact+fact", "chunk", "results"); v != 1 {
 		t.Fatalf("search_total = %v", v)
 	}
-	if _, n := metric(reg, "memo_search_arm_duration_seconds", "keyword"); n != 1 {
+	if _, n := metric(reg, "memors_search_arm_duration_seconds", "keyword"); n != 1 {
 		t.Fatalf("keyword arm observations = %d", n)
 	}
-	if _, n := metric(reg, "memo_search_results", "chunk"); n != 1 {
+	if _, n := metric(reg, "memors_search_results", "chunk"); n != 1 {
 		t.Fatalf("results observations = %d", n)
 	}
 	// Relational question: structural arms, then the graph cache hits.
@@ -65,10 +65,10 @@ func TestSearchMetrics(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if b, _ := metric(reg, "memo_graph_cache_total", "build"); b != 1 {
+	if b, _ := metric(reg, "memors_graph_cache_total", "build"); b != 1 {
 		t.Fatalf("graph builds = %v", b)
 	}
-	if h, _ := metric(reg, "memo_graph_cache_total", "hit"); h != 1 {
+	if h, _ := metric(reg, "memors_graph_cache_total", "hit"); h != 1 {
 		t.Fatalf("graph hits = %v", h)
 	}
 	// Abstention is counted with its reason class.
@@ -76,7 +76,7 @@ func TestSearchMetrics(t *testing.T) {
 	if err != nil || len(resp.Results) != 0 {
 		t.Fatalf("expected abstention: %+v %v", resp, err)
 	}
-	if v, _ := metric(reg, "memo_search_abstentions_total", "no_match"); v != 1 {
+	if v, _ := metric(reg, "memors_search_abstentions_total", "no_match"); v != 1 {
 		t.Fatalf("abstentions = %v", v)
 	}
 	// Without an embedder the search is degraded and says why.
@@ -85,7 +85,7 @@ func TestSearchMetrics(t *testing.T) {
 	if _, err := New(store2, Default, false).WithRegistry(reg2).Search(ctx, Request{Query: "ERR_CONN_RESET"}); err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := metric(reg2, "memo_search_degraded_total", "no_embedder"); v != 1 {
+	if v, _ := metric(reg2, "memors_search_degraded_total", "no_embedder"); v != 1 {
 		t.Fatalf("degraded = %v", v)
 	}
 }

@@ -9,7 +9,7 @@ points down to the one it was derived from, so every answer can be traced to its
 |---|---|---|
 | L0–L2 | Yes, deterministically from the sources | Chunking and indexing are pure functions of the text |
 | L3 | No: facts are additive | Corrections supersede or invalidate; nothing is deleted in place |
-| L4 | Yes: `memo-mcp graph rebuild` | Merge decisions made by a human are kept |
+| L4 | Yes: `memors-mcp graph rebuild` | Merge decisions made by a human are kept |
 | L5 | No: written by agents | Stored as `is_inference`, with the passages each page cites |
 
 ## Addresses
@@ -31,7 +31,7 @@ record's address still resolves, to "forgotten on … because …".
 
 - A **namespace** is a label on sources inside one file. A search spans all namespaces unless
   the request scopes it. Namespaces organise; they do not isolate.
-- A **knowledge base** is a file selected by `MEMO_KB`. Files are the isolation and privacy
+- A **knowledge base** is a file selected by `MEMORS_KB`. Files are the isolation and privacy
   boundary: no command or tool reads across files.
 
 ## Trust and origin
@@ -43,7 +43,7 @@ Every source, and therefore every passage and fact, carries two labels:
 | **trust** | `agent` < `user` < `curated` | The **channel** the write came through, never the request. MCP tool writes are `agent`. CLI writes are `user` by default, `curated` only with `--trust curated` |
 | **origin** | `web`, `user-said`, `agent-derived` | Declared by the writer: fetched from the web, said by a person, or inferred by an agent |
 
-Only a human can raise trust: `memo-mcp trust promote`, or an elicitation dialog the client
+Only a human can raise trust: `memors-mcp trust promote`, or an elicitation dialog the client
 shows for the `promote` tool. Tool calls may forget or supersede only `agent` records. Every
 transition is written to the `audit` table. See [Trust administration](../lifecycle/trust.md).
 
@@ -53,9 +53,9 @@ transition is written to the `audit` table. See [Trust administration](../lifecy
 - **Valid time**: when a fact is true in the world (`valid_from`, `valid_to`).
 
 `as_of` queries ("what did we believe on 1 March?") filter on recorded time. Valid time is
-stored and shown with each fact, and `memo-mcp lint` lists facts whose window has passed.
+stored and shown with each fact, and `memors-mcp lint` lists facts whose window has passed.
 Superseded revisions and replaced facts stay readable under `as_of`. Forgotten records are
 excluded in both views. See [Facts and time](../lifecycle/facts.md).
 
 Full column-by-column reference:
-[schema.md](https://github.com/kKEo/memory-find/blob/master/docs/schema.md).
+[schema.md](https://github.com/kKEo/memors/blob/master/docs/schema.md).

@@ -16,13 +16,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/httpauth"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/live"
-	"github.com/kKEo/memory-find/internal/retrieve"
-	"github.com/kKEo/memory-find/internal/runfile"
-	"github.com/kKEo/memory-find/internal/server"
-	"github.com/kKEo/memory-find/internal/ui"
+	"github.com/kKEo/memors/internal/httpauth"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/live"
+	"github.com/kKEo/memors/internal/retrieve"
+	"github.com/kKEo/memors/internal/runfile"
+	"github.com/kKEo/memors/internal/server"
+	"github.com/kKEo/memors/internal/ui"
 )
 
 // httpFlags are serve's --http options.
@@ -39,14 +39,14 @@ type httpFlags struct {
 }
 
 func (f *httpFlags) register(fs *flag.FlagSet) {
-	fs.StringVar(&f.addr, "http", os.Getenv("MEMO_HTTP_ADDR"), "serve MCP over HTTP at <addr>/mcp, with the live web UI at <addr>/ (off when empty: stdio)")
+	fs.StringVar(&f.addr, "http", os.Getenv("MEMORS_HTTP_ADDR"), "serve MCP over HTTP at <addr>/mcp, with the live web UI at <addr>/ (off when empty: stdio)")
 	fs.BoolVar(&f.allowRemote, "allow-remote", false, "with --http: allow a non-loopback address (needs TLS or --behind-proxy, and authentication)")
-	fs.StringVar(&f.auth, "auth", os.Getenv("MEMO_HTTP_AUTH"), "with --http: token or none (default: token when remote or behind a proxy, none on loopback)")
-	fs.StringVar(&f.tokenFile, "token-file", os.Getenv("MEMO_HTTP_TOKEN_FILE"), "bearer token file (default <MEMO_HOME>/http-token, created 0600 when missing)")
-	fs.StringVar(&f.tlsCert, "tls-cert", os.Getenv("MEMO_TLS_CERT"), "with --http: serve HTTPS with this PEM certificate (chain)")
-	fs.StringVar(&f.tlsKey, "tls-key", os.Getenv("MEMO_TLS_KEY"), "with --http: the certificate's PEM private key")
-	fs.StringVar(&f.clientCA, "tls-client-ca", os.Getenv("MEMO_TLS_CLIENT_CA"), "with --tls-cert: require client certificates signed by this PEM CA (mTLS)")
-	fs.StringVar(&f.publicURL, "public-url", os.Getenv("MEMO_PUBLIC_URL"), "the URL clients use, e.g. https://box.example:8765 (required when remote or behind a proxy)")
+	fs.StringVar(&f.auth, "auth", os.Getenv("MEMORS_HTTP_AUTH"), "with --http: token or none (default: token when remote or behind a proxy, none on loopback)")
+	fs.StringVar(&f.tokenFile, "token-file", os.Getenv("MEMORS_HTTP_TOKEN_FILE"), "bearer token file (default <MEMORS_HOME>/http-token, created 0600 when missing)")
+	fs.StringVar(&f.tlsCert, "tls-cert", os.Getenv("MEMORS_TLS_CERT"), "with --http: serve HTTPS with this PEM certificate (chain)")
+	fs.StringVar(&f.tlsKey, "tls-key", os.Getenv("MEMORS_TLS_KEY"), "with --http: the certificate's PEM private key")
+	fs.StringVar(&f.clientCA, "tls-client-ca", os.Getenv("MEMORS_TLS_CLIENT_CA"), "with --tls-cert: require client certificates signed by this PEM CA (mTLS)")
+	fs.StringVar(&f.publicURL, "public-url", os.Getenv("MEMORS_PUBLIC_URL"), "the URL clients use, e.g. https://box.example:8765 (required when remote or behind a proxy)")
 	fs.BoolVar(&f.behindProxy, "behind-proxy", false, "a reverse proxy terminates TLS and forwards to --http; cookies are marked Secure")
 }
 
@@ -200,10 +200,10 @@ func serveHTTP(ctx context.Context, h *httpSetup, srv *server.Server, store *kb.
 		_ = hs.Shutdown(shutdown)
 	}()
 	base := h.base()
-	add := "claude mcp add --transport http memo " + base + "/mcp"
+	add := "claude mcp add --transport http memors " + base + "/mcp"
 	attrs := []any{"mcp", base + "/mcp", "ui", base + "/", "mtls", h.mtls}
 	if h.guard != nil {
-		add += ` --header "Authorization: Bearer $(memo-mcp http-token)"`
+		add += ` --header "Authorization: Bearer $(memors-mcp http-token)"`
 		attrs = append(attrs, "auth", "token", "token_file", h.tokenFile)
 	} else {
 		attrs = append(attrs, "auth", "none")
@@ -255,7 +255,7 @@ func runHTTPToken(_ context.Context, args []string, stdout, stderr io.Writer) er
 	fs := flag.NewFlagSet("http-token", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	rotate := fs.Bool("rotate", false, "replace the token: every client and browser session must use the new one after the server restarts")
-	file := fs.String("file", os.Getenv("MEMO_HTTP_TOKEN_FILE"), "token file (default <MEMO_HOME>/http-token)")
+	file := fs.String("file", os.Getenv("MEMORS_HTTP_TOKEN_FILE"), "token file (default <MEMORS_HOME>/http-token)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -271,7 +271,7 @@ func runHTTPToken(_ context.Context, args []string, stdout, stderr io.Writer) er
 	if *rotate {
 		tok, err = httpauth.Rotate(path)
 		if err == nil {
-			fmt.Fprintf(stderr, "rotated %s; restart `memo-mcp serve --http` and update your clients\n", path)
+			fmt.Fprintf(stderr, "rotated %s; restart `memors-mcp serve --http` and update your clients\n", path)
 		}
 	} else {
 		var created bool

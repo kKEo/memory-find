@@ -1,4 +1,4 @@
-// Package icon draws memo-tray's icons (the magnifier mark of memo-mcp) in
+// Package icon draws memors-tray's icons (the magnifier mark of memors-mcp) in
 // code, so no image files are committed: the menu-bar template image and
 // the app icon the bundle script turns into an .icns.
 package icon

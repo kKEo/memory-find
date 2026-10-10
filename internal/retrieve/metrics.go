@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/obs"
+	"github.com/kKEo/memors/internal/obs"
 )
 
 // Search metrics (roadmap P10). Every search ends in finish(), which records
@@ -31,19 +31,19 @@ type searchMetrics struct {
 
 func newSearchMetrics(r *obs.Registry) *searchMetrics {
 	return &searchMetrics{
-		searches:    r.Counter("memo_search_total", "Searches, by requested and resolved mode, granularity and outcome (results, abstain).", "mode_requested", "mode_resolved", "granularity", "outcome"),
-		seconds:     r.Histogram("memo_search_duration_seconds", "Search latency end to end.", obs.LatencyBuckets, "granularity"),
-		armSeconds:  r.Histogram("memo_search_arm_duration_seconds", "Time spent in each retrieval arm.", obs.LatencyBuckets, "arm"),
-		armCands:    r.Histogram("memo_search_arm_candidates", "Candidates each arm returned before fusion.", obs.CountBuckets, "arm"),
-		results:     r.Histogram("memo_search_results", "Results returned per search.", obs.CountBuckets, "granularity"),
-		truncated:   r.Counter("memo_search_truncated_results_total", "Ranked results left out by the token budget.").With(),
-		cutoff:      r.Counter("memo_search_cutoff_total", "Why result lists ended (gap, budget, limit, none).", "kind"),
-		degraded:    r.Counter("memo_search_degraded_total", "Searches served without a capability (no_embedder, query_embed_failed, reranker_failed, other).", "reason"),
-		abstentions: r.Counter("memo_search_abstentions_total", "Searches that returned nothing on purpose, by reason.", "reason"),
-		entities:    r.Histogram("memo_search_entities_matched", "Known entities the query named.", obs.CountBuckets).With(),
-		rerank:      r.Histogram("memo_search_rerank_duration_seconds", "Cross-encoder rerank time.", obs.LatencyBuckets, "model"),
-		graphCache:  r.Counter("memo_graph_cache_total", "Namespace graph cache events (hit, build, build_asof).", "event"),
-		graphBuild:  r.Histogram("memo_graph_build_duration_seconds", "Time to build a namespace's in-memory mention graph.", obs.LatencyBuckets).With(),
+		searches:    r.Counter("memors_search_total", "Searches, by requested and resolved mode, granularity and outcome (results, abstain).", "mode_requested", "mode_resolved", "granularity", "outcome"),
+		seconds:     r.Histogram("memors_search_duration_seconds", "Search latency end to end.", obs.LatencyBuckets, "granularity"),
+		armSeconds:  r.Histogram("memors_search_arm_duration_seconds", "Time spent in each retrieval arm.", obs.LatencyBuckets, "arm"),
+		armCands:    r.Histogram("memors_search_arm_candidates", "Candidates each arm returned before fusion.", obs.CountBuckets, "arm"),
+		results:     r.Histogram("memors_search_results", "Results returned per search.", obs.CountBuckets, "granularity"),
+		truncated:   r.Counter("memors_search_truncated_results_total", "Ranked results left out by the token budget.").With(),
+		cutoff:      r.Counter("memors_search_cutoff_total", "Why result lists ended (gap, budget, limit, none).", "kind"),
+		degraded:    r.Counter("memors_search_degraded_total", "Searches served without a capability (no_embedder, query_embed_failed, reranker_failed, other).", "reason"),
+		abstentions: r.Counter("memors_search_abstentions_total", "Searches that returned nothing on purpose, by reason.", "reason"),
+		entities:    r.Histogram("memors_search_entities_matched", "Known entities the query named.", obs.CountBuckets).With(),
+		rerank:      r.Histogram("memors_search_rerank_duration_seconds", "Cross-encoder rerank time.", obs.LatencyBuckets, "model"),
+		graphCache:  r.Counter("memors_graph_cache_total", "Namespace graph cache events (hit, build, build_asof).", "event"),
+		graphBuild:  r.Histogram("memors_graph_build_duration_seconds", "Time to build a namespace's in-memory mention graph.", obs.LatencyBuckets).With(),
 	}
 }
 

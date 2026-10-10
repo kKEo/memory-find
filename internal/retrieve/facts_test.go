@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/kb"
 )
 
 // A remembered fact votes for its evidence passage, so a query phrased like

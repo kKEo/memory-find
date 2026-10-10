@@ -1,8 +1,8 @@
-// Stats windows for memo-tray: one NSWindow with a WKWebView per memo-mcp
+// Stats windows for memors-tray: one NSWindow with a WKWebView per memors-mcp
 // server, living on the run loop fyne.io/systray already owns.
 //
 // Each window has a private, non-persistent website data store (the login
-// cookie never reaches disk), JavaScript off (memo-mcp's UI has none), and
+// cookie never reaches disk), JavaScript off (memors-mcp's UI has none), and
 // a navigation delegate that asks Go (webpolicy) about every navigation:
 // the server's own pages load in the window, links elsewhere open in the
 // default browser, everything else is refused.
@@ -90,11 +90,11 @@ static NSMenuItem *item(NSString *title, SEL action, NSString *key, NSEventModif
 // installMenu gives windows the usual key equivalents (copy, select all,
 // close, reload). An accessory app shows no menu bar, but the main menu
 // still handles shortcuts. There is no Quit: ⌘Q in a window must not stop
-// the servers memo-tray runs.
+// the servers memors-tray runs.
 static void installMenu(void) {
 	NSMenu *main = [[NSMenu alloc] init];
 	NSMenuItem *appItem = [[NSMenuItem alloc] init];
-	appItem.submenu = [[NSMenu alloc] initWithTitle:@"memo-tray"];
+	appItem.submenu = [[NSMenu alloc] initWithTitle:@"memors-tray"];
 	[main addItem:appItem];
 
 	NSMenu *edit = [[NSMenu alloc] initWithTitle:@"Edit"];
@@ -160,7 +160,7 @@ static MWWindow *newWindow(NSString *key, NSString *title) {
 	mw.window.delegate = mw;
 	mw.window.contentMinSize = NSMakeSize(560, 360);
 	[mw.window center];
-	[mw.window setFrameAutosaveName:[@"memo-tray " stringByAppendingString:key]];
+	[mw.window setFrameAutosaveName:[@"memors-tray " stringByAppendingString:key]];
 	windows[key] = mw;
 	return mw;
 }

@@ -29,10 +29,10 @@ add about 1.2 MB more.
 | Search p50, `granite-small-r2` (includes embedding the query) | ~0.2 s |
 | Search p50, `potion` | ~6 ms |
 | Search p50, keyword-only | ~1–3 ms |
-| Reranker (`precise` + `MEMO_RERANK=1`) | +0.7–4 s per query |
+| Reranker (`precise` + `MEMORS_RERANK=1`) | +0.7–4 s per query |
 
 Query embedding dominates search latency. Retrieval itself is milliseconds at these sizes.
-`memo_search_arm_duration_seconds{arm}` shows the split on your data.
+`memors_search_arm_duration_seconds{arm}` shows the split on your data.
 
 ## Memory
 
@@ -44,7 +44,7 @@ graph routing. `go_memstats_sys_bytes` shows the total.
 
 - Everything is single-file SQLite with exact (brute-force) vector search. Tens of thousands of
   passages per knowledge base are comfortable. Beyond about 100,000 passages, watch
-  `memo_search_arm_duration_seconds{arm="semantic"}`, and split knowledge bases by project.
+  `memors_search_arm_duration_seconds{arm="semantic"}`, and split knowledge bases by project.
 - Bulk loads: ingest with `--embed=false`, then `backfill`. Or choose `potion` for fast,
   slightly weaker semantics.
 - Several sessions on one file are fine. Writes are serialised and short; embedding happens

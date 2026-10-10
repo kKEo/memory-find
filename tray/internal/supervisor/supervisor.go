@@ -1,5 +1,5 @@
-// Package supervisor runs the memo-mcp servers memo-tray starts: one
-// `memo-mcp serve --http` child per knowledge base, its output in a log
+// Package supervisor runs the memors-mcp servers memors-tray starts: one
+// `memors-mcp serve --http` child per knowledge base, its output in a log
 // file, its exit noticed and explained. It can also ask a server it did not
 // start to stop, once it has made sure the pid still is that server.
 package supervisor
@@ -19,11 +19,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/live"
-	"github.com/kKEo/memory-find/internal/runfile"
-	"github.com/kKEo/memory-find/tray/internal/config"
-	"github.com/kKEo/memory-find/tray/internal/discover"
-	"github.com/kKEo/memory-find/tray/internal/home"
+	"github.com/kKEo/memors/internal/live"
+	"github.com/kKEo/memors/internal/runfile"
+	"github.com/kKEo/memors/tray/internal/config"
+	"github.com/kKEo/memors/tray/internal/discover"
+	"github.com/kKEo/memors/tray/internal/home"
 )
 
 // State is a child's state.
@@ -45,7 +45,7 @@ type Spec struct {
 	Env  map[string]string // from tray.json: global env, then the server's own
 }
 
-// Child is a server memo-tray started, as last seen.
+// Child is a server memors-tray started, as last seen.
 type Child struct {
 	Spec    Spec
 	PID     int
@@ -75,8 +75,8 @@ type child struct {
 	stopping bool
 }
 
-// New returns a supervisor for servers under MEMO_HOME home; env is the
-// environment children inherit (os.Environ()), minus what memo-tray sets.
+// New returns a supervisor for servers under MEMORS_HOME home; env is the
+// environment children inherit (os.Environ()), minus what memors-tray sets.
 func New(homeDir string, env []string) *Supervisor {
 	return &Supervisor{home: homeDir, baseEnv: env, children: map[string]*child{}}
 }
@@ -109,7 +109,7 @@ func (s *Supervisor) Start(bin string, spec Spec) error {
 	if spec.Auth == "token" {
 		args = append(args, "--auth", "token")
 	}
-	fmt.Fprintf(f, "--- memo-tray %s: %s %s (MEMO_KB=%s)\n", time.Now().Format(time.RFC3339), bin, strings.Join(args, " "), spec.KB)
+	fmt.Fprintf(f, "--- memors-tray %s: %s %s (MEMORS_KB=%s)\n", time.Now().Format(time.RFC3339), bin, strings.Join(args, " "), spec.KB)
 	cmd := exec.Command(bin, args...)
 	cmd.Env = childEnv(s.baseEnv, s.home, spec)
 	cmd.Stdout, cmd.Stderr = f, f // stdin stays /dev/null
@@ -198,7 +198,7 @@ func (s *Supervisor) Running() int {
 	return n
 }
 
-// Snapshot returns every child memo-tray started, by knowledge base.
+// Snapshot returns every child memors-tray started, by knowledge base.
 func (s *Supervisor) Snapshot() []Child {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -214,9 +214,9 @@ func (s *Supervisor) Snapshot() []Child {
 // reaped, so a reused pid is never hit.
 func signal(p *os.Process, sig syscall.Signal) { _ = p.Signal(sig) }
 
-// StopExternal asks a server memo-tray did not start to stop. It sends
+// StopExternal asks a server memors-tray did not start to stop. It sends
 // SIGTERM only, and only once the pid is shown to still be that server:
-// a memo-mcp that started before its run file was written, and, when the
+// a memors-mcp that started before its run file was written, and, when the
 // server answers, one that reports the same pid and instance.
 func StopExternal(ctx context.Context, e runfile.Entry, inspect discover.Inspector, liveOf func(context.Context) (live.Snapshot, error)) error {
 	p := inspect(e.Info.PID)
@@ -227,7 +227,7 @@ func StopExternal(ctx context.Context, e runfile.Entry, inspect discover.Inspect
 	switch {
 	case err == nil && (snap.PID != e.Info.PID || snap.Instance != e.Info.Instance):
 		return errors.New("another server answers at that address; not stopping it")
-	case err != nil && p.Name != "memo-mcp":
+	case err != nil && p.Name != "memors-mcp":
 		return fmt.Errorf("cannot confirm the process is the server (%v); not stopping it", err)
 	}
 	if err := syscall.Kill(e.Info.PID, syscall.SIGTERM); err != nil {
@@ -237,7 +237,7 @@ func StopExternal(ctx context.Context, e runfile.Entry, inspect discover.Inspect
 }
 
 // childEnv is the child's environment: the inherited one without anything
-// that would change how or where it serves, then MEMO_HOME, MEMO_KB and
+// that would change how or where it serves, then MEMORS_HOME, MEMORS_KB and
 // tray.json's settings.
 func childEnv(base []string, homeDir string, spec Spec) []string {
 	var env []string
@@ -249,7 +249,7 @@ func childEnv(base []string, homeDir string, spec Spec) []string {
 			}
 		}
 	}
-	env = append(env, "MEMO_HOME="+homeDir, "MEMO_KB="+spec.KB)
+	env = append(env, "MEMORS_HOME="+homeDir, "MEMORS_KB="+spec.KB)
 	keys := make([]string, 0, len(spec.Env))
 	for k := range spec.Env {
 		if !config.Reserved(k) {

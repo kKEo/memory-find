@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/live"
+	"github.com/kKEo/memors/internal/live"
 )
 
 var updateGolden = flag.Bool("update", false, "rewrite testdata/live.golden.json from the /live.json response")
@@ -24,7 +24,7 @@ func TestLiveJSONGolden(t *testing.T) {
 	_, store, svc := newUI(t)
 	t0 := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
 	src := fakeLive{live.Snapshot{Instance: "K2Q7EXAMPLEINSTANCE", PID: 4242, Version: "v1.5.0", KB: "crportal",
-		KBPath: "/home/u/.memo-mcp/kb/crportal.db", Model: "granite-small-r2", Started: t0, Background: "idle",
+		KBPath: "/home/u/.memors-mcp/kb/crportal.db", Model: "granite-small-r2", Started: t0, Background: "idle",
 		Sessions: []live.Session{
 			{ID: "RAWSESSIONID1", Key: "3fa94c0d12ab", Client: "claude-code", ClientVersion: "2.1.4", Since: t0.Add(time.Minute),
 				LastSeen: t0.Add(3 * time.Minute), LastCall: t0.Add(2 * time.Minute), Calls: 14, Open: true, Stream: true},

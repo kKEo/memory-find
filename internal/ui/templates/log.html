@@ -1,4 +1,4 @@
-{{template "head" .}}<h1>Query and call log</h1><p class="muted">Opt-in (<code>MEMO_QUERY_LOG=1</code> on the server): every tool call and every search; never passage text or written content. Newest first.</p>
+{{template "head" .}}<h1>Query and call log</h1><p class="muted">Opt-in (<code>MEMORS_QUERY_LOG=1</code> on the server): every tool call and every search; never passage text or written content. Newest first.</p>
 {{with .Data}}<h2>Searches</h2>
 <table><tr><th>when</th><th>queries</th><th>mode</th><th>profile</th><th class="num">results</th><th class="num">ms</th></tr>
 {{range .Searches}}<tr><td>{{dt .At}}</td><td>{{.Queries}}</td><td>{{.Mode}}</td><td class="muted">{{.Profile}}</td><td class="num">{{.NResults}}</td><td class="num">{{.LatencyMs}}</td></tr>{{end}}</table>

@@ -7,7 +7,7 @@ import (
 	"syscall"
 )
 
-// Inspect reports only whether pid exists (memo-tray targets macOS).
+// Inspect reports only whether pid exists (memors-tray targets macOS).
 func Inspect(pid int) Process {
 	p, err := os.FindProcess(pid)
 	if err != nil || pid <= 0 {

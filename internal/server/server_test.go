@@ -13,9 +13,9 @@ import (
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
 
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/retrieve"
 )
 
 var updateGolden = flag.Bool("update", false, "rewrite testdata/tools.golden.json from the live tools/list response")
@@ -316,7 +316,7 @@ func TestRememberForgetPromoteRoundTrip(t *testing.T) {
 	}
 	// Promote needs a human: the tool returns the command.
 	pr := structured[PromoteOut](t, callTool(t, cs, "promote", map[string]any{"uri": rem2.URI, "to": "curated"}))
-	if pr.Applied || !strings.Contains(pr.Command, "memo-mcp trust promote") {
+	if pr.Applied || !strings.Contains(pr.Command, "memors-mcp trust promote") {
 		t.Fatalf("promote: %+v", pr)
 	}
 	// Forget an agent fact works; the tombstone is explained on read.

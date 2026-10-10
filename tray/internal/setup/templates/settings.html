@@ -8,37 +8,37 @@
 <input type="hidden" name="rev" value="{{.Rev}}">
 
 <section class="group"><h2>General</h2>
-<div class="row"><label class="check"><input type="checkbox" name="login"{{if .Login}} checked{{end}}> Open memo-tray when you log in</label></div>
-<div class="row"><label class="check"><input type="checkbox" name="stop_on_quit"{{if .StopOnQuit}} checked{{end}}> Stop the servers memo-tray started when it quits</label></div>
+<div class="row"><label class="check"><input type="checkbox" name="login"{{if .Login}} checked{{end}}> Open memors-tray when you log in</label></div>
+<div class="row"><label class="check"><input type="checkbox" name="stop_on_quit"{{if .StopOnQuit}} checked{{end}}> Stop the servers memors-tray started when it quits</label></div>
 </section>
 
-<section class="group"><h2>memo-mcp</h2>
-<div class="row"><div class="status"><span class="dot{{if not .MemoOK}} bad{{end}}"></span><span>{{tilde .MemoStatus}}</span></div>
-<a class="button" href="/wizard/install">{{if .MemoOK}}Check for updates…{{else}}Install…{{end}}</a></div>
+<section class="group"><h2>memors-mcp</h2>
+<div class="row"><div class="status"><span class="dot{{if not .MemorsOK}} bad{{end}}"></span><span>{{tilde .MemorsStatus}}</span></div>
+<a class="button" href="/wizard/install">{{if .MemorsOK}}Check for updates…{{else}}Install…{{end}}</a></div>
 <div class="row stack"><div class="label">Location</div>
-<label class="check"><input type="radio" name="memo_mode" value="auto"{{if ne .MemoMode "path"}} checked{{end}}> Find automatically <span class="muted">(~/.local/bin, Homebrew, /usr/local/bin, ~/go/bin)</span></label>
-<label class="check"><input type="radio" name="memo_mode" value="path"{{if eq .MemoMode "path"}} checked{{end}}> Use this file:</label>
-<input type="text" name="memo_path" value="{{.MemoPath}}" placeholder="/Users/you/.local/bin/memo-mcp" class="wide" aria-label="memo-mcp file"></div>
+<label class="check"><input type="radio" name="memors_mode" value="auto"{{if ne .MemorsMode "path"}} checked{{end}}> Find automatically <span class="muted">(~/.local/bin, Homebrew, /usr/local/bin, ~/go/bin)</span></label>
+<label class="check"><input type="radio" name="memors_mode" value="path"{{if eq .MemorsMode "path"}} checked{{end}}> Use this file:</label>
+<input type="text" name="memors_path" value="{{.MemorsPath}}" placeholder="/Users/you/.local/bin/memors-mcp" class="wide" aria-label="memors-mcp file"></div>
 <div class="row"><div><label class="label" for="model">Embedding model</label>
-<div class="hint">Used by every server memo-tray starts. A new model is downloaded when a server next starts, and documents are re-embedded in the background.</div></div>
+<div class="hint">Used by every server memors-tray starts. A new model is downloaded when a server next starts, and documents are re-embedded in the background.</div></div>
 {{template "modelselect" .}}</div>
 </section>
 
 <section class="group"><h2>Servers</h2>
 <input type="hidden" name="servers" value="{{len .Servers}}">
 <table>
-<tr><th>Knowledge base</th><th>Address</th><th>Access</th><th>Start with memo-tray</th><th>Remove</th></tr>
+<tr><th>Knowledge base</th><th>Address</th><th>Access</th><th>Start with memors-tray</th><th>Remove</th></tr>
 {{- range $i, $s := .Servers}}
 <tr><td><input type="hidden" name="kb_{{$i}}" value="{{$s.KB}}"><span class="kb">{{$s.KB}}</span></td>
 <td><input type="text" name="addr_{{$i}}" value="{{$s.Addr}}" aria-label="address of {{$s.KB}}"></td>
 <td><select name="auth_{{$i}}" aria-label="access to {{$s.KB}}"><option value="none"{{if ne $s.Auth "token"}} selected{{end}}>Open on this Mac</option><option value="token"{{if eq $s.Auth "token"}} selected{{end}}>Token</option></select></td>
-<td class="center"><input type="checkbox" name="autostart_{{$i}}"{{if $s.Autostart}} checked{{end}} aria-label="start {{$s.KB}} with memo-tray"></td>
+<td class="center"><input type="checkbox" name="autostart_{{$i}}"{{if $s.Autostart}} checked{{end}} aria-label="start {{$s.KB}} with memors-tray"></td>
 <td class="center"><input type="checkbox" name="remove_{{$i}}" aria-label="remove {{$s.KB}}"></td></tr>
 {{- end}}
 <tr class="add"><td><input type="text" name="new_kb" value="{{.NewKB}}" list="kbs" placeholder="Add…" aria-label="new knowledge base"></td>
 <td><input type="text" name="new_addr" value="{{.NewAddr}}" placeholder="automatic" aria-label="address of the new server"></td>
 <td><select name="new_auth" aria-label="access to the new server"><option value="none"{{if ne .NewAuth "token"}} selected{{end}}>Open on this Mac</option><option value="token"{{if eq .NewAuth "token"}} selected{{end}}>Token</option></select></td>
-<td class="center"><input type="checkbox" name="new_autostart"{{if .NewAutostart}} checked{{end}} aria-label="start the new server with memo-tray"></td><td></td></tr>
+<td class="center"><input type="checkbox" name="new_autostart"{{if .NewAutostart}} checked{{end}} aria-label="start the new server with memors-tray"></td><td></td></tr>
 </table>
 {{template "kbs" .KBs}}
 <div class="row"><div class="hint">An address stays fixed, so the MCP URL your agents use never changes. Removing a server here does not delete its knowledge base. "Token" also keeps other users of this Mac out.</div></div>
@@ -46,9 +46,9 @@
 
 <section class="group"><h2>Advanced</h2>
 <div class="row stack"><label class="label" for="env">Environment for servers</label>
-<textarea id="env" name="env" placeholder="MEMO_PROFILE=precise">{{.Env}}</textarea>
-<div class="hint">One NAME=value per line, passed to every server memo-tray starts. Apps opened from the Dock do not see your terminal's variables.</div></div>
-<div class="row"><label class="check"><input type="checkbox" name="debug"{{if .Debug}} checked{{end}}> Allow the Web Inspector in memo-tray's windows</label></div>
+<textarea id="env" name="env" placeholder="MEMORS_PROFILE=precise">{{.Env}}</textarea>
+<div class="hint">One NAME=value per line, passed to every server memors-tray starts. Apps opened from the Dock do not see your terminal's variables.</div></div>
+<div class="row"><label class="check"><input type="checkbox" name="debug"{{if .Debug}} checked{{end}}> Allow the Web Inspector in memors-tray's windows</label></div>
 </section>
 
 <div class="actions"><button class="primary">Save</button></div>

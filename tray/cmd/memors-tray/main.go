@@ -1,7 +1,7 @@
 //go:build darwin
 
-// Command memo-tray is a macOS menu-bar companion for memo-mcp's HTTP
-// servers (`memo-mcp serve --http`): it shows the agents connected to each
+// Command memors-tray is a macOS menu-bar companion for memors-mcp's HTTP
+// servers (`memors-mcp serve --http`): it shows the agents connected to each
 // server, opens a server's Live page in a window of its own, and starts and
 // stops servers per knowledge base.
 package main
@@ -19,22 +19,22 @@ import (
 
 	"fyne.io/systray"
 
-	"github.com/kKEo/memory-find/internal/live"
-	"github.com/kKEo/memory-find/internal/runfile"
-	"github.com/kKEo/memory-find/tray/internal/app"
-	"github.com/kKEo/memory-find/tray/internal/client"
-	"github.com/kKEo/memory-find/tray/internal/config"
-	"github.com/kKEo/memory-find/tray/internal/discover"
-	"github.com/kKEo/memory-find/tray/internal/home"
-	"github.com/kKEo/memory-find/tray/internal/icon"
-	"github.com/kKEo/memory-find/tray/internal/installer"
-	"github.com/kKEo/memory-find/tray/internal/locate"
-	"github.com/kKEo/memory-find/tray/internal/loginitem"
-	"github.com/kKEo/memory-find/tray/internal/macwin"
-	"github.com/kKEo/memory-find/tray/internal/menu"
-	"github.com/kKEo/memory-find/tray/internal/setup"
-	"github.com/kKEo/memory-find/tray/internal/supervisor"
-	"github.com/kKEo/memory-find/tray/internal/trayui"
+	"github.com/kKEo/memors/internal/live"
+	"github.com/kKEo/memors/internal/runfile"
+	"github.com/kKEo/memors/tray/internal/app"
+	"github.com/kKEo/memors/tray/internal/client"
+	"github.com/kKEo/memors/tray/internal/config"
+	"github.com/kKEo/memors/tray/internal/discover"
+	"github.com/kKEo/memors/tray/internal/home"
+	"github.com/kKEo/memors/tray/internal/icon"
+	"github.com/kKEo/memors/tray/internal/installer"
+	"github.com/kKEo/memors/tray/internal/locate"
+	"github.com/kKEo/memors/tray/internal/loginitem"
+	"github.com/kKEo/memors/tray/internal/macwin"
+	"github.com/kKEo/memors/tray/internal/menu"
+	"github.com/kKEo/memors/tray/internal/setup"
+	"github.com/kKEo/memors/tray/internal/supervisor"
+	"github.com/kKEo/memors/tray/internal/trayui"
 )
 
 // version is set at build time (-ldflags "-X main.version=...").
@@ -44,10 +44,10 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "-version", "--version", "version":
-			fmt.Println("memo-tray", buildVersion())
+			fmt.Println("memors-tray", buildVersion())
 			return
 		default:
-			fmt.Fprintln(os.Stderr, "usage: memo-tray [-version]\n\nmemo-tray runs in the menu bar; open memo-tray.app, or run it without arguments.")
+			fmt.Fprintln(os.Stderr, "usage: memors-tray [-version]\n\nmemors-tray runs in the menu bar; open memors-tray.app, or run it without arguments.")
 			os.Exit(2)
 		}
 	}
@@ -57,21 +57,21 @@ func main() {
 func run() int {
 	homeDir, err := home.Dir()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "memo-tray:", err)
+		fmt.Fprintln(os.Stderr, "memors-tray:", err)
 		return 1
 	}
 	if err := os.MkdirAll(homeDir, 0o700); err != nil {
-		fmt.Fprintln(os.Stderr, "memo-tray:", err)
+		fmt.Fprintln(os.Stderr, "memors-tray:", err)
 		return 1
 	}
 	unlock, err := lockSingle(filepath.Join(homeDir, "tray.lock"))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "memo-tray:", err)
+		fmt.Fprintln(os.Stderr, "memors-tray:", err)
 		return 1
 	}
 	defer unlock()
 	logf := openLog(filepath.Join(home.LogDir(homeDir), "tray.log"))
-	logf("memo-tray %s starting (MEMO_HOME %s)", buildVersion(), homeDir)
+	logf("memors-tray %s starting (MEMORS_HOME %s)", buildVersion(), homeDir)
 
 	debug := false
 	if cfg, err := config.Load(config.Path(homeDir)); err == nil {
@@ -82,21 +82,24 @@ func run() int {
 	var a *app.App
 	ui := trayui.New(func(act menu.Action) { a.Do(act) })
 	login := loginAgent()
+	if err := login.AdoptLegacy(); err != nil {
+		logf("login item: %v", err)
+	}
 	if err := login.Repair(); err != nil {
 		logf("login item: %v", err)
 	}
 	pages, err := setup.Start(setup.Deps{
-		Home:        homeDir,
-		TrayVersion: buildVersion(),
-		GOARCH:      runtime.GOARCH,
-		Releases:    installer.New("memo-tray/" + buildVersion()),
-		FindMemo:    locate.MemoBinary,
-		MemoVersion: locate.Version,
-		Models:      setup.ListModels(homeDir),
-		Login:       login,
-		PortFree:    config.PortFree,
-		Copy:        copyText,
-		OpenFile:    openFile,
+		Home:          homeDir,
+		TrayVersion:   buildVersion(),
+		GOARCH:        runtime.GOARCH,
+		Releases:      installer.New("memors-tray/" + buildVersion()),
+		FindMemors:    locate.MemorsBinary,
+		MemorsVersion: locate.Version,
+		Models:        setup.ListModels(homeDir),
+		Login:         login,
+		PortFree:      config.PortFree,
+		Copy:          copyText,
+		OpenFile:      openFile,
 		Notify: func(e setup.Event) {
 			switch e.Kind {
 			case setup.ConfigSaved:
@@ -110,7 +113,7 @@ func run() int {
 		Logf: logf,
 	})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "memo-tray:", err)
+		fmt.Fprintln(os.Stderr, "memors-tray:", err)
 		return 1
 	}
 	defer pages.Close()
@@ -125,19 +128,19 @@ func run() int {
 				return cl.Live(ctx, client.TargetOf(e.Info))
 			})
 		},
-		Gone:        func(pid int) bool { return !discover.Inspect(pid).Alive },
-		Supervisor:  sup,
-		FindMemo:    locate.MemoBinary,
-		MemoVersion: locate.Version,
-		PortFree:    config.PortFree,
-		Render:      ui.Render,
-		Windows:     macwin.Init(debug), // its setup runs once the run loop starts
-		OpenURL:     openURL,
-		OpenFile:    openFile,
-		Copy:        copyText,
-		Quit:        systray.Quit,
-		Logf:        logf,
-		Setup:       pages,
+		Gone:          func(pid int) bool { return !discover.Inspect(pid).Alive },
+		Supervisor:    sup,
+		FindMemors:    locate.MemorsBinary,
+		MemorsVersion: locate.Version,
+		PortFree:      config.PortFree,
+		Render:        ui.Render,
+		Windows:       macwin.Init(debug), // its setup runs once the run loop starts
+		OpenURL:       openURL,
+		OpenFile:      openFile,
+		Copy:          copyText,
+		Quit:          systray.Quit,
+		Logf:          logf,
+		Setup:         pages,
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -154,7 +157,7 @@ func run() int {
 		a.Shutdown()
 	}
 	systray.Run(func() {
-		ui.Ready(icon.Template(), "memo-tray: memo-mcp servers and their agents")
+		ui.Ready(icon.Template(), "memors-tray: memors-mcp servers and their agents")
 		go func() {
 			for range systray.TrayOpenedCh {
 				a.MenuOpened()
@@ -163,7 +166,7 @@ func run() int {
 		go a.Run(ctx)
 	}, cleanup)
 	cleanup()
-	logf("memo-tray stopped")
+	logf("memors-tray stopped")
 	return 0
 }
 
@@ -177,7 +180,7 @@ func buildVersion() string {
 	return "dev"
 }
 
-// loginAgent is the LaunchAgent that opens this memo-tray at login.
+// loginAgent is the LaunchAgent that opens this memors-tray at login.
 func loginAgent() loginitem.Agent {
 	userHome, _ := os.UserHomeDir()
 	exe, err := os.Executable()

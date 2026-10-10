@@ -5,67 +5,82 @@ All notable changes. Tags follow semantic versioning; each tag has an eval repor
 
 ## [Unreleased]
 
+- **Renamed: the project is now memors** (`github.com/kKEo/memors`, MCP registry
+  `io.github.kKEo/memors`, guides at `kkeo.github.io/memors/`), **the server binary is
+  `memors-mcp`** (`cmd/memors-mcp`, archives `memors-mcp_<version>_<os>_<arch>`) and **the menu-bar
+  app is memors-tray**. Breaking, with no fallback to the old names:
+  - environment variables `MEMO_*` → `MEMORS_*`;
+  - base directory `~/.memo-mcp` → `~/.memors-mcp` (move it) and model cache
+    `~/.cache/memo-mcp/models` → `~/.cache/memors-mcp/models`;
+  - metrics `memo_*` → `memors_*` (recording rules and alerts in the operator guide follow);
+  - memors-tray's bundle ID and LaunchAgent are `io.github.kkeo.memors-tray`, adopting memo-tray's
+    "open at login" agent on first start; the `tray.json` key `memo_binary` is now `memors_binary`;
+  - the web UI session cookie is renamed (one more login per browser);
+  - the deprecated `JOURNAL_TOKEN` / `JOURNAL_PATH` aliases are removed.
+
+  Unchanged: knowledge-base files (the SQLite application id stays `MEMO`), `memo://` addresses,
+  tool names, the export format. Steps in the operator guide, *Upgrading from memo-mcp*.
 - Documentation: two GitBook-compatible guides under `docs/guide/`: a plain-English user guide
   (quick start, everyday use, trust, privacy, use cases) and an operator guide (install,
   configuration reference, tuning, lifecycle, metric catalogue, Prometheus rules and alerts,
   backup, troubleshooting). Built with mdBook (`make docs`, `make docs-serve`) and deployed to
   GitHub Pages from `master` by `.github/workflows/docs.yml`.
-- `scripts/docs-check.sh`: fails when a `MEMO_*` variable, a command or a metric in the code is
+- `scripts/docs-check.sh`: fails when a `MEMORS_*` variable, a command or a metric in the code is
   missing from the operator guide, or a guide link is broken.
 - Documentation: twelve diagrams (SVG, following the reader's light or dark setting). The user
-  guide shows how memo-mcp fits in, a copy per session against one shared server, a corrected
+  guide shows how memors-mcp fits in, a copy per session against one shared server, a corrected
   fact's history, trust levels, and shelves against separate memories. The operator guide and
   the README show the processes and files, the data layers, the search pipeline, the ingest
-  write path, the two clocks, the `serve --http` setups and memo-tray. The operator guide now
+  write path, the two clocks, the `serve --http` setups and memors-tray. The operator guide now
   says that `as_of` filters on recorded time only, as the code does; valid time is shown, and
   `lint` flags expired facts.
 - CI: the Windows test job is disabled for now; release archives for Windows are still built.
-- Web UI ingest console (`/ingest`, `/ingest/{id}`): every `memo-mcp ingest` batch and MCP
+- Web UI ingest console (`/ingest`, `/ingest/{id}`): every `memors-mcp ingest` batch and MCP
   `ingest` call is recorded as a run with live progress (running / done / failed / stalled) and
   stats: documents written, unchanged and failed, chunks, embedded and pending vectors, bytes,
   duration and docs/s, plus one row per document. The page reloads itself while a run is in
   progress (no JS; the CSP is unchanged). `/status` lists the last five runs. Schema migration 5
   adds `ingest_runs` and `ingest_run_items`.
-- `memo-mcp serve --http 127.0.0.1:8765` (`MEMO_HTTP_ADDR`): one long-running MCP server over
+- `memors-mcp serve --http 127.0.0.1:8765` (`MEMORS_HTTP_ADDR`): one long-running MCP server over
   streamable HTTP at `/mcp` for any number of clients (`claude mcp add --transport http`), with
   the web UI and `/metrics` on the same port. Loopback only unless `--allow-remote`. Only in
   this mode the UI gains a **Live** page: active clients, calls in flight (an ingest links to
   its run), background backfill/reindex state, and per-tool calls, errors and p50/p95 latency
   plus ingest throughput since start. `/ingest` also lists ingest calls still in flight.
-- `serve --http` authentication: a bearer token (`<MEMO_HOME>/http-token`, 0600, printed by the
-  new `memo-mcp http-token [--rotate]`) protects `/mcp`, the UI and `/metrics`, and is on by
+- `serve --http` authentication: a bearer token (`<MEMORS_HOME>/http-token`, 0600, printed by the
+  new `memors-mcp http-token [--rotate]`) protects `/mcp`, the UI and `/metrics`, and is on by
   default whenever the server is reachable from elsewhere. Browsers log in with a single-use
   link printed at startup (or by pasting the token) and get an HttpOnly, SameSite=Strict
   session cookie. HTTPS with `--tls-cert`/`--tls-key`, optional mTLS with `--tls-client-ca`,
   `--behind-proxy` for a TLS-terminating proxy, and `--public-url`. Plain HTTP on a
   non-loopback address and unauthenticated exposure are refused.
 - Fix MCP registry publishing: `server.json` no longer sets `registryBaseUrl` on the MCPB package.
-- memo-tray setup assistant and settings window. **Install or Update memo-mcp…** (and
-  **Install memo-mcp…**, opened by itself on first launch when memo-mcp is missing) downloads
+- memors-tray setup assistant and settings window. **Install or Update memors-mcp…** (and
+  **Install memors-mcp…**, opened by itself on first launch when memors-mcp is missing) downloads
   the latest release for this Mac from GitHub, checks it against the release's `checksums.txt`,
   tries it and installs it atomically (default `~/.local/bin`), then sets up a knowledge base
-  (name, embedding model, token, start with memo-tray) and shows the `claude mcp add` line.
+  (name, embedding model, token, start with memors-tray) and shows the `claude mcp add` line.
   **Settings…** edits `tray.json` in a form: open at login (LaunchAgent), stop servers on quit,
-  memo-mcp location and version, embedding model, servers (address, token, autostart, add and
-  remove), extra environment. memo-tray contacts GitHub only while the install step is open.
-- **memo-tray**, an optional macOS menu-bar app (`tray/`, its own Go module; the only cgo build,
-  memo-mcp stays pure Go): lists the running `serve --http` servers from their run files with
+  memors-mcp location and version, embedding model, servers (address, token, autostart, add and
+  remove), extra environment. memors-tray contacts GitHub only while the install step is open.
+- **memors-tray**, an optional macOS menu-bar app (`tray/`, its own Go module; the only cgo build,
+  memors-mcp stays pure Go): lists the running `serve --http` servers from their run files with
   the agents connected to each (● active, ○ quiet; the count next to the icon), opens a
   server's **Live** page in a native window that logs itself in, and starts, stops and restarts
-  servers per knowledge base (`<MEMO_HOME>/tray.json`, logs in `<MEMO_HOME>/logs/`). Released
-  as `memo-tray_<version>_darwin_universal.zip` (unsigned) by a macOS job after the server
+  servers per knowledge base (`<MEMORS_HOME>/tray.json`, logs in `<MEMORS_HOME>/logs/`). Released
+  as `memors-tray_<version>_darwin_universal.zip` (unsigned) by a macOS job after the server
   archives; `make tray`, `make tray-app`, `make tray-test`.
 - `GET /live.json` on `serve --http`: the Live page's clients and calls in flight as JSON
   (`schema` 1, plus the server's instance id and pid) for companion apps, and
   `POST /login-link` (token mode, `Authorization: Bearer` only) returning a single-use login
   link so an app can open the UI in its own window without handing the token to a browser.
-- `serve --http` advertises itself to local apps in `<MEMO_HOME>/run/serve-<pid>.json` (0600,
+- `serve --http` advertises itself to local apps in `<MEMORS_HOME>/run/serve-<pid>.json` (0600,
   directory 0700) while it serves: URL, bound address, auth mode, token file path (never the
   token), knowledge base, version and the instance id `/live.json` reports. The file is
   removed when the server stops.
 - Fix the **Live** page listing a phantom `unknown` client for 30 minutes next to every go-sdk
   client: the `server/discover` probe such clients send before `initialize` no longer counts as a
-  session, in the page or in `memo_mcp_sessions_total`. Clients now show their version and a
+  session, in the page or in `memors_mcp_sessions_total`. Clients now show their version and a
   state: *connected* (holds its event stream), *open* (session open, no stream) or *left*;
   sessions are shown by a short hashed handle instead of a prefix of the session id, which
   grants access to the session.

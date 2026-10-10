@@ -1,6 +1,6 @@
 # Call and query logs
 
-With `MEMO_QUERY_LOG=1` in a process's environment, that process records:
+With `MEMORS_QUERY_LOG=1` in a process's environment, that process records:
 
 - every **search** in `query_log`: arguments, the addresses returned, scores and the trace;
 - every **MCP tool call** in `call_log`: client, tool, latency, outcome, error class, result
@@ -25,12 +25,12 @@ questions people ask.
 ## Reading the logs
 
 ```bash
-memo-mcp log tail --n 20            # recent searches, then recent tool calls
-memo-mcp log calls --n 50           # tool calls: time, client, tool, latency, results, tokens, args
-memo-mcp log show 128               # one search with its full trace
-memo-mcp log replay --n 200         # searches as JSON lines, for building eval queries
-memo-mcp metrics --since 7d         # per-tool calls, errors, p50/p95/max latency; search aggregates
-memo-mcp metrics --json | jq .
+memors-mcp log tail --n 20            # recent searches, then recent tool calls
+memors-mcp log calls --n 50           # tool calls: time, client, tool, latency, results, tokens, args
+memors-mcp log show 128               # one search with its full trace
+memors-mcp log replay --n 200         # searches as JSON lines, for building eval queries
+memors-mcp metrics --since 7d         # per-tool calls, errors, p50/p95/max latency; search aggregates
+memors-mcp metrics --json | jq .
 ```
 
 The UI's `/log` page shows both tables.
@@ -40,23 +40,23 @@ The UI's `/log` page shows both tables.
 The logs are not pruned automatically. Prune them on a schedule:
 
 ```bash
-memo-mcp log prune                  # both logs: keep at most 10,000 rows and nothing older than 30 days
+memors-mcp log prune                  # both logs: keep at most 10,000 rows and nothing older than 30 days
 ```
 
 For example, with cron:
 
 ```cron
-0 3 * * *  MEMO_KB=my-project /path/to/memo-mcp log prune
+0 3 * * *  MEMORS_KB=my-project /path/to/memors-mcp log prune
 ```
 
 ## Querying with SQL
 
 ```bash
-sqlite3 -header -column ~/.memo-mcp/kb/my-project.db "
+sqlite3 -header -column ~/.memors-mcp/kb/my-project.db "
   SELECT tool, COUNT(*) AS calls, SUM(ok = 0) AS errors, ROUND(AVG(latency_ms)) AS avg_ms
   FROM call_log WHERE ts > (strftime('%s','now','-1 day') * 1000)
   GROUP BY tool ORDER BY calls DESC"
 ```
 
 `ts` is in Unix milliseconds. Column reference:
-[schema §5.8](https://github.com/kKEo/memory-find/blob/master/docs/schema.md).
+[schema §5.8](https://github.com/kKEo/memors/blob/master/docs/schema.md).

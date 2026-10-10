@@ -8,11 +8,11 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/live"
-	"github.com/kKEo/memory-find/internal/obs"
-	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/live"
+	"github.com/kKEo/memors/internal/obs"
+	"github.com/kKEo/memors/internal/retrieve"
 )
 
 // Over streamable HTTP a go-sdk client probes with server/discover on a
@@ -53,10 +53,10 @@ func TestHTTPSessionsAreReal(t *testing.T) {
 	if ss.Client != "http-client" || ss.ClientVersion != "0" || !ss.Open || ss.Calls != 1 || ss.ID == "" || ss.Key != live.SessionKey(ss.ID) {
 		t.Errorf("session = %+v", ss)
 	}
-	if v := counter(reg, "memo_mcp_sessions_total", "http-client"); v != 1 {
+	if v := counter(reg, "memors_mcp_sessions_total", "http-client"); v != 1 {
 		t.Errorf("sessions_total{http-client} = %v, want 1", v)
 	}
-	if v := counter(reg, "memo_mcp_sessions_total", "unknown"); v != -1 {
+	if v := counter(reg, "memors_mcp_sessions_total", "unknown"); v != -1 {
 		t.Errorf("the discover probe was counted as a session: %v", v)
 	}
 

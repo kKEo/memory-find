@@ -256,7 +256,7 @@ func (s *Store) InvalidateFact(ctx context.Context, loserID, winnerID, reason, a
 		return fmt.Errorf("conflict: the losing fact (%s) is more trusted than the winner (%s); a human decides", loserTrust, winnerTrust)
 	}
 	if trustRank[loserTrust] > trustRank[channelCap(channel)] {
-		return &ErrNeedsHuman{Op: "invalidate", URI: "memo://fact/" + loserID, Trust: loserTrust, Command: "memo-mcp facts invalidate memo://fact/" + loserID + " --by memo://fact/" + winnerID}
+		return &ErrNeedsHuman{Op: "invalidate", URI: "memo://fact/" + loserID, Trust: loserTrust, Command: "memors-mcp facts invalidate memo://fact/" + loserID + " --by memo://fact/" + winnerID}
 	}
 	nowMs := s.now().UnixMilli()
 	if _, err := tx.ExecContext(ctx, `UPDATE facts SET invalidated_at = ?, superseded_by = ? WHERE id = ?`, nowMs, winnerID, loserID); err != nil {

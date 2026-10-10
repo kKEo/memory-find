@@ -3,8 +3,8 @@
 ## Markdown with provenance
 
 ```bash
-memo-mcp export --md ./kb-export            # all namespaces
-memo-mcp export --md ./kb-export --ns handbook
+memors-mcp export --md ./kb-export            # all namespaces
+memors-mcp export --md ./kb-export --ns handbook
 ```
 
 The layout is `<namespace>/<kind>/<slug>-<shortid>.md`, plus an `_index.md` per namespace. Each
@@ -33,8 +33,8 @@ the content hashes match. Facts, history, graph and logs are not included.
 ## An index for agents
 
 ```bash
-memo-mcp export --index > kb-index.md                        # ≤ 8 KB, one line per document
-memo-mcp export --index --library grpc/grpc-go@v1.64.0 --max-bytes 4096
+memors-mcp export --index > kb-index.md                        # ≤ 8 KB, one line per document
+memors-mcp export --index --library grpc/grpc-go@v1.64.0 --max-bytes 4096
 ```
 
 Each line has the title, address, kind, version and trust, and facts are summarised. Lines that do
@@ -47,8 +47,8 @@ an agent knows what exists before it searches. The same content is the MCP resou
 The file is standard SQLite, so any tool can read it. For example, every live fact as CSV:
 
 ```bash
-sqlite3 -csv -header ~/.memo-mcp/kb/my-project.db \
+sqlite3 -csv -header ~/.memors-mcp/kb/my-project.db \
   "SELECT id, namespace, statement, trust, valid_from, valid_to FROM facts WHERE invalidated_at IS NULL AND deleted_at IS NULL"
 ```
 
-Column names: [schema.md](https://github.com/kKEo/memory-find/blob/master/docs/schema.md).
+Column names: [schema.md](https://github.com/kKEo/memors/blob/master/docs/schema.md).

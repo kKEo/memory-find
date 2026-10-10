@@ -21,11 +21,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/compact"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/live"
-	"github.com/kKEo/memory-find/internal/obs"
-	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memors/internal/compact"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/live"
+	"github.com/kKEo/memors/internal/obs"
+	"github.com/kKEo/memors/internal/retrieve"
 )
 
 //go:embed templates/*.html
@@ -172,7 +172,7 @@ func (s *Server) guard(next http.Handler) http.Handler {
 			return
 		}
 		if len(s.hosts) > 0 && !s.hosts[strings.ToLower(r.Host)] {
-			http.Error(w, "unexpected Host header (DNS rebinding defence); open the UI by the address memo-mcp printed", http.StatusForbidden)
+			http.Error(w, "unexpected Host header (DNS rebinding defence); open the UI by the address memors-mcp printed", http.StatusForbidden)
 			return
 		}
 		w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'")
@@ -251,7 +251,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	}
 	recent, _ := s.store.List(r.Context(), kb.ListOptions{Limit: 15})
 	pages, _ := s.store.ListPages(r.Context(), kb.PageFilter{Limit: 10})
-	s.render(w, "home.html", "memo-mcp", homeData{Status: st, Recent: recent, Pages: pages})
+	s.render(w, "home.html", "memors-mcp", homeData{Status: st, Recent: recent, Pages: pages})
 }
 
 // SearchData is what the search page renders: the same Response the CLI
@@ -721,8 +721,8 @@ footer { color:var(--muted); font-size:.85em; padding:1rem; text-align:center; b
 `
 
 var (
-	uiRequests = obs.Default().Counter("memo_ui_requests_total", "UI page requests, by route and status.", "route", "status")
-	uiSeconds  = obs.Default().Histogram("memo_ui_request_duration_seconds", "UI page render time.", obs.LatencyBuckets, "route")
+	uiRequests = obs.Default().Counter("memors_ui_requests_total", "UI page requests, by route and status.", "route", "status")
+	uiSeconds  = obs.Default().Histogram("memors_ui_request_duration_seconds", "UI page render time.", obs.LatencyBuckets, "route")
 )
 
 type statusWriter struct {

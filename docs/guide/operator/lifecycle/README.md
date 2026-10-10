@@ -12,4 +12,4 @@ of this through MCP tools; an operator does the parts that need a human through 
 
 Every write in every chapter lands in the `audit` table: who (actor), through which channel
 (`tool`, `cli`, `elicitation`, `worker`), what operation, on which record. The same events
-increment `memo_store_writes_total{op,channel}`.
+increment `memors_store_writes_total{op,channel}`.

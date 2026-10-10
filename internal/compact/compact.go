@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/graph"
-	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memors/internal/graph"
+	"github.com/kKEo/memors/internal/kb"
 )
 
 // Thresholds. Starting points the eval measures, printed by `compact --explain`.

@@ -1,11 +1,11 @@
 ---
-name: memo-mcp
-description: How to use the memo-mcp knowledge base tools well. Search then read, scope by version, record facts you would otherwise re-derive, never trust yourself more than the human does.
+name: memors-mcp
+description: How to use the memors-mcp knowledge base tools well. Search then read, scope by version, record facts you would otherwise re-derive, never trust yourself more than the human does.
 ---
 
-# Using the memo-mcp knowledge base
+# Using the memors-mcp knowledge base
 
-memo-mcp is a local, explainable knowledge base. Everything in it was put there by you, by
+memors-mcp is a local, explainable knowledge base. Everything in it was put there by you, by
 another agent, or by the human; nothing is fetched by the server. Seven tools, one loop.
 
 ## The loop

@@ -1,12 +1,12 @@
 # Logs
 
-memo-mcp logs with Go's `log/slog`, **to stderr only**. In server mode, stdout carries the MCP
+memors-mcp logs with Go's `log/slog`, **to stderr only**. In server mode, stdout carries the MCP
 JSON-RPC stream and is never written to by anything else; a test enforces this.
 
 | Variable | Values | Default |
 |---|---|---|
-| `MEMO_LOG_FORMAT` | `text`, `json` | `text` |
-| `MEMO_LOG_LEVEL` | `debug`, `info`, `warn`, `error` | `info` |
+| `MEMORS_LOG_FORMAT` | `text`, `json` | `text` |
+| `MEMORS_LOG_LEVEL` | `debug`, `info`, `warn`, `error` | `info` |
 
 An unknown value falls back to the default and prints one warning.
 
@@ -24,7 +24,7 @@ An unknown value falls back to the default and prints one warning.
 Logs never contain document text, fact statements, or forget reasons. **Search log lines do not
 include the query text.**
 
-Example, with `MEMO_LOG_FORMAT=json`:
+Example, with `MEMORS_LOG_FORMAT=json`:
 
 ```json
 {"time":"2026-10-03T16:23:45.136+02:00","level":"INFO","msg":"search","mode":"auto","resolved":"semantic+keyword+fact","granularity":"chunk","outcome":"results","n_results":1,"truncated":0,"cutoff":"none","latency_ms":"461.8","profile":"default"}
@@ -36,20 +36,20 @@ Example, with `MEMO_LOG_FORMAT=json`:
 
 - **Claude Code** shows a stdio server's stderr. Run `claude --debug` to see it live.
 - **Claude Desktop** writes each server's stderr to its own log file. On macOS this is
-  `~/Library/Logs/Claude/mcp-server-memo.log`.
-- **CLI commands** print logs to your terminal's stderr. Every `memo-mcp search` prints its
-  INFO `search` line. Use `MEMO_LOG_LEVEL=warn` for quiet interactive use, or `2>/dev/null`.
+  `~/Library/Logs/Claude/mcp-server-memors.log`.
+- **CLI commands** print logs to your terminal's stderr. Every `memors-mcp search` prints its
+  INFO `search` line. Use `MEMORS_LOG_LEVEL=warn` for quiet interactive use, or `2>/dev/null`.
 - To capture a server's logs yourself, wrap the binary in a small script:
 
   ```bash
   #!/bin/sh
-  exec /path/to/memo-mcp "$@" 2>>"$HOME/.memo-mcp/serve.log"
+  exec /path/to/memors-mcp "$@" 2>>"$HOME/.memors-mcp/serve.log"
   ```
 
   Point the client's `command` at the script. Rotate the file with your usual tool.
 
 ## MCP logging capability
 
-memo-mcp does **not** advertise the MCP `logging` capability. It is deprecated in protocol
+memors-mcp does **not** advertise the MCP `logging` capability. It is deprecated in protocol
 `2026-07-28`, and stdio hosts already surface stderr. Do not expect log notifications over the
 protocol.

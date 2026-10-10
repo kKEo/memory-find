@@ -1,5 +1,7 @@
 # GraphRAG Evolution Plan: memo-mcp
 
+> **Renamed.** This document predates the rename to memors (2026-10-10): `memo-mcp` is now `memors-mcp`, `memo-tray` is `memors-tray`, `MEMO_*` is `MEMORS_*` and `~/.memo-mcp` is `~/.memors-mcp`. `memo://` addresses are unchanged.
+
 > **Historical document — superseded (2026-10-01), moved to `docs/history/` on
 > 2026-10-02.** The research synthesis
 > [`../knowledge-base-sota.md`](../knowledge-base-sota.md) replaces this

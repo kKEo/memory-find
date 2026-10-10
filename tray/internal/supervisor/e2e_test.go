@@ -6,25 +6,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/live"
-	"github.com/kKEo/memory-find/internal/runfile"
-	"github.com/kKEo/memory-find/tray/internal/client"
-	"github.com/kKEo/memory-find/tray/internal/discover"
+	"github.com/kKEo/memors/internal/live"
+	"github.com/kKEo/memors/internal/runfile"
+	"github.com/kKEo/memors/tray/internal/client"
+	"github.com/kKEo/memors/tray/internal/discover"
 )
 
-// With MEMO_TRAY_E2E_BIN set to a real memo-mcp (make build), memo-tray
-// starts it on a fresh MEMO_HOME, finds its run file, reads /live.json and
-// stops it cleanly. MEMO_MODEL names no model, so the server runs keyword
+// With MEMORS_TRAY_E2E_BIN set to a real memors-mcp (make build), memors-tray
+// starts it on a fresh MEMORS_HOME, finds its run file, reads /live.json and
+// stops it cleanly. MEMORS_MODEL names no model, so the server runs keyword
 // only and downloads nothing.
 func TestE2ERealServer(t *testing.T) {
-	bin := os.Getenv("MEMO_TRAY_E2E_BIN")
+	bin := os.Getenv("MEMORS_TRAY_E2E_BIN")
 	if bin == "" {
-		t.Skip("set MEMO_TRAY_E2E_BIN to a memo-mcp binary to run")
+		t.Skip("set MEMORS_TRAY_E2E_BIN to a memors-mcp binary to run")
 	}
 	h := t.TempDir()
 	s := New(h, os.Environ())
 	addr := freeAddr(t)
-	if err := s.Start(bin, Spec{KB: "e2e", Addr: addr, Env: map[string]string{"MEMO_MODEL": "not-a-model"}}); err != nil {
+	if err := s.Start(bin, Spec{KB: "e2e", Addr: addr, Env: map[string]string{"MEMORS_MODEL": "not-a-model"}}); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.StopAll(5 * time.Second) })

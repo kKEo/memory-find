@@ -23,17 +23,17 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/httpauth"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/live"
-	"github.com/kKEo/memory-find/internal/retrieve"
-	"github.com/kKEo/memory-find/internal/runfile"
-	"github.com/kKEo/memory-find/internal/server"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/httpauth"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/live"
+	"github.com/kKEo/memors/internal/retrieve"
+	"github.com/kKEo/memors/internal/runfile"
+	"github.com/kKEo/memors/internal/server"
 )
 
 func TestServeHTTPRefusesRemoteAddress(t *testing.T) {
-	t.Setenv("MEMO_HOME", t.TempDir())
+	t.Setenv("MEMORS_HOME", t.TempDir())
 	var out, errOut bytes.Buffer
 	code := Main(context.Background(), "test", []string{"serve", "--http", "0.0.0.0:0"}, &out, &errOut)
 	if code == 0 || !strings.Contains(errOut.String(), "TLS") {
@@ -173,7 +173,7 @@ func TestServeHTTPHostsMCPAndLiveUI(t *testing.T) {
 	if _, body = get(t, c, base+"/ingest"); !strings.Contains(body, `<span class="badge done">done</span>`) || !strings.Contains(body, "http-client") {
 		t.Errorf("/ingest does not show the tool run")
 	}
-	if _, body = get(t, c, base+"/metrics"); !strings.Contains(body, "memo_mcp_tool_calls_total") {
+	if _, body = get(t, c, base+"/metrics"); !strings.Contains(body, "memors_mcp_tool_calls_total") {
 		t.Error("/metrics lacks tool counters")
 	}
 	code, body = get(t, c, base+"/live.json")
@@ -224,7 +224,7 @@ func TestServeHTTPSWithToken(t *testing.T) {
 	if code, _ := get(t, plain, base+"/metrics"); code != 401 {
 		t.Errorf("/metrics without token: %d", code)
 	}
-	if code, body := get(t, plain, base+"/metrics", "Authorization", "Bearer "+tok); code != 200 || !strings.Contains(body, "memo_mcp_tool_calls_total") {
+	if code, body := get(t, plain, base+"/metrics", "Authorization", "Bearer "+tok); code != 200 || !strings.Contains(body, "memors_mcp_tool_calls_total") {
 		t.Errorf("/metrics with token: %d", code)
 	}
 	if code, _ := get(t, plain, base+"/live", "Accept", "text/html"); code != 303 {
@@ -324,7 +324,7 @@ func newTestPKI(t *testing.T) testPKI {
 	}
 	now := time.Now()
 	caKey := key()
-	caTmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "memo test CA"}, NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour),
+	caTmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "memors test CA"}, NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour),
 		IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
 	caDER, err := x509.CreateCertificate(rand.Reader, caTmpl, caTmpl, &caKey.PublicKey, caKey)
 	if err != nil {
@@ -332,7 +332,7 @@ func newTestPKI(t *testing.T) testPKI {
 	}
 	ca, _ := x509.ParseCertificate(caDER)
 	issue := func(serial int64, usage x509.ExtKeyUsage, k *ecdsa.PrivateKey) []byte {
-		tmpl := &x509.Certificate{SerialNumber: big.NewInt(serial), Subject: pkix.Name{CommonName: "memo test"}, NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour),
+		tmpl := &x509.Certificate{SerialNumber: big.NewInt(serial), Subject: pkix.Name{CommonName: "memors test"}, NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour),
 			KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{usage}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}}
 		der, err := x509.CreateCertificate(rand.Reader, tmpl, ca, &k.PublicKey, caKey)
 		if err != nil {
@@ -358,7 +358,7 @@ func newTestPKI(t *testing.T) testPKI {
 	return p
 }
 
-// A serving process advertises itself in <MEMO_HOME>/run while it runs:
+// A serving process advertises itself in <MEMORS_HOME>/run while it runs:
 // how to reach it and which token file to read, never the token, and the
 // same instance id as /live.json. The file is gone once it stops.
 func TestServeHTTPRunFile(t *testing.T) {

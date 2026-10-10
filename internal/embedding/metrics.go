@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/kKEo/memory-find/internal/obs"
+	"github.com/kKEo/memors/internal/obs"
 )
 
 // Embedding metrics (roadmap P10): per-call latency and volume through the
@@ -23,13 +23,13 @@ type embedMetrics struct {
 var metricsOnce = sync.OnceValue(func() *embedMetrics {
 	r := obs.Default()
 	return &embedMetrics{
-		seconds:   r.Histogram("memo_embed_duration_seconds", "Embedding call latency, by model and role (query, doc).", obs.LatencyBuckets, "model", "role"),
-		texts:     r.Counter("memo_embed_texts_total", "Texts embedded, by model and role.", "model", "role"),
-		errors:    r.Counter("memo_embed_errors_total", "Embedding calls that failed, by model and role.", "model", "role"),
-		batch:     r.Histogram("memo_embed_batch_size", "Texts per embedding call.", obs.CountBuckets, "model"),
-		downloads: r.Counter("memo_embed_model_downloads_total", "Model downloads, by model and outcome (ok, error, corrupt_retry).", "model", "outcome"),
-		loadSecs:  r.Gauge("memo_embed_model_load_seconds", "Time the last model load took.", "model"),
-		loaded:    r.Gauge("memo_embed_model_loaded", "1 while a model is loaded in this process, by backend (hugot, static).", "model", "backend"),
+		seconds:   r.Histogram("memors_embed_duration_seconds", "Embedding call latency, by model and role (query, doc).", obs.LatencyBuckets, "model", "role"),
+		texts:     r.Counter("memors_embed_texts_total", "Texts embedded, by model and role.", "model", "role"),
+		errors:    r.Counter("memors_embed_errors_total", "Embedding calls that failed, by model and role.", "model", "role"),
+		batch:     r.Histogram("memors_embed_batch_size", "Texts per embedding call.", obs.CountBuckets, "model"),
+		downloads: r.Counter("memors_embed_model_downloads_total", "Model downloads, by model and outcome (ok, error, corrupt_retry).", "model", "outcome"),
+		loadSecs:  r.Gauge("memors_embed_model_load_seconds", "Time the last model load took.", "model"),
+		loaded:    r.Gauge("memors_embed_model_loaded", "1 while a model is loaded in this process, by backend (hugot, static).", "model", "backend"),
 	}
 })
 

@@ -1,4 +1,4 @@
-// Package locate finds the memo-mcp executable. An app started from Finder
+// Package locate finds the memors-mcp executable. An app started from Finder
 // gets a minimal PATH, so the usual install directories are searched too.
 package locate
 
@@ -12,30 +12,30 @@ import (
 	"time"
 )
 
-// ErrNotFound means no memo-mcp executable was found.
-var ErrNotFound = errors.New("memo-mcp not found: install it, or set memo_binary in tray.json")
+// ErrNotFound means no memors-mcp executable was found.
+var ErrNotFound = errors.New("memors-mcp not found: install it, or set memors_binary in tray.json")
 
-// MemoBinary returns the memo-mcp to run: the configured path, else one
-// next to memo-tray (inside the app bundle), on PATH, or in a usual install
+// MemorsBinary returns the memors-mcp to run: the configured path, else one
+// next to memors-tray (inside the app bundle), on PATH, or in a usual install
 // directory.
-func MemoBinary(configured string) (string, error) {
+func MemorsBinary(configured string) (string, error) {
 	userHome, _ := os.UserHomeDir()
 	if configured != "" {
 		p := expand(configured, userHome)
 		if !executable(p) {
-			return "", errors.New("memo_binary in tray.json is not an executable: " + configured)
+			return "", errors.New("memors_binary in tray.json is not an executable: " + configured)
 		}
 		return p, nil
 	}
 	var candidates []string
 	if exe, err := os.Executable(); err == nil {
-		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "memo-mcp"))
+		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "memors-mcp"))
 	}
-	if p, err := exec.LookPath("memo-mcp"); err == nil {
+	if p, err := exec.LookPath("memors-mcp"); err == nil {
 		candidates = append(candidates, p)
 	}
 	for _, dir := range []string{"~/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "~/go/bin"} {
-		candidates = append(candidates, filepath.Join(expand(dir, userHome), "memo-mcp"))
+		candidates = append(candidates, filepath.Join(expand(dir, userHome), "memors-mcp"))
 	}
 	for _, p := range candidates {
 		if executable(p) {
@@ -48,7 +48,7 @@ func MemoBinary(configured string) (string, error) {
 	return "", ErrNotFound
 }
 
-// Version runs `memo-mcp version` and returns the version it reports.
+// Version runs `memors-mcp version` and returns the version it reports.
 func Version(ctx context.Context, bin string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -57,10 +57,10 @@ func Version(ctx context.Context, bin string) (string, error) {
 		return "", err
 	}
 	first, _, _ := strings.Cut(string(out), "\n")
-	if v, ok := strings.CutPrefix(strings.TrimSpace(first), "memo-mcp "); ok && v != "" {
+	if v, ok := strings.CutPrefix(strings.TrimSpace(first), "memors-mcp "); ok && v != "" {
 		return v, nil
 	}
-	return "", errors.New("unexpected `memo-mcp version` output")
+	return "", errors.New("unexpected `memors-mcp version` output")
 }
 
 func expand(p, userHome string) string {

@@ -7,16 +7,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memors/internal/kb"
 )
 
 // A directory ingest is recorded as one cli run with an item per file, so
 // the web UI's ingest console can show it.
 func TestIngestRecordsRun(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("MEMO_HOME", home)
-	t.Setenv("MEMO_KB", "demo")
-	t.Setenv("JOURNAL_TOKEN", "")
+	t.Setenv("MEMORS_HOME", home)
+	t.Setenv("MEMORS_KB", "demo")
 	dir := t.TempDir()
 	for name, body := range map[string]string{"a.md": "# A\n\nalpha beta\n", "b.md": "# B\n\ngamma delta\n"} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {

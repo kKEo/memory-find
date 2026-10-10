@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kKEo/memory-find/internal/embedding"
+	"github.com/kKEo/memors/internal/embedding"
 )
 
 func TestReadDocumentChunkAndSource(t *testing.T) {

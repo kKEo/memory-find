@@ -2,23 +2,23 @@
 
 ## One binary, three processes
 
-`memo-mcp` is one statically linked Go binary (`CGO_ENABLED=0`, about 30 MB). The same
+`memors-mcp` is one statically linked Go binary (`CGO_ENABLED=0`, about 30 MB). The same
 binary runs in three roles, which are **separate processes** that share only the database file:
 
 | Role | Started by | Talks over | Lifetime |
 |---|---|---|---|
-| **MCP server** (`memo-mcp` or `memo-mcp serve`) | The MCP client (Claude Code, Claude Desktop, …) | stdio: JSON-RPC on stdin/stdout, logs on stderr | As long as the client session |
-| **Web UI** (`memo-mcp ui`) | An operator | HTTP on a loopback port, GET only | Until Ctrl-C |
-| **CLI** (`memo-mcp <command>`) | An operator or a script | Terminal | One command |
+| **MCP server** (`memors-mcp` or `memors-mcp serve`) | The MCP client (Claude Code, Claude Desktop, …) | stdio: JSON-RPC on stdin/stdout, logs on stderr | As long as the client session |
+| **Web UI** (`memors-mcp ui`) | An operator | HTTP on a loopback port, GET only | Until Ctrl-C |
+| **CLI** (`memors-mcp <command>`) | An operator or a script | Terminal | One command |
 
 Each MCP client session usually starts its own server process. Alternatively,
-`memo-mcp serve --http` runs one long-lived server that many clients share over HTTP; an
-operator, a service manager or [memo-tray](../install/tray.md) starts it. See
+`memors-mcp serve --http` runs one long-lived server that many clients share over HTTP; an
+operator, a service manager or [memors-tray](../install/tray.md) starts it. See
 [One shared server over HTTP](../install/clients.md#one-shared-server-over-http). Several
 processes can hold the same file open at once; SQLite WAL mode and a 5-second busy timeout
 serialise writers.
 
-![MCP clients start memo-mcp serve over stdio, one per session; many clients can share one memo-mcp serve --http; an operator runs memo-mcp ui and memo-mcp commands. Every process opens the knowledge base, one SQLite file under $MEMO_HOME/kb, and embedding models are cached in ~/.cache/memo-mcp/models after a one-time download from Hugging Face.](../images/system-overview.svg)
+![MCP clients start memors-mcp serve over stdio, one per session; many clients can share one memors-mcp serve --http; an operator runs memors-mcp ui and memors-mcp commands. Every process opens the knowledge base, one SQLite file under $MEMORS_HOME/kb, and embedding models are cached in ~/.cache/memors-mcp/models after a one-time download from Hugging Face.](../images/system-overview.svg)
 
 ## Inside the process
 
@@ -56,9 +56,9 @@ Resources mirror the addresses (`memo://doc/{id}`, `memo://chunk/{id}`, …), an
 ## The one network call
 
 The first time a process needs an embedding model that is not cached, it downloads the model
-files from Hugging Face into `~/.cache/memo-mcp/models`. Nothing else in the default
+files from Hugging Face into `~/.cache/memors-mcp/models`. Nothing else in the default
 configuration opens an outbound connection. The optional Ollama executor and the
 `--metrics-addr` listener are explicit opt-ins, and both are loopback-only by default. See
 [Air-gapped installs](../install/air-gapped.md) to avoid even the download.
 
-Design reference: [architecture §1–§4](https://github.com/kKEo/memory-find/blob/master/docs/architecture.md).
+Design reference: [architecture §1–§4](https://github.com/kKEo/memors/blob/master/docs/architecture.md).

@@ -12,7 +12,7 @@ import (
 func TestWriteListRemove(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "run")
 	in := Info{PID: 4242, Instance: "I", Version: "v1", KB: "crportal", KBPath: "/kb/crportal.db", URL: "http://127.0.0.1:8765",
-		Listen: "127.0.0.1:8765", Scheme: "http", Auth: "token", TokenFile: "/home/u/.memo-mcp/http-token", Started: time.Unix(1700000000, 0).UTC()}
+		Listen: "127.0.0.1:8765", Scheme: "http", Auth: "token", TokenFile: "/home/u/.memors-mcp/http-token", Started: time.Unix(1700000000, 0).UTC()}
 	path, err := Write(dir, in)
 	if err != nil {
 		t.Fatal(err)

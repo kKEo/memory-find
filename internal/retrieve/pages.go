@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/chunk"
-	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memors/internal/chunk"
+	"github.com/kKEo/memors/internal/kb"
 )
 
 // searchPages is granularity=page: keyword (pages_fts) and semantic

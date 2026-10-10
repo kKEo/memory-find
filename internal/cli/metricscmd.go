@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memors/internal/kb"
 )
 
 // runMetrics prints a database-backed snapshot: the knowledge-base gauges
@@ -46,7 +46,7 @@ func runMetrics(ctx context.Context, args []string, stdout, stderr io.Writer) er
 	if fi, err := os.Stat(st.Path); err == nil {
 		size = fi.Size()
 	}
-	note := "live counters are per process: scrape the serving process (memo-mcp serve --metrics-addr 127.0.0.1:9469, then GET /metrics) or the UI's /metrics; this snapshot comes from the knowledge-base file"
+	note := "live counters are per process: scrape the serving process (memors-mcp serve --metrics-addr 127.0.0.1:9469, then GET /metrics) or the UI's /metrics; this snapshot comes from the knowledge-base file"
 	if *asJSON {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
@@ -65,7 +65,7 @@ func runMetrics(ctx context.Context, args []string, stdout, stderr io.Writer) er
 		fmt.Fprintf(stdout, "   pending vectors[%s] %d", m, n)
 	}
 	fmt.Fprintln(stdout)
-	fmt.Fprintf(stdout, "\nlast %s (opt-in log, MEMO_QUERY_LOG=1):\n", since.String())
+	fmt.Fprintf(stdout, "\nlast %s (opt-in log, MEMORS_QUERY_LOG=1):\n", since.String())
 	if searches.Searches == 0 && len(calls) == 0 {
 		fmt.Fprintln(stdout, "  no logged calls or searches")
 	} else {

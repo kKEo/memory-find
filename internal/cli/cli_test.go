@@ -10,51 +10,39 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memors/internal/retrieve"
 )
 
 func env(m map[string]string) Getenv { return func(k string) string { return m[k] } }
 
-func TestResolveConfigDefaultsToMemoKBUnderHome(t *testing.T) {
-	cfg, err := ResolveConfig(env(map[string]string{"MEMO_HOME": "/tmp/home"}))
+func TestResolveConfigDefaultsToMemorsKBUnderHome(t *testing.T) {
+	cfg, err := ResolveConfig(env(map[string]string{"MEMORS_HOME": "/tmp/home"}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.DBName != "default" || cfg.KBDir != filepath.Join("/tmp/home", "kb") || cfg.LogQueries {
 		t.Fatalf("got %+v", cfg)
 	}
-	if len(cfg.Deprecations) != 0 {
-		t.Fatalf("unexpected deprecations: %v", cfg.Deprecations)
-	}
 }
 
-func TestResolveConfigMemoKBName(t *testing.T) {
-	cfg, err := ResolveConfig(env(map[string]string{"MEMO_HOME": "/tmp/home", "MEMO_KB": "grpc-go"}))
+func TestResolveConfigMemorsKBName(t *testing.T) {
+	cfg, err := ResolveConfig(env(map[string]string{"MEMORS_HOME": "/tmp/home", "MEMORS_KB": "grpc-go", "MEMORS_QUERY_LOG": "1"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DBName != "grpc-go" {
+	if cfg.DBName != "grpc-go" || !cfg.LogQueries {
 		t.Fatalf("got %+v", cfg)
 	}
 }
 
-// Legacy variables are accepted as aliases for one release (JOURNAL_TOKEN as
-// the name, JOURNAL_PATH as the home) with warnings; old journal files are
-// never opened, the knowledge base is a new file under <home>/kb.
-func TestResolveConfigLegacyJournalVariables(t *testing.T) {
-	cfg, err := ResolveConfig(env(map[string]string{"JOURNAL_TOKEN": "proj", "JOURNAL_PATH": "/data/journals", "MEMO_QUERY_LOG": "1"}))
+// The pre-memo-mcp JOURNAL_TOKEN / JOURNAL_PATH aliases are gone: they select
+// nothing.
+func TestResolveConfigIgnoresJournalVariables(t *testing.T) {
+	cfg, err := ResolveConfig(env(map[string]string{"MEMORS_HOME": "/tmp/home", "JOURNAL_TOKEN": "proj", "JOURNAL_PATH": "/data/journals"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DBName != "proj" || cfg.KBDir != filepath.Join("/data/journals", "kb") || !cfg.LogQueries {
-		t.Fatalf("got %+v", cfg)
-	}
-	if len(cfg.Deprecations) != 2 {
-		t.Fatalf("want 2 deprecation warnings, got %v", cfg.Deprecations)
-	}
-	// MEMO_KB wins over the legacy name when both are set.
-	cfg, _ = ResolveConfig(env(map[string]string{"JOURNAL_TOKEN": "proj", "MEMO_KB": "new"}))
-	if cfg.DBName != "new" {
+	if cfg.DBName != "default" || cfg.KBDir != filepath.Join("/tmp/home", "kb") {
 		t.Fatalf("got %+v", cfg)
 	}
 }
@@ -64,7 +52,7 @@ func TestVersionCommand(t *testing.T) {
 	if code := Main(context.Background(), "v9.9.9-test", []string{"version"}, &out, &errOut); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut.String())
 	}
-	for _, want := range []string{"memo-mcp v9.9.9-test", "MCP protocol: 2026-07-28", "Go: go"} {
+	for _, want := range []string{"memors-mcp v9.9.9-test", "MCP protocol: 2026-07-28", "Go: go"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("version output missing %q:\n%s", want, out.String())
 		}
@@ -82,8 +70,7 @@ func TestUnknownCommandExits2(t *testing.T) {
 }
 
 func TestStatusOnFreshHome(t *testing.T) {
-	t.Setenv("MEMO_HOME", t.TempDir())
-	t.Setenv("JOURNAL_TOKEN", "")
+	t.Setenv("MEMORS_HOME", t.TempDir())
 	var out, errOut bytes.Buffer
 	if code := Main(context.Background(), "dev", []string{"status"}, &out, &errOut); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut.String())
@@ -91,15 +78,14 @@ func TestStatusOnFreshHome(t *testing.T) {
 	if !strings.Contains(out.String(), "No knowledge base named") {
 		t.Errorf("unexpected status output:\n%s", out.String())
 	}
-	if entries, _ := os.ReadDir(filepath.Join(os.Getenv("MEMO_HOME"), "kb")); len(entries) != 0 {
+	if entries, _ := os.ReadDir(filepath.Join(os.Getenv("MEMORS_HOME"), "kb")); len(entries) != 0 {
 		t.Errorf("status created files: %v", entries)
 	}
 }
 
 // The old flag spelling must keep working for one release, with a warning.
 func TestLegacyStatsFlagAlias(t *testing.T) {
-	t.Setenv("MEMO_HOME", t.TempDir())
-	t.Setenv("JOURNAL_TOKEN", "")
+	t.Setenv("MEMORS_HOME", t.TempDir())
 	var out, errOut bytes.Buffer
 	if code := Main(context.Background(), "dev", []string{"--stats"}, &out, &errOut); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut.String())
@@ -113,9 +99,8 @@ func TestLegacyStatsFlagAlias(t *testing.T) {
 // it, export it, re-import the export (no new revision), verify, status.
 func TestKnowledgeBaseCommandsEndToEnd(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("MEMO_HOME", home)
-	t.Setenv("MEMO_KB", "demo")
-	t.Setenv("JOURNAL_TOKEN", "")
+	t.Setenv("MEMORS_HOME", home)
+	t.Setenv("MEMORS_KB", "demo")
 	run := func(args ...string) (string, string, int) {
 		var out, errOut bytes.Buffer
 		code := Main(context.Background(), "dev", args, &out, &errOut)
@@ -185,10 +170,9 @@ func TestFenceCode(t *testing.T) {
 // numbers: the same Why struct, serialised, not a re-computation.
 func TestSearchAndExplainCommands(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("MEMO_HOME", home)
-	t.Setenv("MEMO_KB", "demo")
-	t.Setenv("JOURNAL_TOKEN", "")
-	t.Setenv("MEMO_QUERY_LOG", "1")
+	t.Setenv("MEMORS_HOME", home)
+	t.Setenv("MEMORS_KB", "demo")
+	t.Setenv("MEMORS_QUERY_LOG", "1")
 	run := func(args ...string) (string, string, int) {
 		var out, errOut bytes.Buffer
 		code := Main(context.Background(), "dev", args, &out, &errOut)
@@ -226,7 +210,7 @@ func TestSearchAndExplainCommands(t *testing.T) {
 	if why.URI != resp.Results[0].URI || math.Abs(why.Final-resp.Results[0].Score) > 1e-12 {
 		t.Fatalf("CLI explain disagrees with search: %+v vs %+v", why, resp.Results[0])
 	}
-	// The query log recorded the searches (opt-in via MEMO_QUERY_LOG=1).
+	// The query log recorded the searches (opt-in via MEMORS_QUERY_LOG=1).
 	out, _, code = run("log", "tail")
 	if code != 0 || !strings.Contains(out, "ERR_CONN_RESET") {
 		t.Fatalf("log tail: %s", out)
@@ -242,7 +226,7 @@ func TestSearchAndExplainCommands(t *testing.T) {
 	}
 	// export --index is the AGENTS.md view: one line per document, under the cap.
 	out, _, code = run("export", "--index", "--max-bytes", "8192")
-	if code != 0 || !strings.Contains(out, "memo://doc/") || !strings.Contains(out, "# memo-mcp knowledge base index") || len(out) > 8192 {
+	if code != 0 || !strings.Contains(out, "memo://doc/") || !strings.Contains(out, "# memors-mcp knowledge base index") || len(out) > 8192 {
 		t.Fatalf("export --index: %d bytes, code %d\n%s", len(out), code, out)
 	}
 	out, _, code = run("export", "--index", "--max-bytes", "300")
@@ -255,9 +239,8 @@ func TestSearchAndExplainCommands(t *testing.T) {
 // so it may do what tool calls cannot, and everything it does is audited.
 func TestFactsForgetTrustCommands(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("MEMO_HOME", home)
-	t.Setenv("MEMO_KB", "demo")
-	t.Setenv("JOURNAL_TOKEN", "")
+	t.Setenv("MEMORS_HOME", home)
+	t.Setenv("MEMORS_KB", "demo")
 	run := func(args ...string) (string, string, int) {
 		var out, errOut bytes.Buffer
 		code := Main(context.Background(), "dev", args, &out, &errOut)
@@ -309,8 +292,8 @@ func TestFactsForgetTrustCommands(t *testing.T) {
 
 func TestMetricsCommandAndServeMetricsAddr(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("MEMO_HOME", home)
-	t.Setenv("MEMO_KB", "m")
+	t.Setenv("MEMORS_HOME", home)
+	t.Setenv("MEMORS_KB", "m")
 	run := func(args ...string) (string, string, int) {
 		var out, errOut bytes.Buffer
 		code := Main(context.Background(), "test", args, &out, &errOut)

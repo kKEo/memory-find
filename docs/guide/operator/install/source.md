@@ -1,24 +1,24 @@
 # Build from source
 
-Requirements: Go 1.26 or newer. No C toolchain is needed for memo-mcp. The optional macOS
-menu-bar app ([memo-tray](tray.md)) lives in its own module under `tray/` and needs the Xcode
+Requirements: Go 1.26 or newer. No C toolchain is needed for memors-mcp. The optional macOS
+menu-bar app ([memors-tray](tray.md)) lives in its own module under `tray/` and needs the Xcode
 command-line tools: `make tray`, `make tray-app`.
 
 ```bash
-git clone https://github.com/kKEo/memory-find
-cd memory-find
+git clone https://github.com/kKEo/memors
+cd memors
 make build            # CGO_ENABLED=0, stripped, version from `git describe`
-./memo-mcp version
+./memors-mcp version
 ```
 
 `make build` runs:
 
 ```bash
-CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(VERSION)" -o memo-mcp ./cmd/memo-mcp/
+CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(VERSION)" -o memors-mcp ./cmd/memors-mcp/
 ```
 
 Cross-compiling is plain Go, for example
-`GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build ./cmd/memo-mcp`.
+`GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build ./cmd/memors-mcp`.
 
 ## Reproducing a release
 
@@ -36,7 +36,7 @@ publishing. It writes the five archives and `checksums.txt` under `dist/`. Relea
 | `make golden-update` | Re-record the `tools/list` golden after a deliberate tool-surface change |
 | `make baseline-update` | Re-record the eval baseline after a deliberate retrieval change |
 | `make docs` | Build these guides with mdBook into `site/` |
-| `make tray-test` | Vet and test the memo-tray module (macOS) |
-| `make tray-app` | Build `tray/dist/memo-tray.app` and its release zip (macOS) |
+| `make tray-test` | Vet and test the memors-tray module (macOS) |
+| `make tray-app` | Build `tray/dist/memors-tray.app` and its release zip (macOS) |
 
 Tests use a deterministic hash embedder and need no network or model download.

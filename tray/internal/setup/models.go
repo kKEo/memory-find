@@ -8,15 +8,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kKEo/memory-find/tray/internal/config"
+	"github.com/kKEo/memors/tray/internal/config"
 )
 
-// Model is an embedding model memo-mcp can use (MEMO_MODEL).
+// Model is an embedding model memors-mcp can use (MEMORS_MODEL).
 type Model struct {
 	ID      string
 	Licence string
 	Note    string
-	Default bool // the registry default, used when MEMO_MODEL is unset
+	Default bool // the registry default, used when MEMORS_MODEL is unset
 }
 
 // Label is how a model reads in a list: its id and the start of its note.
@@ -33,7 +33,7 @@ func (m Model) Label() string {
 
 var columns = regexp.MustCompile(`\s{2,}`)
 
-// ParseModels reads the table `memo-mcp model ls` prints: one row per
+// ParseModels reads the table `memors-mcp model ls` prints: one row per
 // model under an "id" header, up to the first blank line; the row marked
 // "*" is the one in use.
 func ParseModels(out string) []Model {
@@ -58,7 +58,7 @@ func ParseModels(out string) []Model {
 	return models
 }
 
-// ListModels asks memo-mcp which models it knows. MEMO_MODEL is left
+// ListModels asks memors-mcp which models it knows. MEMORS_MODEL is left
 // unset, so the marked row is the registry default.
 func ListModels(homeDir string) func(ctx context.Context, bin string) ([]Model, error) {
 	return func(ctx context.Context, bin string) ([]Model, error) {
@@ -67,11 +67,11 @@ func ListModels(homeDir string) func(ctx context.Context, bin string) ([]Model, 
 		cmd := exec.CommandContext(ctx, bin, "model", "ls")
 		for _, kv := range os.Environ() {
 			k, _, _ := strings.Cut(kv, "=")
-			if k != "MEMO_MODEL" && !config.Reserved(k) {
+			if k != "MEMORS_MODEL" && !config.Reserved(k) {
 				cmd.Env = append(cmd.Env, kv)
 			}
 		}
-		cmd.Env = append(cmd.Env, "MEMO_HOME="+homeDir)
+		cmd.Env = append(cmd.Env, "MEMORS_HOME="+homeDir)
 		out, err := cmd.Output()
 		if err != nil {
 			return nil, err

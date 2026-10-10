@@ -1,6 +1,6 @@
 # Security model
 
-memo-mcp is designed to run on one person's machine with that person's privileges. Its
+memors-mcp is designed to run on one person's machine with that person's privileges. Its
 security properties come from being local, small and explicit.
 
 ## Exposure
@@ -16,8 +16,8 @@ security properties come from being local, small and explicit.
 ## Outbound traffic
 
 - **Model download** from Hugging Face on first use of a model, into
-  `~/.cache/memo-mcp/models`. Avoidable; see [Air-gapped installs](../install/air-gapped.md).
-- **memo-tray**, the optional macOS app, contacts GitHub (`api.github.com` and the release
+  `~/.cache/memors-mcp/models`. Avoidable; see [Air-gapped installs](../install/air-gapped.md).
+- **memors-tray**, the optional macOS app, contacts GitHub (`api.github.com` and the release
   download hosts) only while its setup assistant shows the Install step, and installs only a
   download whose SHA-256 matches the release's `checksums.txt`.
 - Nothing else. The server never fetches URLs. Agents fetch content and pass the text to
@@ -29,7 +29,7 @@ security properties come from being local, small and explicit.
 - One SQLite file per knowledge base, in **plaintext**. Directories are created `0700` and
   files `0600`. A pre-existing directory with wider permissions is not tightened; check it.
 - Use full-disk encryption if the file may hold sensitive material.
-- A running `serve --http` advertises itself in `$MEMO_HOME/run/serve-<pid>.json` (`0600`):
+- A running `serve --http` advertises itself in `$MEMORS_HOME/run/serve-<pid>.json` (`0600`):
   its URL, auth mode and the path of the token file, never the token itself.
 - `forget --redact` erases a record's text. Plain `forget` hides the record but keeps the text
   in history.
@@ -38,7 +38,7 @@ security properties come from being local, small and explicit.
 
 - Trust is set by channel. An agent cannot write a record above `agent`, and cannot forget or
   supersede `user` or `curated` records.
-- Raising trust requires a human: `memo-mcp trust promote`, or an MCP elicitation dialog that
+- Raising trust requires a human: `memors-mcp trust promote`, or an MCP elicitation dialog that
   shows the excerpt, the source and the target level. **A client configured to auto-accept
   elicitation removes this protection.** In that case, treat `user` and `curated` as no
   stronger than `agent`.
@@ -47,7 +47,7 @@ security properties come from being local, small and explicit.
 
 ## Prompt injection
 
-Ingested content is data, but agents read it. memo-mcp limits the blast radius: content
+Ingested content is data, but agents read it. memors-mcp limits the blast radius: content
 cannot raise its own trust, cannot delete human records and cannot trigger network calls.
 Results carry provenance and trust, so an agent, or a human reviewing its answer, can discount
 `agent`-trust web content.
@@ -55,5 +55,5 @@ Results carry provenance and trust, so an agent, or a human reviewing its answer
 ## The MCP host
 
 Everything an agent writes or searches passes through the MCP host as tool input and output.
-The knowledge base is as private as that host. memo-mcp does not advertise the MCP `logging`
+The knowledge base is as private as that host. memors-mcp does not advertise the MCP `logging`
 capability; logs stay on stderr, which the host may display or store.

@@ -4,10 +4,10 @@ A **fact** is one sentence with an optional subject list, an evidence passage an
 window. Facts are searched by their own arm. A matching fact votes for its evidence passage.
 
 ```bash
-memo-mcp remember "Production runs Postgres 16" --about postgres,production \
+memors-mcp remember "Production runs Postgres 16" --about postgres,production \
   --evidence memo://chunk/812 --valid-from 2026-06-01
-memo-mcp facts ls --ns default
-memo-mcp facts ls --as-of 2026-05-15 --history
+memors-mcp facts ls --ns default
+memors-mcp facts ls --as-of 2026-05-15 --history
 ```
 
 ## Correcting facts
@@ -15,8 +15,8 @@ memo-mcp facts ls --as-of 2026-05-15 --history
 - **Supersede**: `remember "<new>" --supersedes memo://fact/<old>`. The old fact is invalidated,
   not deleted, and remains visible under `as_of` and `--history`. Agents may supersede only
   `agent`-trust facts.
-- **Expire**: set `--valid-to`. `memo-mcp lint` lists facts past their window.
-- **Retire**: `memo-mcp forget memo://fact/<id> --reason "…"`.
+- **Expire**: set `--valid-to`. `memors-mcp lint` lists facts past their window.
+- **Retire**: `memors-mcp forget memo://fact/<id> --reason "…"`.
 
 ## Two clocks
 
@@ -27,7 +27,7 @@ memo-mcp facts ls --as-of 2026-05-15 --history
 
 `as_of=T`, available on the `search` and `explore` tools and on `facts ls --as-of` and
 `explore --as-of` in the CLI, shows what was recorded on or before T and not superseded before
-T. Valid time does not filter: it is stored and shown with each fact, and `memo-mcp lint` lists
+T. Valid time does not filter: it is stored and shown with each fact, and `memors-mcp lint` lists
 facts whose `valid_to` has passed.
 
 ![Fact A, Postgres 15, recorded in March; fact B, Postgres 16, valid from 1 May but recorded on 15 June, superseding A. as_of 20 May returns A, because B was true but not yet recorded; as_of 20 July returns B.](../images/two-clocks.svg)

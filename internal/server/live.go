@@ -13,7 +13,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kKEo/memory-find/internal/live"
+	"github.com/kKEo/memors/internal/live"
 )
 
 // tracker keeps the state the hosted web UI shows on /live. Only counts,

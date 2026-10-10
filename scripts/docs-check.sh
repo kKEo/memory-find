@@ -4,10 +4,10 @@
 #  1. Every relative link in either guide resolves to a file or directory
 #     inside docs/guide/ (links leaving the guides would break on Pages; use
 #     an absolute GitHub URL for anything else in the repository).
-#  2. Every MEMO_* environment variable read by the code appears in the
+#  2. Every MEMORS_* environment variable read by the code appears in the
 #     operator guide's environment reference.
 #  3. Every top-level command in `usage()` appears in the commands reference.
-#  4. Every memo_* metric registered in internal/ appears in the metric
+#  4. Every memors_* metric registered in internal/ appears in the metric
 #     catalogue.
 #
 # Checks 2-4 are skipped with a warning while their reference page is still
@@ -25,7 +25,7 @@ err()  { echo "docs-check: $*" >&2; fail=1; }
 warn() { echo "docs-check: warning: $*" >&2; }
 is_draft() { grep -qx '> Draft\.' "$1"; }
 
-# Non-test Go sources, memo-tray's included.
+# Non-test Go sources, memors-tray's included.
 go_sources() { find internal cmd tray -name '*.go' ! -name '*_test.go' -print0; }
 
 # 1. Relative links.
@@ -55,8 +55,10 @@ env_ref=$OP/config/environment.md
 if is_draft "$env_ref"; then
   warn "$env_ref is a draft; skipping the environment-variable check"
 else
-  # A name ends in a letter; "MEMO_HTTP_" and the like are prefixes.
-  for v in $(go_sources | xargs -0 grep -hoE '"MEMO_[A-Z_]*[A-Z]"' | tr -d '"' | sort -u); do
+  # A name ends in a letter; "MEMORS_HTTP_" and the like are prefixes.
+  vars=$(go_sources | xargs -0 grep -hoE '"MEMORS_[A-Z_]*[A-Z]"' | tr -d '"' | sort -u || true)
+  [ -n "$vars" ] || err "found no MEMORS_* variables in the code; is the pattern stale?"
+  for v in $vars; do
     grep -q "\`$v\`" "$env_ref" || err "$v is read by the code but missing from $env_ref"
   done
 fi
@@ -66,10 +68,10 @@ cmd_ref=$OP/config/commands.md
 if is_draft "$cmd_ref"; then
   warn "$cmd_ref is a draft; skipping the command check"
 else
-  cmds=$(sed -n '/^func usage/,/^}/p' internal/cli/cli.go | grep -oE '^  memo-mcp \[?[a-z][a-z-]*' | sed -E 's/^  memo-mcp \[?//' | sort -u)
+  cmds=$(sed -n '/^func usage/,/^}/p' internal/cli/cli.go | grep -oE '^  memors-mcp \[?[a-z][a-z-]*' | sed -E 's/^  memors-mcp \[?//' | sort -u)
   [ -n "$cmds" ] || err "could not extract commands from usage() in internal/cli/cli.go"
   for c in $cmds; do
-    grep -qE "memo-mcp $c( |\`|$)" "$cmd_ref" || err "command '$c' is in usage() but missing from $cmd_ref"
+    grep -qE "memors-mcp $c( |\`|$)" "$cmd_ref" || err "command '$c' is in usage() but missing from $cmd_ref"
   done
 fi
 
@@ -78,7 +80,9 @@ cat_ref=$OP/monitoring/catalogue.md
 if is_draft "$cat_ref"; then
   warn "$cat_ref is a draft; skipping the metric catalogue check"
 else
-  for m in $(go_sources | xargs -0 grep -hoE '"memo_(build|mcp|search|graph|store|kb|embed|ui)_[a-z0-9_]+"' | tr -d '"' | sort -u); do
+  metrics=$(go_sources | xargs -0 grep -hoE '"memors_(build|mcp|search|graph|store|kb|embed|ui)_[a-z0-9_]+"' | tr -d '"' | sort -u || true)
+  [ -n "$metrics" ] || err "found no memors_* metrics in the code; is the pattern stale?"
+  for m in $metrics; do
     grep -q "\`$m\`" "$cat_ref" || err "metric $m is registered but missing from $cat_ref"
   done
 fi

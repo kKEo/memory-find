@@ -32,10 +32,10 @@ jobs:
         run: go test ./... -race -count=1
       - name: build (pure Go)
         shell: bash
-        run: CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(git describe --tags --always)" -o memo-mcp${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/memo-mcp
+        run: CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=$(git describe --tags --always)" -o memors-mcp${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/memors-mcp
       - name: smoke
         shell: bash
-        run: ./memo-mcp${{ runner.os == 'Windows' && '.exe' || '' }} version
+        run: ./memors-mcp${{ runner.os == 'Windows' && '.exe' || '' }} version
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -72,7 +72,7 @@ jobs:
       - name: five archives
         run: test "$(ls dist/*.tar.gz dist/*.zip | wc -l)" -eq 5 && ls dist
   tray:
-    # memo-tray (tray/, its own module) is macOS-only and the one cgo build:
+    # memors-tray (tray/, its own module) is macOS-only and the one cgo build:
     # it is vetted, tested and bundled here, apart from the pure-Go gate.
     runs-on: macos-latest
     steps:
@@ -89,13 +89,13 @@ jobs:
         run: make tray-test
       - name: links none of the server's dependencies
         working-directory: tray
-        run: "! go list -deps ./cmd/memo-tray | grep -E 'modernc.org/sqlite|knights-analytics|modelcontextprotocol'"
-      - name: end to end with a real memo-mcp
-        run: make build && cd tray && MEMO_TRAY_E2E_BIN="$PWD/../memo-mcp" go test ./internal/supervisor/ -run E2E -count=1 -v
+        run: "! go list -deps ./cmd/memors-tray | grep -E 'modernc.org/sqlite|knights-analytics|modelcontextprotocol'"
+      - name: end to end with a real memors-mcp
+        run: make build && cd tray && MEMORS_TRAY_E2E_BIN="$PWD/../memors-mcp" go test ./internal/supervisor/ -run E2E -count=1 -v
       - name: app bundle
         run: |
           make tray-app
-          codesign --verify --strict tray/dist/memo-tray.app
-          lipo -archs tray/dist/memo-tray.app/Contents/MacOS/memo-tray | grep -q 'x86_64 arm64'
-          tray/dist/memo-tray.app/Contents/MacOS/memo-tray -version
+          codesign --verify --strict tray/dist/memors-tray.app
+          lipo -archs tray/dist/memors-tray.app/Contents/MacOS/memors-tray | grep -q 'x86_64 arm64'
+          tray/dist/memors-tray.app/Contents/MacOS/memors-tray -version
           ls tray/dist/*.zip tray/dist/*.sha256

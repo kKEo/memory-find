@@ -1,5 +1,5 @@
-// Package home finds memo-mcp's directories the way memo-mcp does:
-// MEMO_HOME, or ~/.memo-mcp.
+// Package home finds memors-mcp's directories the way memors-mcp does:
+// MEMORS_HOME, or ~/.memors-mcp.
 package home
 
 import (
@@ -10,25 +10,25 @@ import (
 	"strings"
 )
 
-// Dir is MEMO_HOME as an absolute path.
+// Dir is MEMORS_HOME as an absolute path.
 func Dir() (string, error) {
-	if h := os.Getenv("MEMO_HOME"); h != "" {
+	if h := os.Getenv("MEMORS_HOME"); h != "" {
 		return filepath.Abs(h)
 	}
 	u, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(u, ".memo-mcp"), nil
+	return filepath.Join(u, ".memors-mcp"), nil
 }
 
 // KBDir holds the knowledge-base files.
 func KBDir(home string) string { return filepath.Join(home, "kb") }
 
-// LogDir holds the logs of servers memo-tray starts, and its own.
+// LogDir holds the logs of servers memors-tray starts, and its own.
 func LogDir(home string) string { return filepath.Join(home, "logs") }
 
-// namePattern is memo-mcp's rule for MEMO_KB (internal/kb.ValidateName).
+// namePattern is memors-mcp's rule for MEMORS_KB (internal/kb.ValidateName).
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 
 // ValidName reports whether name is a valid knowledge-base name.

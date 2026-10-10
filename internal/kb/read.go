@@ -274,7 +274,7 @@ func (s *Store) List(ctx context.Context, opts ListOptions) ([]ListEntry, error)
 	return out, rows.Err()
 }
 
-// Status is what `memo-mcp status` and the `status` tool report.
+// Status is what `memors-mcp status` and the `status` tool report.
 type Status struct {
 	Path              string
 	SizeMB            float64

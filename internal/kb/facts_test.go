@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/embedding"
+	"github.com/kKEo/memors/internal/embedding"
 )
 
 func rememberIn(ns, stmt, channel, trust string) RememberInput {
@@ -63,7 +63,7 @@ func TestToolCannotRetireOrPromoteTrustedRecords(t *testing.T) {
 
 	var needs *ErrNeedsHuman
 	err := s.Forget(ctx, ForgetInput{URI: userFact.URI, Reason: "wrong", Channel: ChannelTool})
-	if !errors.As(err, &needs) || !strings.Contains(needs.Command, "memo-mcp forget") {
+	if !errors.As(err, &needs) || !strings.Contains(needs.Command, "memors-mcp forget") {
 		t.Fatalf("tool forgetting a user fact must need a human: %v", err)
 	}
 	in := rememberIn("ns", "replacement", ChannelTool, TrustAgent)

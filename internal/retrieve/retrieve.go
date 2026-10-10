@@ -14,11 +14,11 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/kKEo/memory-find/internal/chunk"
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/obs"
-	"github.com/kKEo/memory-find/internal/rerank"
+	"github.com/kKEo/memors/internal/chunk"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/obs"
+	"github.com/kKEo/memors/internal/rerank"
 )
 
 // Service runs searches over a knowledge base.
@@ -605,7 +605,7 @@ func (s *Service) semanticArm(ctx context.Context, q, where string, args []any, 
 		return nil, "", err
 	}
 	if have == 0 {
-		return nil, "", fmt.Errorf("no vectors stored for model %s yet (run `memo-mcp reindex`)", modelID)
+		return nil, "", fmt.Errorf("no vectors stored for model %s yet (run `memors-mcp reindex`)", modelID)
 	}
 	vecs, err := s.embedder.EmbedBatch(ctx, []string{q}, embedding.RoleQuery)
 	if err != nil {

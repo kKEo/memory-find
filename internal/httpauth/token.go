@@ -1,7 +1,7 @@
-// Package httpauth protects `memo-mcp serve --http`: one shared secret,
+// Package httpauth protects `memors-mcp serve --http`: one shared secret,
 // accepted as an `Authorization: Bearer` header (MCP clients, Prometheus)
 // or, for browsers, as a session cookie set by /login. The token lives in a
-// 0600 file under MEMO_HOME; rotating it invalidates every cookie.
+// 0600 file under MEMORS_HOME; rotating it invalidates every cookie.
 package httpauth
 
 import (

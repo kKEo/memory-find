@@ -1,4 +1,4 @@
-// Command iconset writes memo-tray's app icon as a macOS .iconset
+// Command iconset writes memors-tray's app icon as a macOS .iconset
 // directory for iconutil (scripts/build-app.sh runs it).
 package main
 
@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/kKEo/memory-find/tray/internal/icon"
+	"github.com/kKEo/memors/tray/internal/icon"
 )
 
 func main() {

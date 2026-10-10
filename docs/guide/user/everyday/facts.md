@@ -24,7 +24,7 @@ You can also say how long a fact holds:
 
 When something changes, say so:
 
-> The rate limit is now 200 per minute. Update memo.
+> The rate limit is now 200 per minute. Update memors.
 
 Claude records the new fact as replacing the old one. The new fact is current from now on. The
 old one is not deleted; it is kept as history with the date it stopped being true.
@@ -43,5 +43,5 @@ The browser view has a **facts timeline** that shows the same thing at a glance.
 ## When facts disagree
 
 Two facts can contradict each other, for example when two people recorded different numbers.
-memo-mcp notices this and lists it as something to resolve. See
+memors-mcp notices this and lists it as something to resolve. See
 [Keeping it tidy](../keeping-tidy.md).

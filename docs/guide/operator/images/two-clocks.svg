@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="312" viewBox="0 0 760 312" role="img" aria-labelledby="t d">
 <title id="t">Recorded time, valid time and as_of</title>
-<desc id="d">Fact A, "Production runs Postgres 15", was recorded on 2 March and has no validity window. Fact B, "Production runs Postgres 16", is valid from 1 May but was recorded only on 15 June, superseding A. as_of filters on recorded time: as_of May 20 returns A, because B was already true but not yet recorded; as_of July 20 returns B. Valid time is stored and shown with every fact, and memo-mcp lint lists facts whose valid_to has passed.</desc>
+<desc id="d">Fact A, "Production runs Postgres 15", was recorded on 2 March and has no validity window. Fact B, "Production runs Postgres 16", is valid from 1 May but was recorded only on 15 June, superseding A. as_of filters on recorded time: as_of May 20 returns A, because B was already true but not yet recorded; as_of July 20 returns B. Valid time is stored and shown with every fact, and memors-mcp lint lists facts whose valid_to has passed.</desc>
 <style>
 text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
 .mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -75,5 +75,5 @@ text{fill:#eceeec}
 <text class="xs t3" x="663" y="250" text-anchor="middle">Jul</text>
 
 <text class="xs t2" x="24" y="278">as_of = T filters on recorded time. On 20 May, B was already true but not yet recorded, so the answer is A.</text>
-<text class="xs t2" x="24" y="295">Valid time is stored and shown with every fact; memo-mcp lint lists facts whose valid_to has passed.</text>
+<text class="xs t2" x="24" y="295">Valid time is stored and shown with every fact; memors-mcp lint lists facts whose valid_to has passed.</text>
 </svg>

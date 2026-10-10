@@ -1,4 +1,4 @@
-// Package menu turns what memo-tray knows (running servers, their agents,
+// Package menu turns what memors-tray knows (running servers, their agents,
 // the knowledge bases on disk) into the menu-bar menu as plain data. The
 // GUI layer renders it and sends the chosen Action back; nothing here
 // touches AppKit, so the whole menu is unit-tested.
@@ -12,7 +12,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/kKEo/memory-find/internal/live"
+	"github.com/kKEo/memors/internal/live"
 )
 
 // ActionKind is what a menu item does.
@@ -32,8 +32,8 @@ const (
 	EditConfig
 	OpenLogs
 	Quit
-	OpenSettings // memo-tray's settings window
-	OpenSetup    // the assistant that installs memo-mcp and sets up a knowledge base
+	OpenSettings // memors-tray's settings window
+	OpenSetup    // the assistant that installs memors-mcp and sets up a knowledge base
 )
 
 // Action is a click: what to do, to which server or knowledge base.
@@ -55,7 +55,7 @@ type Item struct {
 	Action    Action
 }
 
-// State is a server's state as memo-tray sees it.
+// State is a server's state as memors-tray sees it.
 type State string
 
 // The states.
@@ -79,7 +79,7 @@ type ServerView struct {
 	Auth       string
 	State      State
 	Detail     string // why, for crashed or unreachable servers and old versions
-	Managed    bool   // started by this memo-tray
+	Managed    bool   // started by this memors-tray
 	Configured bool   // listed in tray.json, so it can be (re)started
 	HasLog     bool
 	MTLS       bool
@@ -92,11 +92,11 @@ type Input struct {
 	Now              time.Time
 	Servers          []ServerView
 	KBs              []string // knowledge bases on disk
-	Memo             string   // "memo-mcp <version> at <path>", or why it is missing
-	MemoOK           bool
+	Memors           string   // "memors-mcp <version> at <path>", or why it is missing
+	MemorsOK         bool
 	Problem          string // a configuration or discovery problem
 	StopsOnQuit      int    // servers Quit will stop
-	DefaultTokenFile string // <MEMO_HOME>/http-token
+	DefaultTokenFile string // <MEMORS_HOME>/http-token
 }
 
 // activeWindow is how recently a client without an event stream must have
@@ -106,8 +106,8 @@ const activeWindow = 2 * time.Minute
 // Build returns the menu.
 func Build(in Input) []Item {
 	var items []Item
-	if !in.MemoOK {
-		items = append(items, Item{Key: "install", Title: "Install memo-mcp…", Tooltip: in.Memo, Action: Action{Kind: OpenSetup}}, sep("install"))
+	if !in.MemorsOK {
+		items = append(items, Item{Key: "install", Title: "Install memors-mcp…", Tooltip: in.Memors, Action: Action{Kind: OpenSetup}}, sep("install"))
 	}
 	if in.Problem != "" {
 		items = append(items, Item{Key: "problem", Title: "⚠ " + in.Problem, Disabled: true}, sep("problem"))
@@ -124,13 +124,13 @@ func Build(in Input) []Item {
 		items = append(items, agents(in.Now, s)...)
 	}
 	if len(servers) == 0 {
-		items = append(items, Item{Key: "none", Title: "No memo-mcp servers running", Disabled: true})
+		items = append(items, Item{Key: "none", Title: "No memors-mcp servers running", Disabled: true})
 	}
 	items = append(items, sep("start"), startMenu(in, servers),
 		Item{Key: "settings", Title: "Settings…", Action: Action{Kind: OpenSettings}},
-		Item{Key: "setup", Title: "Install or Update memo-mcp…", Tooltip: in.Memo, Action: Action{Kind: OpenSetup}},
+		Item{Key: "setup", Title: "Install or Update memors-mcp…", Tooltip: in.Memors, Action: Action{Kind: OpenSetup}},
 		sep("quit"))
-	quit := "Quit memo-tray"
+	quit := "Quit memors-tray"
 	if in.StopsOnQuit > 0 {
 		quit += fmt.Sprintf(" (stops %d server%s)", in.StopsOnQuit, plural(in.StopsOnQuit))
 	}
@@ -203,7 +203,7 @@ func header(s ServerView, in Input) Item {
 		children = append(children, act("stop", "Stop", Stop, s.State != Stopping))
 	} else {
 		if s.Configured {
-			children = append(children, act("start", "Start", Start, in.MemoOK))
+			children = append(children, act("start", "Start", Start, in.MemorsOK))
 		}
 		if s.HasLog {
 			children = append(children, act("log", "Show Log", ShowLog, true))
@@ -211,7 +211,7 @@ func header(s ServerView, in Input) Item {
 	}
 	tip := ""
 	if s.Snapshot != nil {
-		tip = fmt.Sprintf("memo-mcp %s · %s · model %s · up %s", s.Snapshot.Version, s.Snapshot.KBPath, orNone(s.Snapshot.Model), ago(in.Now.Sub(s.Snapshot.Started)))
+		tip = fmt.Sprintf("memors-mcp %s · %s · model %s · up %s", s.Snapshot.Version, s.Snapshot.KBPath, orNone(s.Snapshot.Model), ago(in.Now.Sub(s.Snapshot.Started)))
 	}
 	return Item{Key: k, Title: title, Tooltip: tip, Children: children}
 }
@@ -283,12 +283,12 @@ func startMenu(in Input, servers []ServerView) Item {
 		if running[kb] {
 			continue
 		}
-		children = append(children, Item{Key: "start:" + kb, Title: kb, Disabled: !in.MemoOK, Action: Action{Kind: Start, KB: kb}})
+		children = append(children, Item{Key: "start:" + kb, Title: kb, Disabled: !in.MemorsOK, Action: Action{Kind: Start, KB: kb}})
 	}
 	if len(children) == 0 {
 		title := "Every knowledge base is running"
 		if len(in.KBs) == 0 {
-			title = "No knowledge bases yet (memo-mcp ingest creates one)"
+			title = "No knowledge bases yet (memors-mcp ingest creates one)"
 		}
 		children = append(children, Item{Key: "start:none", Title: title, Disabled: true})
 	}
@@ -296,11 +296,11 @@ func startMenu(in Input, servers []ServerView) Item {
 }
 
 // ClaudeAddCommand is the line that adds a server to Claude Code. It names
-// the token through `memo-mcp http-token`, never the token itself.
+// the token through `memors-mcp http-token`, never the token itself.
 func ClaudeAddCommand(kb, serverURL, auth, tokenFile, defaultTokenFile string) string {
-	name := "memo"
+	name := "memors"
 	if kb != "default" {
-		name = "memo-" + strings.Map(func(r rune) rune {
+		name = "memors-" + strings.Map(func(r rune) rune {
 			if r == '-' || r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r) {
 				return r
 			}
@@ -309,7 +309,7 @@ func ClaudeAddCommand(kb, serverURL, auth, tokenFile, defaultTokenFile string) s
 	}
 	cmd := "claude mcp add --transport http " + name + " " + shellQuote(serverURL+"/mcp")
 	if auth == "token" {
-		tok := "memo-mcp http-token"
+		tok := "memors-mcp http-token"
 		if tokenFile != "" && tokenFile != defaultTokenFile {
 			tok += " --file " + shellQuote(tokenFile)
 		}

@@ -8,7 +8,7 @@ conventions, the decision made last month and the reason for it. Time goes into 
 instead of working. When the assistant guesses instead, it can sound confident and still be
 wrong.
 
-## What changes with memo-mcp
+## What changes with memors-mcp
 
 **Answers come with receipts.** Every answer from the memory carries its source: which
 document, which passage, who saved it and when. You can open the original in one step. You can
@@ -34,7 +34,7 @@ server, no database to install and no paid service.
 
 ## Where it pays off
 
-| Situation | Without a memory | With memo-mcp |
+| Situation | Without a memory | With memors-mcp |
 |---|---|---|
 | Starting a new conversation on an ongoing project | Paste the background again | Claude looks it up |
 | "Why did we choose this?" six months later | Search chat history or ask around | The decision is saved with its reason and date |
@@ -49,7 +49,7 @@ More examples are in [Use cases](use-cases.md).
 Claude Code and the Claude apps have their own memory features. For many people those are the
 right default, and they need no setup.
 
-memo-mcp is for when you want more than that:
+memors-mcp is for when you want more than that:
 
 - to **see and check** what the memory holds, in a browser or as plain files;
 - to know **why** a particular answer came back;

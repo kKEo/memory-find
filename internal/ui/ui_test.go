@@ -15,11 +15,11 @@ import (
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
 
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/live"
-	"github.com/kKEo/memory-find/internal/obs"
-	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/live"
+	"github.com/kKEo/memors/internal/obs"
+	"github.com/kKEo/memors/internal/retrieve"
 )
 
 func newUI(t *testing.T) (*Server, *kb.Store, *retrieve.Service) {
@@ -171,7 +171,7 @@ func TestMetricsRoute(t *testing.T) {
 		t.Fatal(code)
 	}
 	code, body := get(t, h, "/metrics", "")
-	if code != 200 || !strings.Contains(body, "# TYPE memo_ui_requests_total counter") || !strings.Contains(body, `memo_ui_requests_total{route="GET /{$}",status="200"}`) {
+	if code != 200 || !strings.Contains(body, "# TYPE memors_ui_requests_total counter") || !strings.Contains(body, `memors_ui_requests_total{route="GET /{$}",status="200"}`) {
 		t.Fatalf("metrics: %d\n%s", code, body)
 	}
 	req := httptest.NewRequest(http.MethodPost, "/metrics", nil)
@@ -234,10 +234,10 @@ func TestLivePage(t *testing.T) {
 	_, store, svc := newUI(t)
 	now := time.Now()
 	reg := obs.NewRegistry()
-	reg.Counter("memo_mcp_tool_calls_total", "", "tool", "outcome").With("search", "ok").Add(3)
-	reg.Counter("memo_mcp_tool_calls_total", "", "tool", "outcome").With("search", "tool_error").Inc()
-	reg.Histogram("memo_mcp_tool_call_duration_seconds", "", obs.LatencyBuckets, "tool").With("search").Observe(0.004)
-	reg.Counter("memo_store_ingests_total", "", "outcome").With("new").Add(2)
+	reg.Counter("memors_mcp_tool_calls_total", "", "tool", "outcome").With("search", "ok").Add(3)
+	reg.Counter("memors_mcp_tool_calls_total", "", "tool", "outcome").With("search", "tool_error").Inc()
+	reg.Histogram("memors_mcp_tool_call_duration_seconds", "", obs.LatencyBuckets, "tool").With("search").Observe(0.004)
+	reg.Counter("memors_store_ingests_total", "", "outcome").With("new").Add(2)
 	src := fakeLive{live.Snapshot{Version: "v1", KBPath: "/kb/x.db", Model: "hash", Started: now.Add(-time.Hour), Background: "idle",
 		Sessions: []live.Session{
 			{ID: "abcdef123456789", Key: "c0ffee000001", Client: "claude-code", ClientVersion: "2.1.4", Since: now.Add(-time.Minute), Calls: 4, LastCall: now, LastSeen: now, Open: true, Stream: true},

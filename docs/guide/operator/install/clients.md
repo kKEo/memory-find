@@ -1,6 +1,6 @@
 # Connecting MCP clients
 
-memo-mcp speaks MCP over stdio. A client starts the binary, writes JSON-RPC to its stdin and
+memors-mcp speaks MCP over stdio. A client starts the binary, writes JSON-RPC to its stdin and
 reads responses from its stdout. Configuration is passed through **environment variables in
 the client's server entry**, not the shell. The client starts the process, so your shell
 profile does not apply.
@@ -9,18 +9,18 @@ profile does not apply.
 
 ```bash
 # In a project directory: this project only, private to you (the default "local" scope)
-claude mcp add memo --env MEMO_KB=my-project -- /absolute/path/to/memo-mcp
+claude mcp add memors --env MEMORS_KB=my-project -- /absolute/path/to/memors-mcp
 
 # Shared with the team through .mcp.json in the repository
-claude mcp add memo --scope project --env MEMO_KB=my-project -- memo-mcp
+claude mcp add memors --scope project --env MEMORS_KB=my-project -- memors-mcp
 
 # Available in every project
-claude mcp add memo --scope user --env MEMO_KB=personal -- /absolute/path/to/memo-mcp
+claude mcp add memors --scope user --env MEMORS_KB=personal -- /absolute/path/to/memors-mcp
 ```
 
 Add more variables with additional `--env` flags, for example
-`--env MEMO_QUERY_LOG=1 --env MEMO_LOG_LEVEL=warn`. Check the connection with `/mcp` inside
-Claude Code. Claude Code shows a stdio server's stderr, so memo-mcp's logs appear there.
+`--env MEMORS_QUERY_LOG=1 --env MEMORS_LOG_LEVEL=warn`. Check the connection with `/mcp` inside
+Claude Code. Claude Code shows a stdio server's stderr, so memors-mcp's logs appear there.
 
 ## One shared server over HTTP
 
@@ -28,22 +28,22 @@ Instead of one process per session, run a single long-lived server and point eve
 its URL:
 
 ```bash
-MEMO_KB=my-project memo-mcp serve --http 127.0.0.1:8765
-claude mcp add --transport http memo http://127.0.0.1:8765/mcp
+MEMORS_KB=my-project memors-mcp serve --http 127.0.0.1:8765
+claude mcp add --transport http memors http://127.0.0.1:8765/mcp
 ```
 
 The same port serves the web UI at `http://127.0.0.1:8765/`. In this mode the UI also has a
 **Live** page with what only the running process knows: active clients, calls in flight,
-background backfill, and tool and ingest latency since start. The standalone `memo-mcp ui`
+background backfill, and tool and ingest latency since start. The standalone `memors-mcp ui`
 reads the knowledge-base file alone and has no Live page.
 
 Start the server yourself (a terminal, `launchd` or a `systemd --user` unit), or from the macOS
-menu-bar app, [memo-tray](tray.md). Clients do not start it, and its logs go to its own
+menu-bar app, [memors-tray](tray.md). Clients do not start it, and its logs go to its own
 stderr.
 
 ### For companion apps
 
-Two routes exist for local tools such as memo-tray rather than for people:
+Two routes exist for local tools such as memors-tray rather than for people:
 
 - `GET /live.json`: the Live page's client list as JSON (schema 1): the server's instance id,
   pid, version, knowledge base and model, every client with its name, version, `open` and
@@ -58,7 +58,7 @@ Two routes exist for local tools such as memo-tray rather than for people:
 ### Authentication
 
 One shared secret, the **bearer token**, protects `/mcp`, the UI and `/metrics`. It lives in
-`<MEMO_HOME>/http-token` (mode 0600, created on first use); `memo-mcp http-token` prints it.
+`<MEMORS_HOME>/http-token` (mode 0600, created on first use); `memors-mcp http-token` prints it.
 
 | Setup | Auth by default | Notes |
 |---|---|---|
@@ -75,13 +75,13 @@ send the token unencrypted over the network.
 **Claude Code** sends the token as a header:
 
 ```bash
-claude mcp add --transport http memo https://box.example:8765/mcp \
-  --header "Authorization: Bearer $(memo-mcp http-token)"
+claude mcp add --transport http memors https://box.example:8765/mcp \
+  --header "Authorization: Bearer $(memors-mcp http-token)"
 ```
 
-`$(memo-mcp http-token)` is expanded once, when you run the command, and the token is stored in
-Claude Code's configuration. After `memo-mcp http-token --rotate`, restart the server and run
-`claude mcp remove memo` and the `add` line again.
+`$(memors-mcp http-token)` is expanded once, when you run the command, and the token is stored in
+Claude Code's configuration. After `memors-mcp http-token --rotate`, restart the server and run
+`claude mcp remove memors` and the `add` line again.
 
 **Prometheus** uses the same header (`authorization: { credentials_file: … }` in the scrape
 config).
@@ -95,8 +95,8 @@ link appears in the server's log, so treat that log as sensitive while the link 
 A full remote example with a certificate:
 
 ```bash
-memo-mcp serve --http 0.0.0.0:8765 --allow-remote \
-  --tls-cert /etc/memo/cert.pem --tls-key /etc/memo/key.pem \
+memors-mcp serve --http 0.0.0.0:8765 --allow-remote \
+  --tls-cert /etc/memors/cert.pem --tls-key /etc/memors/key.pem \
   --public-url https://box.example:8765
 ```
 
@@ -112,11 +112,11 @@ on Windows, in `%APPDATA%\Claude\`. Use absolute paths; `~` is not expanded.
 ```json
 {
   "mcpServers": {
-    "memo": {
-      "command": "/Users/you/.local/bin/memo-mcp",
+    "memors": {
+      "command": "/Users/you/.local/bin/memors-mcp",
       "env": {
-        "MEMO_KB": "my-project",
-        "MEMO_QUERY_LOG": "1"
+        "MEMORS_KB": "my-project",
+        "MEMORS_QUERY_LOG": "1"
       }
     }
   }
@@ -131,9 +131,9 @@ The generic shape is the same everywhere: a command, optional args and an enviro
 
 | Field | Value |
 |---|---|
-| command | Absolute path to `memo-mcp` |
+| command | Absolute path to `memors-mcp` |
 | args | none, or `["serve", "--metrics-addr", "127.0.0.1:9469"]` |
-| env | `MEMO_KB`, and optionally `MEMO_HOME`, `MEMO_MODEL`, `MEMO_PROFILE`, `MEMO_QUERY_LOG`, `MEMO_LOG_FORMAT`, `MEMO_LOG_LEVEL` |
+| env | `MEMORS_KB`, and optionally `MEMORS_HOME`, `MEMORS_MODEL`, `MEMORS_PROFILE`, `MEMORS_QUERY_LOG`, `MEMORS_LOG_FORMAT`, `MEMORS_LOG_LEVEL` |
 
 The server implements protocol version `2026-07-28`: stateless, with `server/discover` in
 place of `initialize`. It advertises tools and resources. It does not advertise `logging` or
@@ -145,14 +145,14 @@ returns the CLI command a human can run.
 Ship `SKILL.md` from the release archive with the project, for example as a Claude Code
 skill, or paste it into the system prompt. It describes the search-then-read loop, scoping,
 writing facts and how to treat trust. For a static orientation, add the output of
-`memo-mcp export --index` to `CLAUDE.md` or `AGENTS.md`.
+`memors-mcp export --index` to `CLAUDE.md` or `AGENTS.md`.
 
 ## Verifying a connection without a client
 
 ```bash
-MEMO_KB=my-project memo-mcp status      # read-only; fails if the file does not exist yet
+MEMORS_KB=my-project memors-mcp status      # read-only; fails if the file does not exist yet
 ```
 
-A server that starts and immediately exits usually has an invalid `MEMO_KB` name or an
-unwritable `MEMO_HOME`. The reason is on stderr. See the
+A server that starts and immediately exits usually has an invalid `MEMORS_KB` name or an
+unwritable `MEMORS_HOME`. The reason is on stderr. See the
 [troubleshooting runbook](../operations/troubleshooting.md).

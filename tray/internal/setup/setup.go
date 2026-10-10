@@ -1,6 +1,6 @@
-// Package setup serves memo-tray's own pages to its windows: the wizard
-// that downloads and installs memo-mcp and sets up a first knowledge base,
-// and the settings form. Like memo-mcp's UI they are server-rendered forms
+// Package setup serves memors-tray's own pages to its windows: the wizard
+// that downloads and installs memors-mcp and sets up a first knowledge base,
+// and the settings form. Like memors-mcp's UI they are server-rendered forms
 // with no JavaScript, served over HTTP on a loopback port. A window gets
 // in through a link carrying a per-process secret (handed to it in
 // process, never on a command line) and then holds a SameSite=Strict
@@ -24,19 +24,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kKEo/memory-find/tray/internal/installer"
+	"github.com/kKEo/memors/tray/internal/installer"
 )
 
 //go:embed templates/*.html style.css
 var files embed.FS
 
-// Releases finds and installs memo-mcp releases (*installer.Client).
+// Releases finds and installs memors-mcp releases (*installer.Client).
 type Releases interface {
 	Latest(ctx context.Context) (installer.Release, error)
 	Install(ctx context.Context, rel installer.Release, goarch, dir string, progress func(installer.Progress)) (string, error)
 }
 
-// LoginItem switches starting memo-tray at login (loginitem.Agent).
+// LoginItem switches starting memors-tray at login (loginitem.Agent).
 type LoginItem interface {
 	Enabled() bool
 	Enable() error
@@ -48,9 +48,9 @@ type EventKind int
 
 // The events.
 const (
-	ConfigSaved    EventKind = iota // tray.json changed: reload it, look for memo-mcp again
+	ConfigSaved    EventKind = iota // tray.json changed: reload it, look for memors-mcp again
 	StartServer                     // start KB's server (unless it runs)
-	RestartServers                  // restart the servers memo-tray started, to run a new memo-mcp
+	RestartServers                  // restart the servers memors-tray started, to run a new memors-mcp
 )
 
 // Event is sent to the controller; it must not block.
@@ -61,23 +61,23 @@ type Event struct {
 
 // Deps is everything the pages reach outside themselves.
 type Deps struct {
-	Home        string
-	TrayVersion string
-	GOARCH      string // the memo-mcp archive to install (arm64, amd64)
-	Releases    Releases
-	FindMemo    func(configured string) (string, error)
-	MemoVersion func(ctx context.Context, bin string) (string, error)
-	Models      func(ctx context.Context, bin string) ([]Model, error)
-	Login       LoginItem
-	PortFree    func(addr string) bool
-	Copy        func(text string) error
-	OpenFile    func(path, how string) error
-	Notify      func(Event)
-	Logf        func(format string, args ...any)
+	Home          string
+	TrayVersion   string
+	GOARCH        string // the memors-mcp archive to install (arm64, amd64)
+	Releases      Releases
+	FindMemors    func(configured string) (string, error)
+	MemorsVersion func(ctx context.Context, bin string) (string, error)
+	Models        func(ctx context.Context, bin string) ([]Model, error)
+	Login         LoginItem
+	PortFree      func(addr string) bool
+	Copy          func(text string) error
+	OpenFile      func(path, how string) error
+	Notify        func(Event)
+	Logf          func(format string, args ...any)
 }
 
 // cookieName holds the secret once a window has come in.
-const cookieName = "memo_tray"
+const cookieName = "memors_tray"
 
 // Server serves the pages.
 type Server struct {
@@ -194,7 +194,7 @@ func (s *Server) Handler() http.Handler {
 // enter trades the secret in the link for the session cookie.
 func (s *Server) enter(w http.ResponseWriter, r *http.Request) {
 	if subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("k")), []byte(s.secret)) != 1 {
-		http.Error(w, "Open this page from memo-tray's menu.", http.StatusForbidden)
+		http.Error(w, "Open this page from memors-tray's menu.", http.StatusForbidden)
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: s.secret, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
@@ -205,7 +205,7 @@ func (s *Server) authed(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(cookieName)
 		if err != nil || subtle.ConstantTimeCompare([]byte(c.Value), []byte(s.secret)) != 1 {
-			http.Error(w, "Open this page from memo-tray's menu.", http.StatusForbidden)
+			http.Error(w, "Open this page from memors-tray's menu.", http.StatusForbidden)
 			return
 		}
 		next.ServeHTTP(w, r)

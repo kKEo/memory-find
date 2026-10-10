@@ -7,7 +7,7 @@ import (
 )
 
 // schemaV4 is migration 4: the per-call log (roadmap P10). One row per MCP
-// tool call when MEMO_QUERY_LOG=1, next to the per-search query_log. It
+// tool call when MEMORS_QUERY_LOG=1, next to the per-search query_log. It
 // stores timing, outcome and an allowlisted summary of the arguments, never
 // the content that was written or the text that came back.
 const schemaV4 = `

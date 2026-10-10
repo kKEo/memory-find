@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/compact"
-	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memors/internal/compact"
+	"github.com/kKEo/memors/internal/kb"
 )
 
 // rawChecksum hashes every raw row (sources, documents, chunks, facts) so a

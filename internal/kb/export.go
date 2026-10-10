@@ -40,7 +40,7 @@ func (s *Store) Export(ctx context.Context, dir string, opts ExportOptions) (*Ex
 	for ns, list := range byNS {
 		res.Namespaces = append(res.Namespaces, ns)
 		var index strings.Builder
-		fmt.Fprintf(&index, "# %s\n\nExported from memo-mcp on %s. One line per document; open the file for the text and its provenance.\n\n", ns, s.now().UTC().Format("2006-01-02"))
+		fmt.Fprintf(&index, "# %s\n\nExported from memors-mcp on %s. One line per document; open the file for the text and its provenance.\n\n", ns, s.now().UTC().Format("2006-01-02"))
 		sort.Slice(list, func(i, j int) bool { return list[i].Title < list[j].Title })
 		for _, e := range list {
 			d, err := s.ReadDocument(ctx, e.DocumentID)
@@ -266,7 +266,7 @@ func (s *Store) ExportIndex(ctx context.Context, opts IndexOptions) (string, err
 		return "", err
 	}
 	var header strings.Builder
-	fmt.Fprintf(&header, "# memo-mcp knowledge base index (%d documents, %d facts)\n\n", len(kept), len(facts))
+	fmt.Fprintf(&header, "# memors-mcp knowledge base index (%d documents, %d facts)\n\n", len(kept), len(facts))
 	header.WriteString("Search with the `search` tool (scope by namespace/library/version), read an address with `read`. Lines: title · address · kind · version · trust.\n")
 	var lines []string
 	byNS := map[string][]ListEntry{}
@@ -309,7 +309,7 @@ func (s *Store) ExportIndex(ctx context.Context, opts IndexOptions) (string, err
 		written++
 	}
 	if written < len(lines) {
-		out += fmt.Sprintf("\n_%d more line(s) omitted to fit %d bytes; use `search` or `memo-mcp ls`._\n", len(lines)-written, opts.MaxBytes)
+		out += fmt.Sprintf("\n_%d more line(s) omitted to fit %d bytes; use `search` or `memors-mcp ls`._\n", len(lines)-written, opts.MaxBytes)
 	}
 	return out, nil
 }

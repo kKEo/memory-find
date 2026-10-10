@@ -1,17 +1,17 @@
-# HELP memo_calls_total Tool calls.
-# TYPE memo_calls_total counter
-memo_calls_total{tool="read",outcome="error"} 1
-memo_calls_total{tool="search",outcome="ok"} 3
-# HELP memo_collected From a collector.
-# TYPE memo_collected gauge
-memo_collected 42
-# HELP memo_latency_seconds Latency.
-# TYPE memo_latency_seconds histogram
-memo_latency_seconds_bucket{arm="keyword",le="0.1"} 1
-memo_latency_seconds_bucket{arm="keyword",le="1"} 1
-memo_latency_seconds_bucket{arm="keyword",le="+Inf"} 2
-memo_latency_seconds_sum{arm="keyword"} 2.05
-memo_latency_seconds_count{arm="keyword"} 2
-# HELP memo_odd_gauge Label value needing escapes.
-# TYPE memo_odd_gauge gauge
-memo_odd_gauge{name="a\"b\\c\nd"} 1.5
+# HELP memors_calls_total Tool calls.
+# TYPE memors_calls_total counter
+memors_calls_total{tool="read",outcome="error"} 1
+memors_calls_total{tool="search",outcome="ok"} 3
+# HELP memors_collected From a collector.
+# TYPE memors_collected gauge
+memors_collected 42
+# HELP memors_latency_seconds Latency.
+# TYPE memors_latency_seconds histogram
+memors_latency_seconds_bucket{arm="keyword",le="0.1"} 1
+memors_latency_seconds_bucket{arm="keyword",le="1"} 1
+memors_latency_seconds_bucket{arm="keyword",le="+Inf"} 2
+memors_latency_seconds_sum{arm="keyword"} 2.05
+memors_latency_seconds_count{arm="keyword"} 2
+# HELP memors_odd_gauge Label value needing escapes.
+# TYPE memors_odd_gauge gauge
+memors_odd_gauge{name="a\"b\\c\nd"} 1.5

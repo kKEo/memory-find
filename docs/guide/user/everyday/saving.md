@@ -10,11 +10,11 @@
 
 ## How to ask
 
-> Save this to memo as a note: the staging database is reset every Sunday night.
+> Save this to memors as a note: the staging database is reset every Sunday night.
 
-> Read the file `docs/runbook.md` and save it to memo.
+> Read the file `docs/runbook.md` and save it to memors.
 
-> Fetch the gRPC Go documentation page on deadlines and save it to memo, as version 1.64.
+> Fetch the gRPC Go documentation page on deadlines and save it to memors, as version 1.64.
 
 Claude replies with an address such as `memo://doc/01a1…`. You do not need to remember it.
 Claude and the browser view use it to point at that exact document.
@@ -39,7 +39,7 @@ can always see what a document said on an earlier date.
 If you prefer, you can save files without Claude, for example a whole folder of notes:
 
 ```bash
-memo-mcp ingest ~/notes/project-x
+memors-mcp ingest ~/notes/project-x
 ```
 
 Things you save yourself this way are marked as *yours*. Things Claude saves are marked as

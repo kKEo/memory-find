@@ -1,8 +1,8 @@
 # Forget and redact
 
 ```bash
-memo-mcp forget memo://doc/0199… --reason "superseded by the 2026 policy"
-memo-mcp forget memo://fact/0199… --reason "wrong owner" --redact
+memors-mcp forget memo://doc/0199… --reason "superseded by the 2026 policy"
+memors-mcp forget memo://fact/0199… --reason "wrong owner" --redact
 ```
 
 | | `forget` | `forget --redact` |
@@ -23,7 +23,7 @@ SQLite does not shrink the file when rows are cleared. After large redactions, c
 no process has the file open:
 
 ```bash
-sqlite3 ~/.memo-mcp/kb/my-project.db 'VACUUM'
+sqlite3 ~/.memors-mcp/kb/my-project.db 'VACUUM'
 ```
 
 `VACUUM` also removes freed pages that might still hold redacted bytes. Run it after redacting

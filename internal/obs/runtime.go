@@ -67,6 +67,6 @@ func ProcessCollector() Collector {
 
 // BuildInfo registers the constant build-info gauge.
 func BuildInfo(reg *Registry, version, protocol string) {
-	reg.Gauge("memo_build_info", "Build information; always 1.", "version", "go_version", "mcp_protocol", "goos", "goarch").
+	reg.Gauge("memors_build_info", "Build information; always 1.", "version", "go_version", "mcp_protocol", "goos", "goarch").
 		With(version, runtime.Version(), protocol, runtime.GOOS, runtime.GOARCH).Set(1)
 }

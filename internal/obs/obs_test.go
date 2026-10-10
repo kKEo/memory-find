@@ -18,19 +18,19 @@ import (
 
 func TestCounterGaugeHistogram(t *testing.T) {
 	r := NewRegistry()
-	c := r.Counter("memo_test_total", "help", "tool")
+	c := r.Counter("memors_test_total", "help", "tool")
 	c.With("search").Inc()
 	c.With("search").Add(2)
 	if v := c.With("search").Value(); v != 3 {
 		t.Fatalf("counter %v", v)
 	}
-	g := r.Gauge("memo_test_gauge", "help")
+	g := r.Gauge("memors_test_gauge", "help")
 	g.With().Set(5)
 	g.With().Dec()
 	if v := g.With().Value(); v != 4 {
 		t.Fatalf("gauge %v", v)
 	}
-	h := r.Histogram("memo_test_seconds", "help", []float64{0.1, 1}, "arm")
+	h := r.Histogram("memors_test_seconds", "help", []float64{0.1, 1}, "arm")
 	for _, x := range []float64{0.05, 0.5, 5} {
 		h.With("keyword").Observe(x)
 	}
@@ -40,7 +40,7 @@ func TestCounterGaugeHistogram(t *testing.T) {
 	snap := r.Snapshot(context.Background())
 	var hist *Family
 	for i := range snap.Families {
-		if snap.Families[i].Name == "memo_test_seconds" {
+		if snap.Families[i].Name == "memors_test_seconds" {
 			hist = &snap.Families[i]
 		}
 	}
@@ -52,7 +52,7 @@ func TestCounterGaugeHistogram(t *testing.T) {
 		t.Fatalf("cumulative buckets: %+v", b)
 	}
 	// Re-registration is idempotent; a different label set panics.
-	if r.Counter("memo_test_total", "help", "tool").With("search").Value() != 3 {
+	if r.Counter("memors_test_total", "help", "tool").With("search").Value() != 3 {
 		t.Fatal("re-registration lost the series")
 	}
 	func() {
@@ -61,7 +61,7 @@ func TestCounterGaugeHistogram(t *testing.T) {
 				t.Fatal("expected panic on label mismatch")
 			}
 		}()
-		r.Counter("memo_test_total", "help", "other")
+		r.Counter("memors_test_total", "help", "other")
 	}()
 	// Concurrent increments are exact.
 	var wg sync.WaitGroup
@@ -85,14 +85,14 @@ var updateGolden = os.Getenv("UPDATE_GOLDEN") == "1"
 
 func TestPromTextGolden(t *testing.T) {
 	r := NewRegistry()
-	r.Counter("memo_calls_total", "Tool calls.", "tool", "outcome").With("search", "ok").Add(3)
-	r.Counter("memo_calls_total", "Tool calls.", "tool", "outcome").With("read", "error").Inc()
-	r.Gauge("memo_odd_gauge", "Label value needing escapes.", "name").With("a\"b\\c\nd").Set(1.5)
-	h := r.Histogram("memo_latency_seconds", "Latency.", []float64{0.1, 1}, "arm")
+	r.Counter("memors_calls_total", "Tool calls.", "tool", "outcome").With("search", "ok").Add(3)
+	r.Counter("memors_calls_total", "Tool calls.", "tool", "outcome").With("read", "error").Inc()
+	r.Gauge("memors_odd_gauge", "Label value needing escapes.", "name").With("a\"b\\c\nd").Set(1.5)
+	h := r.Histogram("memors_latency_seconds", "Latency.", []float64{0.1, 1}, "arm")
 	h.With("keyword").Observe(0.05)
 	h.With("keyword").Observe(2)
 	r.AddCollector(CollectorFunc(func(_ context.Context, emit func(Point)) {
-		emit(Point{Name: "memo_collected", Help: "From a collector.", Kind: GaugeKind, Value: 42})
+		emit(Point{Name: "memors_collected", Help: "From a collector.", Kind: GaugeKind, Value: 42})
 	}))
 	var buf bytes.Buffer
 	if err := WriteText(&buf, r.Snapshot(context.Background())); err != nil {
@@ -120,7 +120,7 @@ func TestPromTextParses(t *testing.T) {
 	r.AddCollector(RuntimeCollector())
 	r.AddCollector(ProcessCollector())
 	BuildInfo(r, "v1.4.0-test", "2026-07-28")
-	h := r.Histogram("memo_x_seconds", "x", LatencyBuckets, "k")
+	h := r.Histogram("memors_x_seconds", "x", LatencyBuckets, "k")
 	h.With("a").Observe(0.3)
 	h.With("a").Observe(30)
 	var buf bytes.Buffer
@@ -164,7 +164,7 @@ func TestPromTextParses(t *testing.T) {
 			t.Fatalf("%s: +Inf bucket %v != count %v", key, b[len(b)-1], c)
 		}
 	}
-	for _, must := range []string{"go_goroutines ", "process_start_time_seconds ", `memo_build_info{version="v1.4.0-test"`, "go_info{"} {
+	for _, must := range []string{"go_goroutines ", "process_start_time_seconds ", `memors_build_info{version="v1.4.0-test"`, "go_info{"} {
 		if !strings.Contains(buf.String(), must) {
 			t.Errorf("missing %q", must)
 		}
@@ -190,11 +190,11 @@ func stripLe(labels string) string {
 
 func TestHandlerAndMetricsServer(t *testing.T) {
 	r := NewRegistry()
-	r.Counter("memo_a_total", "a").With().Inc()
+	r.Counter("memors_a_total", "a").With().Inc()
 	h := Handler(r)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
-	if rec.Code != 200 || rec.Header().Get("Content-Type") != "text/plain; version=0.0.4; charset=utf-8" || !strings.Contains(rec.Body.String(), "memo_a_total 1") {
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "text/plain; version=0.0.4; charset=utf-8" || !strings.Contains(rec.Body.String(), "memors_a_total 1") {
 		t.Fatalf("GET: %d %s %s", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
 	}
 	rec = httptest.NewRecorder()
@@ -235,7 +235,7 @@ func TestHandlerAndMetricsServer(t *testing.T) {
 
 func TestSetupLogging(t *testing.T) {
 	var buf bytes.Buffer
-	env := map[string]string{"MEMO_LOG_FORMAT": "json", "MEMO_LOG_LEVEL": "warn"}
+	env := map[string]string{"MEMORS_LOG_FORMAT": "json", "MEMORS_LOG_LEVEL": "warn"}
 	l := SetupLogging(&buf, func(k string) string { return env[k] })
 	l.Info("dropped")
 	l.Warn("kept", "k", 1)
@@ -248,14 +248,14 @@ func TestSetupLogging(t *testing.T) {
 		t.Fatalf("json line: %v %q", err, lines[0])
 	}
 	buf.Reset()
-	env = map[string]string{"MEMO_LOG_LEVEL": "loud", "MEMO_LOG_FORMAT": "xml"}
+	env = map[string]string{"MEMORS_LOG_LEVEL": "loud", "MEMORS_LOG_FORMAT": "xml"}
 	l = SetupLogging(&buf, func(k string) string { return env[k] })
 	l.Info("info shows at the default level")
-	if !strings.Contains(buf.String(), "unknown MEMO_LOG_LEVEL") || !strings.Contains(buf.String(), "unknown MEMO_LOG_FORMAT") || !strings.Contains(buf.String(), "info shows") {
+	if !strings.Contains(buf.String(), "unknown MEMORS_LOG_LEVEL") || !strings.Contains(buf.String(), "unknown MEMORS_LOG_FORMAT") || !strings.Contains(buf.String(), "info shows") {
 		t.Fatalf("fallback: %q", buf.String())
 	}
 	tm := Start()
-	h := NewRegistry().Histogram("memo_t_seconds", "t", LatencyBuckets)
+	h := NewRegistry().Histogram("memors_t_seconds", "t", LatencyBuckets)
 	tm.ObserveTo(h.With())
 	if h.With().Count() != 1 {
 		t.Fatal("timer did not observe")

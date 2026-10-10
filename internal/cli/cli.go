@@ -1,4 +1,4 @@
-// Package cli is the command-line front of memo-mcp: subcommand dispatch,
+// Package cli is the command-line front of memors-mcp: subcommand dispatch,
 // configuration from the environment, and the small commands that do not
 // need an MCP client (version, status, model management). It uses only the
 // standard library's flag package (roadmap OD-14).
@@ -23,24 +23,22 @@ import (
 	_ "modernc.org/sqlite"
 	_ "modernc.org/sqlite/vec"
 
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/obs"
-	"github.com/kKEo/memory-find/internal/retrieve"
-	"github.com/kKEo/memory-find/internal/server"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/obs"
+	"github.com/kKEo/memors/internal/retrieve"
+	"github.com/kKEo/memors/internal/server"
 )
 
 // Config is everything the commands need from the environment.
 type Config struct {
 	// DBName is the knowledge-base name; it selects the database file.
-	// Comes from MEMO_KB (default "default"), or JOURNAL_TOKEN (deprecated).
+	// Comes from MEMORS_KB (default "default").
 	DBName string
-	// KBDir is the directory holding knowledge-base files (<MEMO_HOME>/kb).
+	// KBDir is the directory holding knowledge-base files (<MEMORS_HOME>/kb).
 	KBDir string
-	// LogQueries is MEMO_QUERY_LOG=1: keep an opt-in log of searches.
+	// LogQueries is MEMORS_QUERY_LOG=1: keep an opt-in log of searches.
 	LogQueries bool
-	// Deprecations lists warnings about legacy variables that were honoured.
-	Deprecations []string
 }
 
 // Getenv is the lookup function ResolveConfig uses; tests substitute it.
@@ -48,34 +46,21 @@ type Getenv func(string) string
 
 // ResolveConfig maps the environment onto a Config.
 //
-// MEMO_KB (default "default") names the knowledge base; its file is
-// <MEMO_HOME or ~/.memo-mcp>/kb/<name>.db. The legacy JOURNAL_TOKEN is
-// accepted as the name for one release with a deprecation warning
-// (JOURNAL_PATH as MEMO_HOME); the old journal files themselves are not
-// opened (owner decision 5: nothing is migrated).
+// MEMORS_KB (default "default") names the knowledge base; its file is
+// <MEMORS_HOME or ~/.memors-mcp>/kb/<name>.db.
 func ResolveConfig(getenv Getenv) (Config, error) {
 	var cfg Config
-	home := getenv("MEMO_HOME")
+	home := getenv("MEMORS_HOME")
 	if home == "" {
 		h, err := os.UserHomeDir()
 		if err != nil {
 			return cfg, fmt.Errorf("resolve home directory: %w", err)
 		}
-		home = filepath.Join(h, ".memo-mcp")
-	}
-
-	if jp := getenv("JOURNAL_PATH"); jp != "" && getenv("MEMO_HOME") == "" {
-		home = jp
-		cfg.Deprecations = append(cfg.Deprecations, "JOURNAL_PATH is deprecated; set MEMO_HOME=<dir> instead")
+		home = filepath.Join(h, ".memors-mcp")
 	}
 	cfg.KBDir = filepath.Join(home, "kb")
-	cfg.LogQueries = getenv("MEMO_QUERY_LOG") == "1"
-	cfg.DBName = getenv("MEMO_KB")
-	if token := getenv("JOURNAL_TOKEN"); token != "" && cfg.DBName == "" {
-		cfg.DBName = token
-		cfg.Deprecations = append(cfg.Deprecations,
-			"JOURNAL_TOKEN is deprecated; set MEMO_KB=<name> instead. Old journal files are not opened; the knowledge base is a new file under "+cfg.KBDir)
-	}
+	cfg.LogQueries = getenv("MEMORS_QUERY_LOG") == "1"
+	cfg.DBName = getenv("MEMORS_KB")
 	if cfg.DBName == "" {
 		cfg.DBName = "default"
 	}
@@ -85,18 +70,18 @@ func ResolveConfig(getenv Getenv) (Config, error) {
 // Main runs the CLI. version is the build's tag (from -ldflags); args are
 // the process arguments without the program name. It returns the exit code.
 func Main(ctx context.Context, version string, args []string, stdout, stderr io.Writer) int {
-	// Legacy flag form: `memo-mcp --stats`, `memo-mcp --redownload-model`.
+	// Legacy flag form: `memors-mcp --stats`, `memors-mcp --redownload-model`.
 	// Kept as aliases for one release.
-	fs := flag.NewFlagSet("memo-mcp", flag.ContinueOnError)
+	fs := flag.NewFlagSet("memors-mcp", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	statsFlag := fs.Bool("stats", false, "Deprecated alias of `memo-mcp status`")
-	redownload := fs.Bool("redownload-model", false, "Deprecated alias of `memo-mcp model redownload`")
+	statsFlag := fs.Bool("stats", false, "Deprecated alias of `memors-mcp status`")
+	redownload := fs.Bool("redownload-model", false, "Deprecated alias of `memors-mcp model redownload`")
 	fs.Usage = func() { usage(stderr) }
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	// Structured logs go to stderr (never stdout: in serve mode stdout is the
-	// MCP stream). MEMO_LOG_FORMAT and MEMO_LOG_LEVEL configure them.
+	// MCP stream). MEMORS_LOG_FORMAT and MEMORS_LOG_LEVEL configure them.
 	obs.SetupLogging(stderr, os.Getenv)
 	obs.BuildInfo(obs.Default(), version, server.ProtocolVersion)
 	obs.Default().AddCollector(obs.RuntimeCollector())
@@ -104,10 +89,10 @@ func Main(ctx context.Context, version string, args []string, stdout, stderr io.
 	rest := fs.Args()
 	switch {
 	case *statsFlag:
-		slog.Warn("--stats is deprecated; use `memo-mcp status`")
+		slog.Warn("--stats is deprecated; use `memors-mcp status`")
 		rest = []string{"status"}
 	case *redownload:
-		slog.Warn("--redownload-model is deprecated; use `memo-mcp model redownload`")
+		slog.Warn("--redownload-model is deprecated; use `memors-mcp model redownload`")
 		rest = []string{"model", "redownload"}
 	}
 
@@ -193,67 +178,66 @@ func Main(ctx context.Context, version string, args []string, stdout, stderr io.
 }
 
 func usage(w io.Writer) {
-	fmt.Fprint(w, `memo-mcp — a local, measurable knowledge base for agents (MCP server + CLI)
+	fmt.Fprint(w, `memors-mcp — a local, measurable knowledge base for agents (MCP server + CLI)
 
 Usage:
-  memo-mcp [serve] [--metrics-addr 127.0.0.1:9469]   start the MCP server on stdio (default); the flag exposes /metrics on loopback
-  memo-mcp serve --http 127.0.0.1:8765   one long-running MCP server over HTTP (/mcp) with the live web UI (/)
+  memors-mcp [serve] [--metrics-addr 127.0.0.1:9469]   start the MCP server on stdio (default); the flag exposes /metrics on loopback
+  memors-mcp serve --http 127.0.0.1:8765   one long-running MCP server over HTTP (/mcp) with the live web UI (/)
         [--auth token|none] [--token-file F] [--tls-cert F --tls-key F [--tls-client-ca F]]
         [--allow-remote --public-url https://host:port] [--behind-proxy]
-  memo-mcp http-token [--rotate]   print (or replace) the bearer token for serve --http
-  memo-mcp ingest <file|dir|->     add documents to the knowledge base
+  memors-mcp http-token [--rotate]   print (or replace) the bearer token for serve --http
+  memors-mcp ingest <file|dir|->     add documents to the knowledge base
       --ns <name> --kind doc|note|code|conversation --uri <u> --title <t>
       --library <l> --version <v> --trust user|curated --context <text> --embed=false
-  memo-mcp search "<q>" [--mode --ns --library --version --kind --limit --format table|json|md --explain]
-  memo-mcp explain "<q>" [<memo://...>]   ranking table for every hit, or the full why for one
-  memo-mcp log tail|calls|show <id>|replay|prune   inspect the opt-in query and call logs
-  memo-mcp remember "<fact>" [--ns --about a,b --valid-from --valid-to --supersedes <memo://fact/..> --evidence <memo://chunk/n> --trust user|curated]
-  memo-mcp forget <memo://doc/..|memo://fact/..> --reason "<why>" [--redact]
-  memo-mcp facts ls [--ns --as-of YYYY-MM-DD --history --json]
-  memo-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user
-  memo-mcp explore <name> [--ns --hops 1|2 --as-of --json]   walk the graph index from one entity
-  memo-mcp graph merges [--state] | merge <id> | reject <id> | rebuild [--ns]   review near-duplicate names; re-extract mentions
-  memo-mcp compact [--ns --kinds page,stale,conflict,merge,duplicate --lint --json] [--executor ollama --apply]
+  memors-mcp search "<q>" [--mode --ns --library --version --kind --limit --format table|json|md --explain]
+  memors-mcp explain "<q>" [<memo://...>]   ranking table for every hit, or the full why for one
+  memors-mcp log tail|calls|show <id>|replay|prune   inspect the opt-in query and call logs
+  memors-mcp remember "<fact>" [--ns --about a,b --valid-from --valid-to --supersedes <memo://fact/..> --evidence <memo://chunk/n> --trust user|curated]
+  memors-mcp forget <memo://doc/..|memo://fact/..> --reason "<why>" [--redact]
+  memors-mcp facts ls [--ns --as-of YYYY-MM-DD --history --json]
+  memors-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user
+  memors-mcp explore <name> [--ns --hops 1|2 --as-of --json]   walk the graph index from one entity
+  memors-mcp graph merges [--state] | merge <id> | reject <id> | rebuild [--ns]   review near-duplicate names; re-extract mentions
+  memors-mcp compact [--ns --kinds page,stale,conflict,merge,duplicate --lint --json] [--executor ollama --apply]
                                    propose compaction work (pages to write, conflicts, merges, duplicates)
-  memo-mcp submit <item-id> [--content-file f.md --title t | --keep <memo://fact/..> | --accept|--reject | --skip] [--reason ..] [--dry-run]
-  memo-mcp lint [--ns --json]      contradictions, orphan entities, missing or stale pages, expired facts
-  memo-mcp pages ls [--ns --stale --json]   list curated pages
-  memo-mcp ui [--addr 127.0.0.1:0 --no-model]   read-only web face on loopback (prints the URL)
-  memo-mcp read <memo://...> [--history]   print a record with its provenance, or its revision chain
-  memo-mcp ls [--ns --kind --since 2026-01-01 --json]   list live documents, newest first
-  memo-mcp export --md <dir> [--ns <name>]              write markdown files with front matter
-  memo-mcp migrate                 bring an existing file to this binary's schema version
-  memo-mcp verify [--repair]       check integrity (chunks, vectors, indexes)
-  memo-mcp backfill                embed chunks whose vectors are pending
-  memo-mcp status                  print knowledge-base statistics
-  memo-mcp metrics [--json --since 24h]   knowledge-base gauges and per-tool call statistics from the opt-in log
-  memo-mcp version                 print version, protocol version, Go version, model dir
-  memo-mcp model ls|smoke|pull|use|redownload   the embedding-model registry (MEMO_MODEL picks one)
-  memo-mcp reindex [--model <id>]  embed every passage that lacks a vector for the model
-  memo-mcp profiles show [<name>]  print every ranking constant with its derivation (MEMO_PROFILE picks one)
-  memo-mcp eval [--models hash,minilm --profiles default,all --corpus notes|kb|all --format table|md|json --explain-failures]
+  memors-mcp submit <item-id> [--content-file f.md --title t | --keep <memo://fact/..> | --accept|--reject | --skip] [--reason ..] [--dry-run]
+  memors-mcp lint [--ns --json]      contradictions, orphan entities, missing or stale pages, expired facts
+  memors-mcp pages ls [--ns --stale --json]   list curated pages
+  memors-mcp ui [--addr 127.0.0.1:0 --no-model]   read-only web face on loopback (prints the URL)
+  memors-mcp read <memo://...> [--history]   print a record with its provenance, or its revision chain
+  memors-mcp ls [--ns --kind --since 2026-01-01 --json]   list live documents, newest first
+  memors-mcp export --md <dir> [--ns <name>]              write markdown files with front matter
+  memors-mcp migrate                 bring an existing file to this binary's schema version
+  memors-mcp verify [--repair]       check integrity (chunks, vectors, indexes)
+  memors-mcp backfill                embed chunks whose vectors are pending
+  memors-mcp status                  print knowledge-base statistics
+  memors-mcp metrics [--json --since 24h]   knowledge-base gauges and per-tool call statistics from the opt-in log
+  memors-mcp version                 print version, protocol version, Go version, model dir
+  memors-mcp model ls|smoke|pull|use|redownload   the embedding-model registry (MEMORS_MODEL picks one)
+  memors-mcp reindex [--model <id>]  embed every passage that lacks a vector for the model
+  memors-mcp profiles show [<name>]  print every ranking constant with its derivation (MEMORS_PROFILE picks one)
+  memors-mcp eval [--models hash,minilm --profiles default,all --corpus notes|kb|all --format table|md|json --explain-failures]
 
 Environment:
-  MEMO_KB        knowledge-base name (default "default"); file is $MEMO_HOME/kb/<name>.db
-  MEMO_HOME      base directory (default ~/.memo-mcp)
-  MEMO_QUERY_LOG=1               keep an opt-in log of searches in the same file
-  MEMO_MODEL     embedding model id from 'memo-mcp model ls' (default granite-small-r2)
-  MEMO_PROFILE   ranking profile (default "default"); overrides in $MEMO_HOME/profiles.json
-  MEMO_RERANK=1  attach the cross-encoder reranker (used by the precise profile)
-  MEMO_OLLAMA_URL, MEMO_OLLAMA_MODEL   optional local model for 'compact --executor ollama' (loopback by default)
-  MEMO_METRICS_ADDR   same as 'serve --metrics-addr' (loopback only)
-  MEMO_HTTP_ADDR      same as 'serve --http' (loopback unless --allow-remote)
-  MEMO_HTTP_AUTH      same as 'serve --auth' (token | none)
-  MEMO_HTTP_TOKEN_FILE  bearer token file (default <MEMO_HOME>/http-token)
-  MEMO_TLS_CERT, MEMO_TLS_KEY, MEMO_TLS_CLIENT_CA   same as 'serve --tls-cert/--tls-key/--tls-client-ca'
-  MEMO_PUBLIC_URL     same as 'serve --public-url'
-  MEMO_LOG_FORMAT     text (default) | json      MEMO_LOG_LEVEL   debug | info (default) | warn | error
-  JOURNAL_TOKEN, JOURNAL_PATH    deprecated aliases of MEMO_KB / MEMO_HOME (old journal files are not opened)
+  MEMORS_KB        knowledge-base name (default "default"); file is $MEMORS_HOME/kb/<name>.db
+  MEMORS_HOME      base directory (default ~/.memors-mcp)
+  MEMORS_QUERY_LOG=1               keep an opt-in log of searches in the same file
+  MEMORS_MODEL     embedding model id from 'memors-mcp model ls' (default granite-small-r2)
+  MEMORS_PROFILE   ranking profile (default "default"); overrides in $MEMORS_HOME/profiles.json
+  MEMORS_RERANK=1  attach the cross-encoder reranker (used by the precise profile)
+  MEMORS_OLLAMA_URL, MEMORS_OLLAMA_MODEL   optional local model for 'compact --executor ollama' (loopback by default)
+  MEMORS_METRICS_ADDR   same as 'serve --metrics-addr' (loopback only)
+  MEMORS_HTTP_ADDR      same as 'serve --http' (loopback unless --allow-remote)
+  MEMORS_HTTP_AUTH      same as 'serve --auth' (token | none)
+  MEMORS_HTTP_TOKEN_FILE  bearer token file (default <MEMORS_HOME>/http-token)
+  MEMORS_TLS_CERT, MEMORS_TLS_KEY, MEMORS_TLS_CLIENT_CA   same as 'serve --tls-cert/--tls-key/--tls-client-ca'
+  MEMORS_PUBLIC_URL     same as 'serve --public-url'
+  MEMORS_LOG_FORMAT     text (default) | json      MEMORS_LOG_LEVEL   debug | info (default) | warn | error
 `)
 }
 
 func runVersion(version string, w io.Writer) error {
-	fmt.Fprintf(w, "memo-mcp %s\n", version)
+	fmt.Fprintf(w, "memors-mcp %s\n", version)
 	fmt.Fprintf(w, "MCP protocol: %s\n", server.ProtocolVersion)
 	fmt.Fprintf(w, "Go: %s %s/%s\n", runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	fmt.Fprintf(w, "Model dir: %s\n", embedding.DefaultModelDir())
@@ -262,7 +246,7 @@ func runVersion(version string, w io.Writer) error {
 
 func runModel(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: memo-mcp model ls | smoke [<id>|--all] | pull <id> | use <id> | redownload [<id>]")
+		return errors.New("usage: memors-mcp model ls | smoke [<id>|--all] | pull <id> | use <id> | redownload [<id>]")
 	}
 	sub, rest := args[0], args[1:]
 	switch sub {
@@ -272,7 +256,7 @@ func runModel(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 		return runModelSmoke(ctx, rest, stdout, stderr)
 	case "pull":
 		if len(rest) != 1 {
-			return errors.New("usage: memo-mcp model pull <id>")
+			return errors.New("usage: memors-mcp model pull <id>")
 		}
 		info, err := embedding.LookupModel(rest[0])
 		if err != nil {
@@ -287,7 +271,7 @@ func runModel(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 		return nil
 	case "use":
 		if len(rest) != 1 {
-			return errors.New("usage: memo-mcp model use <id>")
+			return errors.New("usage: memors-mcp model use <id>")
 		}
 		if _, err := embedding.LookupModel(rest[0]); err != nil {
 			return err
@@ -300,7 +284,7 @@ func runModel(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 		if err := store.SetDefaultModel(ctx, rest[0], "cli", kb.ChannelCLI); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "default model is now %s; set MEMO_MODEL=%s in the MCP server config so queries embed with it\n", rest[0], rest[0])
+		fmt.Fprintf(stdout, "default model is now %s; set MEMORS_MODEL=%s in the MCP server config so queries embed with it\n", rest[0], rest[0])
 		return nil
 	case "redownload":
 		info := embedding.MiniLM
@@ -325,7 +309,7 @@ func runModel(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 func runServe(ctx context.Context, args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	metricsAddr := fs.String("metrics-addr", os.Getenv("MEMO_METRICS_ADDR"), "expose Prometheus metrics at http://<addr>/metrics (loopback only; off when empty)")
+	metricsAddr := fs.String("metrics-addr", os.Getenv("MEMORS_METRICS_ADDR"), "expose Prometheus metrics at http://<addr>/metrics (loopback only; off when empty)")
 	var hf httpFlags
 	hf.register(fs)
 	if err := fs.Parse(args); err != nil {
@@ -334,9 +318,6 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) error {
 	cfg, err := ResolveConfig(os.Getenv)
 	if err != nil {
 		return err
-	}
-	for _, d := range cfg.Deprecations {
-		slog.Warn(d)
 	}
 	// Bind the metrics listener before the store is opened so that a bad
 	// address fails fast without touching the database or starting the
@@ -376,12 +357,12 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) error {
 	defer db.Close()
 	store := kb.NewStore(db, embedder)
 
-	profile, err := retrieve.Lookup(os.Getenv("MEMO_PROFILE"))
+	profile, err := retrieve.Lookup(os.Getenv("MEMORS_PROFILE"))
 	if err != nil {
 		return err
 	}
 	svc := retrieve.New(store, profile, cfg.LogQueries)
-	if os.Getenv("MEMO_RERANK") == "1" {
+	if os.Getenv("MEMORS_RERANK") == "1" {
 		rr, closeRR, err := loadReranker(ctx, stderr)
 		if err != nil {
 			slog.Warn("reranker unavailable; continuing without it", "err", err)
@@ -444,13 +425,13 @@ func runServe(ctx context.Context, args []string, stderr io.Writer) error {
 }
 
 // serverVersion is set by Main before serving so the MCP implementation
-// reports the same string as `memo-mcp version`.
+// reports the same string as `memors-mcp version`.
 var serverVersion = "dev"
 
 // SetVersion records the build version for the MCP server's Implementation.
 func SetVersion(v string) { serverVersion = v }
 
-// buildEmbedder constructs the embedding backend for the model MEMO_MODEL
+// buildEmbedder constructs the embedding backend for the model MEMORS_MODEL
 // names (default: the registry's MiniLM), returning a genuinely nil
 // embedding.Embedder interface value on failure — not a non-nil interface
 // wrapping a nil pointer. Every caller checks "if embedder != nil", and that
@@ -467,10 +448,10 @@ func buildEmbedder(ctx context.Context) (embedding.Embedder, func(), error) {
 	return e, cleanup, nil
 }
 
-// selectedModel resolves MEMO_MODEL against the registry; unset means the
+// selectedModel resolves MEMORS_MODEL against the registry; unset means the
 // registry default (granite-small-r2 since v0.7.0).
 func selectedModel() (embedding.ModelInfo, error) {
-	id := os.Getenv("MEMO_MODEL")
+	id := os.Getenv("MEMORS_MODEL")
 	if id == "" {
 		return embedding.DefaultModel(), nil
 	}
@@ -481,7 +462,7 @@ func runStatus(ctx context.Context, stdout, stderr io.Writer) error {
 	store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
 	if errors.Is(err, kb.ErrNoSuchKB) {
 		cfg, _ := ResolveConfig(os.Getenv)
-		fmt.Fprintf(stdout, "No knowledge base named %q yet (%s). Add one with `memo-mcp ingest`.\n", cfg.DBName, kb.Path(cfg.KBDir, cfg.DBName))
+		fmt.Fprintf(stdout, "No knowledge base named %q yet (%s). Add one with `memors-mcp ingest`.\n", cfg.DBName, kb.Path(cfg.KBDir, cfg.DBName))
 		return nil
 	}
 	if err != nil {

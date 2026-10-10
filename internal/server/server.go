@@ -17,10 +17,10 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kKEo/memory-find/internal/compact"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/obs"
-	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memors/internal/compact"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/obs"
+	"github.com/kKEo/memors/internal/retrieve"
 )
 
 // ProtocolVersion is the MCP specification date this server negotiates with
@@ -70,7 +70,7 @@ func New(store *kb.Store, search *retrieve.Service, version string, opts ...Opti
 	if srv.registry == nil {
 		srv.registry = obs.Default()
 	}
-	srv.mcp = mcp.NewServer(&mcp.Implementation{Name: "memo-mcp", Version: version}, &mcp.ServerOptions{
+	srv.mcp = mcp.NewServer(&mcp.Implementation{Name: "memors-mcp", Version: version}, &mcp.ServerOptions{
 		// Diagnostics go to stderr through slog; the deprecated MCP
 		// `logging` capability (SEP-2577, decision D-O) is not advertised.
 		// Tools and resources are still inferred from what is registered.
@@ -828,7 +828,7 @@ func (s *Server) handlePromote(ctx context.Context, req *mcp.CallToolRequest, ar
 	if args.To != kb.TrustUser && args.To != kb.TrustCurated {
 		return nil, PromoteOut{}, fmt.Errorf("to must be user or curated")
 	}
-	command := fmt.Sprintf("memo-mcp trust promote %s --to %s", args.URI, args.To)
+	command := fmt.Sprintf("memors-mcp trust promote %s --to %s", args.URI, args.To)
 	// Raising trust needs a human. If the client can show a dialog
 	// (elicitation), ask them with what is being promoted. On protocol
 	// 2026-07-28 this is a multi round-trip request (SEP-2322): the first
@@ -851,7 +851,7 @@ func (s *Server) handlePromote(ctx context.Context, req *mcp.CallToolRequest, ar
 			RequestState: promoteState(args),
 			InputRequests: mcp.InputRequestMap{promoteConfirmID: &mcp.ElicitParams{
 				Mode:            "form",
-				Message:         fmt.Sprintf("memo-mcp: raise trust of %s from %s to %s?\n\n%s\n\nAccept only if you vouch for this content yourself.", args.URI, from, args.To, excerpt),
+				Message:         fmt.Sprintf("memors-mcp: raise trust of %s from %s to %s?\n\n%s\n\nAccept only if you vouch for this content yourself.", args.URI, from, args.To, excerpt),
 				RequestedSchema: map[string]any{"type": "object", "properties": map[string]any{"confirm": map[string]any{"type": "boolean", "title": "Raise trust", "description": "Confirm the promotion"}}, "required": []string{"confirm"}},
 			}},
 		}, PromoteOut{}, nil

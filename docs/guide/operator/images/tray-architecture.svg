@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="396" viewBox="0 0 760 396" role="img" aria-labelledby="t d">
-<title id="t">How memo-tray works</title>
-<desc id="d">memo-tray, the macOS menu-bar app, has a menu bar, a stats window, setup and settings pages it serves locally, and a supervisor. It polls GET /live.json on every running memo-mcp serve --http every 2 seconds, mints single-use login links with POST /login-link for its window, and starts and stops servers. It finds servers through the run files each server writes in $MEMO_HOME/run, keeps its settings in tray.json, and sends the output of the servers it started to $MEMO_HOME/logs. It contacts GitHub only on the setup assistant's Install step. MCP clients connect to the servers at /mcp.</desc>
+<title id="t">How memors-tray works</title>
+<desc id="d">memors-tray, the macOS menu-bar app, has a menu bar, a stats window, setup and settings pages it serves locally, and a supervisor. It polls GET /live.json on every running memors-mcp serve --http every 2 seconds, mints single-use login links with POST /login-link for its window, and starts and stops servers. It finds servers through the run files each server writes in $MEMORS_HOME/run, keeps its settings in tray.json, and sends the output of the servers it started to $MEMORS_HOME/logs. It contacts GitHub only on the setup assistant's Install step. MCP clients connect to the servers at /mcp.</desc>
 <style>
 text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
 .mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -42,10 +42,10 @@ text{fill:#eceeec}
 <text class="xs t2" x="38" y="51">Install step only; checksum verified</text>
 <path class="ln dash" d="M148,59 V81" marker-end="url(#an)"/>
 
-<!-- memo-tray -->
+<!-- memors-tray -->
 <rect class="green" x="24" y="84" width="248" height="216" rx="12"/>
-<text class="h lg tg" x="40" y="109">memo-tray</text>
-<text class="xs t2" x="118" y="109">macOS menu-bar app</text>
+<text class="h lg tg" x="40" y="109">memors-tray</text>
+<text class="xs t2" x="134" y="109">macOS menu-bar app</text>
 <rect class="box" x="36" y="122" width="224" height="38" rx="8"/>
 <text class="s h" x="48" y="138">Menu bar</text>
 <text class="xs t2" x="48" y="152">servers and their agents ● ○</text>
@@ -70,18 +70,18 @@ text{fill:#eceeec}
 
 <!-- servers -->
 <rect class="box" x="488" y="84" width="248" height="86" rx="12"/>
-<text class="s h mono tg" x="502" y="106">memo-mcp serve --http</text>
+<text class="s h mono tg" x="502" y="106">memors-mcp serve --http</text>
 <text class="xs mono t2" x="502" y="124">work · 127.0.0.1:8770</text>
 <text class="xs t3" x="502" y="142">started in a terminal</text>
-<text class="xs t3" x="502" y="158">memo-tray stops it with SIGTERM only</text>
+<text class="xs t3" x="502" y="158">memors-tray stops it with SIGTERM only</text>
 
 <rect class="box" x="488" y="204" width="248" height="86" rx="12"/>
-<text class="s h mono tg" x="502" y="226">memo-mcp serve --http</text>
+<text class="s h mono tg" x="502" y="226">memors-mcp serve --http</text>
 <text class="xs mono t2" x="502" y="244">crportal · 127.0.0.1:8765</text>
-<text class="xs t3" x="502" y="262">started by memo-tray</text>
+<text class="xs t3" x="502" y="262">started by memors-tray</text>
 <text class="xs t3" x="502" y="278">stop: SIGTERM, SIGKILL after 10 s</text>
 
-<!-- memo-tray to servers -->
+<!-- memors-tray to servers -->
 <text class="xs mono t2" x="284" y="142">GET /live.json · 2 s</text>
 <text class="xs mono t2" x="284" y="158">POST /login-link</text>
 <text class="xs t2" x="284" y="174">start · stop</text>
@@ -90,7 +90,7 @@ text{fill:#eceeec}
 <path class="ln" d="M460,247 H485" marker-end="url(#an)"/>
 
 <!-- files -->
-<text class="cap t3" x="24" y="322">$MEMO_HOME</text>
+<text class="cap t3" x="24" y="322">$MEMORS_HOME</text>
 <path class="ln" d="M148,302 V328" marker-start="url(#an)" marker-end="url(#an)"/>
 <path class="ln" d="M240,302 L322,328" marker-end="url(#an)"/>
 <text class="xs t3" x="300" y="310">scans</text>

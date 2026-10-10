@@ -16,7 +16,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// lockSingle keeps a second memo-tray from starting: it holds an exclusive
+// lockSingle keeps a second memors-tray from starting: it holds an exclusive
 // lock on path for the life of the process.
 func lockSingle(path string) (func(), error) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)

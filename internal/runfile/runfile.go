@@ -1,11 +1,11 @@
-// Package runfile advertises running `memo-mcp serve --http` servers to
-// local companion apps (memo-tray). While it serves, each server keeps
-// <MEMO_HOME>/run/serve-<pid>.json, which says where and how to reach it,
+// Package runfile advertises running `memors-mcp serve --http` servers to
+// local companion apps (memors-tray). While it serves, each server keeps
+// <MEMORS_HOME>/run/serve-<pid>.json, which says where and how to reach it,
 // and removes the file when it stops. A run file never holds a secret:
 // in token mode it names the token file, which the reader opens with its
 // own permissions.
 //
-// memo-tray, a separate module, imports this package, so it depends on the
+// memors-tray, a separate module, imports this package, so it depends on the
 // standard library only.
 package runfile
 
@@ -44,7 +44,7 @@ type Info struct {
 	Started     time.Time `json:"started"`
 }
 
-// Dir is the run-file directory under MEMO_HOME.
+// Dir is the run-file directory under MEMORS_HOME.
 func Dir(home string) string { return filepath.Join(home, "run") }
 
 // Name is the file name for a server process.

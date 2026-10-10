@@ -7,14 +7,14 @@ import (
 	"testing"
 )
 
-func TestDirFollowsMemoHome(t *testing.T) {
+func TestDirFollowsMemorsHome(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("MEMO_HOME", dir)
+	t.Setenv("MEMORS_HOME", dir)
 	if got, err := Dir(); err != nil || got != dir {
 		t.Errorf("Dir = %q, %v; want %q", got, err, dir)
 	}
-	t.Setenv("MEMO_HOME", "")
-	if got, err := Dir(); err != nil || filepath.Base(got) != ".memo-mcp" {
+	t.Setenv("MEMORS_HOME", "")
+	if got, err := Dir(); err != nil || filepath.Base(got) != ".memors-mcp" {
 		t.Errorf("default Dir = %q, %v", got, err)
 	}
 }

@@ -17,18 +17,19 @@ import (
 // ApplicationID is written into the SQLite file header by migration 1 so
 // that a knowledge base can be told apart from any other SQLite file —
 // in particular from a v1 memo-mcp journal, which has user_version 1 too
-// but no application id.
+// but no application id. It predates the rename to memors-mcp and stays
+// "MEMO": changing it would make every existing knowledge base unopenable.
 const ApplicationID = 0x4D454D4F // "MEMO"
 
 // ErrNotKnowledgeBase is returned when the file exists, has tables, and is
 // not a knowledge base (for example an old journal). Nothing is migrated:
 // owner decision 5 (2026-10-02).
-var ErrNotKnowledgeBase = errors.New("this file is not a memo-mcp knowledge base (it looks like a v1 memo-mcp journal or another SQLite database); nothing is migrated")
+var ErrNotKnowledgeBase = errors.New("this file is not a memors-mcp knowledge base (it looks like a v1 memo-mcp journal or another SQLite database); nothing is migrated")
 
 // ErrNoSuchKB is returned by read-only opens when the file does not exist.
 var ErrNoSuchKB = errors.New("knowledge base does not exist")
 
-// namePattern constrains MEMO_KB to a safe filename component.
+// namePattern constrains MEMORS_KB to a safe filename component.
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 
 // ValidateName checks a knowledge-base or namespace name.
@@ -112,7 +113,7 @@ func Open(ctx context.Context, dir, name string, opts Options) (*sql.DB, error) 
 		var v int
 		if err := db.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&v); err == nil && v < len(migrations) {
 			db.Close()
-			return nil, fmt.Errorf("%w: file is at schema v%d, this binary expects v%d; run `memo-mcp migrate` (or any writing command) once", ErrSchemaBehind, v, len(migrations))
+			return nil, fmt.Errorf("%w: file is at schema v%d, this binary expects v%d; run `memors-mcp migrate` (or any writing command) once", ErrSchemaBehind, v, len(migrations))
 		}
 	}
 	return db, nil

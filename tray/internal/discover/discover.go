@@ -1,6 +1,6 @@
-// Package discover finds the memo-mcp HTTP servers running on this machine
-// from their run files (<MEMO_HOME>/run/serve-<pid>.json, written by
-// memo-mcp itself) and tidies up after servers that died without removing
+// Package discover finds the memors-mcp HTTP servers running on this machine
+// from their run files (<MEMORS_HOME>/run/serve-<pid>.json, written by
+// memors-mcp itself) and tidies up after servers that died without removing
 // theirs.
 package discover
 
@@ -8,7 +8,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/runfile"
+	"github.com/kKEo/memors/internal/runfile"
 )
 
 // Process is what the operating system says about a pid.
@@ -25,7 +25,7 @@ type Inspector func(pid int) Process
 // so its files cannot be believed.
 var ErrUntrusted = errors.New("run directory is not owned by you or is writable by others; ignoring it")
 
-// Scan returns the run files in dir that belong to a live memo-mcp, plus
+// Scan returns the run files in dir that belong to a live memors-mcp, plus
 // any file that cannot be read (Err set; left alone). A file whose process
 // is gone, or whose pid now belongs to another program, is deleted.
 func Scan(dir string, inspect Inspector) ([]runfile.Entry, error) {
@@ -51,14 +51,14 @@ func Scan(dir string, inspect Inspector) ([]runfile.Entry, error) {
 	return out, nil
 }
 
-// Ours reports whether p is the memo-mcp process that wrote e: alive,
-// named memo-mcp, and started before the file was written (a pid reused
+// Ours reports whether p is the memors-mcp process that wrote e: alive,
+// named memors-mcp, and started before the file was written (a pid reused
 // later belongs to someone else).
 func Ours(p Process, e runfile.Entry) bool {
 	switch {
 	case !p.Alive:
 		return false
-	case p.Name != "" && p.Name != "memo-mcp":
+	case p.Name != "" && p.Name != "memors-mcp":
 		return false
 	case !p.Started.IsZero() && !e.ModTime.IsZero() && p.Started.After(e.ModTime.Add(time.Second)):
 		return false

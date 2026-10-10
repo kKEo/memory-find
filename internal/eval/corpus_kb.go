@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/retrieve"
 )
 
 // FixtureDoc is a knowledge-base fixture: a document with its provenance.

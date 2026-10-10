@@ -1,6 +1,6 @@
-// Package config is memo-tray's settings file, <MEMO_HOME>/tray.json: the
+// Package config is memors-tray's settings file, <MEMORS_HOME>/tray.json: the
 // servers it starts (knowledge base, address, auth), extra environment for
-// them, and where memo-mcp is installed.
+// them, and where memors-mcp is installed.
 package config
 
 import (
@@ -15,26 +15,26 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kKEo/memory-find/tray/internal/home"
+	"github.com/kKEo/memors/tray/internal/home"
 )
 
 // Config is tray.json.
 type Config struct {
-	// MemoBinary is the memo-mcp executable; empty means search for it.
-	MemoBinary string `json:"memo_binary,omitempty"`
-	// Env is extra environment for every server memo-tray starts. Apps
+	// MemorsBinary is the memors-mcp executable; empty means search for it.
+	MemorsBinary string `json:"memors_binary,omitempty"`
+	// Env is extra environment for every server memors-tray starts. Apps
 	// started from Finder do not see your shell's variables, so settings
-	// such as MEMO_MODEL go here.
+	// such as MEMORS_MODEL go here.
 	Env     map[string]string `json:"env,omitempty"`
 	Servers []Server          `json:"servers,omitempty"`
-	// StopOnQuit stops the servers memo-tray started when it quits
+	// StopOnQuit stops the servers memors-tray started when it quits
 	// (default true).
 	StopOnQuit *bool `json:"stop_on_quit,omitempty"`
 	// Debug enables the web inspector in stats windows.
 	Debug bool `json:"debug,omitempty"`
 }
 
-// Server is one knowledge base memo-tray can start.
+// Server is one knowledge base memors-tray can start.
 type Server struct {
 	KB        string            `json:"kb"`
 	Addr      string            `json:"addr"`           // loopback host:port
@@ -43,7 +43,7 @@ type Server struct {
 	Env       map[string]string `json:"env,omitempty"`
 }
 
-// Path is the settings file under MEMO_HOME.
+// Path is the settings file under MEMORS_HOME.
 func Path(homeDir string) string { return filepath.Join(homeDir, "tray.json") }
 
 // Load reads path; a missing file is an empty configuration.
@@ -139,7 +139,7 @@ func Revision(path string) string {
 	return fmt.Sprintf("%d-%d", fi.ModTime().UnixNano(), fi.Size())
 }
 
-// StopsOnQuit reports whether quitting stops the servers memo-tray started.
+// StopsOnQuit reports whether quitting stops the servers memors-tray started.
 func (c *Config) StopsOnQuit() bool { return c.StopOnQuit == nil || *c.StopOnQuit }
 
 // Find returns the entry for a knowledge base, or nil.
@@ -192,14 +192,14 @@ func PortFree(addr string) bool {
 
 var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
-// Reserved reports whether memo-tray sets an environment variable itself
+// Reserved reports whether memors-tray sets an environment variable itself
 // (or removes it) for the servers it starts, so tray.json may not.
 func Reserved(name string) bool {
 	switch name {
-	case "MEMO_KB", "MEMO_HOME", "MEMO_PUBLIC_URL", "MEMO_METRICS_ADDR":
+	case "MEMORS_KB", "MEMORS_HOME", "MEMORS_PUBLIC_URL", "MEMORS_METRICS_ADDR":
 		return true
 	}
-	return strings.HasPrefix(name, "MEMO_HTTP_") || strings.HasPrefix(name, "MEMO_TLS_") || strings.HasPrefix(name, "JOURNAL_")
+	return strings.HasPrefix(name, "MEMORS_HTTP_") || strings.HasPrefix(name, "MEMORS_TLS_")
 }
 
 // Validate checks names, addresses and environment.
@@ -224,7 +224,7 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("server %q: addr %q: bad port", s.KB, s.Addr)
 		}
 		if ip := net.ParseIP(host); host != "localhost" && (ip == nil || !ip.IsLoopback()) {
-			return fmt.Errorf("server %q: addr %q: memo-tray starts loopback servers only", s.KB, s.Addr)
+			return fmt.Errorf("server %q: addr %q: memors-tray starts loopback servers only", s.KB, s.Addr)
 		}
 		if addrs[s.Addr] {
 			return fmt.Errorf("server %q: addr %s used twice", s.KB, s.Addr)
@@ -246,7 +246,7 @@ func validEnv(env map[string]string) error {
 			return fmt.Errorf("env: %q is not a variable name", k)
 		}
 		if Reserved(k) {
-			return fmt.Errorf("env: %s is set by memo-tray itself", k)
+			return fmt.Errorf("env: %s is set by memors-tray itself", k)
 		}
 	}
 	return nil

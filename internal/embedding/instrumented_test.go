@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/kKEo/memory-find/internal/obs"
+	"github.com/kKEo/memors/internal/obs"
 )
 
 func TestInstrumentedEmbedder(t *testing.T) {
@@ -19,22 +19,22 @@ func TestInstrumentedEmbedder(t *testing.T) {
 	if e.Info().ID != NewHashEmbedder(16).Info().ID {
 		t.Fatal("Info passthrough")
 	}
-	before := metricValue(t, "memo_embed_texts_total", e.Info().ID, "query")
+	before := metricValue(t, "memors_embed_texts_total", e.Info().ID, "query")
 	if _, err := e.EmbedBatch(context.Background(), []string{"a", "b", "c"}, RoleQuery); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.Embed(context.Background(), "d"); err != nil {
 		t.Fatal(err)
 	}
-	if got := metricValue(t, "memo_embed_texts_total", e.Info().ID, "query") - before; got != 3 {
+	if got := metricValue(t, "memors_embed_texts_total", e.Info().ID, "query") - before; got != 3 {
 		t.Fatalf("query texts counted %v", got)
 	}
-	if got := metricValue(t, "memo_embed_texts_total", e.Info().ID, "doc"); got < 1 {
+	if got := metricValue(t, "memors_embed_texts_total", e.Info().ID, "doc"); got < 1 {
 		t.Fatalf("doc texts counted %v", got)
 	}
 	f := Instrumented(NewFailingEmbedder(errors.New("boom")))
 	_, _ = f.EmbedBatch(context.Background(), []string{"x"}, RoleDocument)
-	if got := metricValue(t, "memo_embed_errors_total", f.Info().ID, "doc"); got < 1 {
+	if got := metricValue(t, "memors_embed_errors_total", f.Info().ID, "doc"); got < 1 {
 		t.Fatalf("errors counted %v", got)
 	}
 }

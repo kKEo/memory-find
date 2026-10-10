@@ -1,6 +1,6 @@
 # Part VI: Monitoring and observability
 
-All observability in memo-mcp is **local and pull-based**. Metrics are served on loopback, logs
+All observability in memors-mcp is **local and pull-based**. Metrics are served on loopback, logs
 go to stderr, and the optional call log is a table in your own file. Nothing is pushed
 anywhere, and there is no telemetry.
 

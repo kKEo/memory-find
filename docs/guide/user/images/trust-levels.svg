@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="300" viewBox="0 0 760 300" role="img" aria-labelledby="t d">
 <title id="t">Trust levels and who can change them</title>
-<desc id="d">Three trust levels from low to high: Agent (saved by Claude, unchecked; everything Claude saves starts here), User (a person saved or confirmed it; your terminal saves start here) and Curated (checked and approved; only ever set by a person). Only a person can raise trust, by accepting a dialog or running memo-mcp trust promote. Claude can only ask. A person can lower trust with memo-mcp trust demote.</desc>
+<desc id="d">Three trust levels from low to high: Agent (saved by Claude, unchecked; everything Claude saves starts here), User (a person saved or confirmed it; your terminal saves start here) and Curated (checked and approved; only ever set by a person). Only a person can raise trust, by accepting a dialog or running memors-mcp trust promote. Claude can only ask. A person can lower trust with memors-mcp trust demote.</desc>
 <style>
 text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
 .mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -55,12 +55,12 @@ text{fill:#eceeec}
 <!-- raise: only a person -->
 <path class="lcl" d="M268,245 H252 a8,8 0 0 1 -8,-8 V168 a8,8 0 0 1 8,-8 H265" marker-end="url(#ac)"/>
 <path class="lcl" d="M268,138 H252 a8,8 0 0 1 -8,-8 V61 a8,8 0 0 1 8,-8 H265" marker-end="url(#ac)"/>
-<circle class="ic" cx="58" cy="122" r="7"/>
-<path class="ic" d="M45,143 c0,-8 6,-12 13,-12 s13,4 13,12"/>
-<text class="h tc" x="80" y="126">Only a person</text>
-<text class="h tc" x="80" y="143">can raise trust</text>
-<text class="xs t2" x="80" y="163">accept the dialog, or run</text>
-<text class="xs mono t2" x="80" y="179">memo-mcp trust promote</text>
+<circle class="ic" cx="44" cy="122" r="7"/>
+<path class="ic" d="M31,143 c0,-8 6,-12 13,-12 s13,4 13,12"/>
+<text class="h tc" x="66" y="126">Only a person</text>
+<text class="h tc" x="66" y="143">can raise trust</text>
+<text class="xs t2" x="66" y="163">accept the dialog, or run</text>
+<text class="xs mono t2" x="66" y="179">memors-mcp trust promote</text>
 
 <!-- claude can only ask -->
 <rect class="blue" x="40" y="230" width="176" height="44" rx="10"/>
@@ -72,5 +72,5 @@ text{fill:#eceeec}
 <path class="ln" d="M494,53 H508 a8,8 0 0 1 8,8 V237 a8,8 0 0 1 -8,8 H497" marker-end="url(#an)"/>
 <path class="ln" d="M516,149 H497" marker-end="url(#an)"/>
 <text class="h" x="532" y="145">A person can lower it</text>
-<text class="xs mono t2" x="532" y="163">memo-mcp trust demote</text>
+<text class="xs mono t2" x="532" y="163">memors-mcp trust demote</text>
 </svg>

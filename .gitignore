@@ -1,6 +1,6 @@
-# Built binary. Anchored to the repo root — an unanchored "memo-mcp" would
-# also match cmd/memo-mcp/, silently ignoring any new file added there.
-/memo-mcp
+# Built binary. Anchored to the repo root — an unanchored "memors-mcp" would
+# also match cmd/memors-mcp/, silently ignoring any new file added there.
+/memors-mcp
 
 # Local databases and coverage output that shouldn't be checked in.
 *.db
@@ -26,8 +26,8 @@ coverage.out
 # Built documentation (make docs).
 /site/
 
-# memo-tray (tray/, its own Go module): binary and app bundle builds.
-/tray/memo-tray
+# memors-tray (tray/, its own Go module): binary and app bundle builds.
+/tray/memors-tray
 /tray/dist/
 
 # A go.work would pull the cgo tray module into the root ./... patterns.

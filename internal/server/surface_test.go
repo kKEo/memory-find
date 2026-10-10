@@ -13,9 +13,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/retrieve"
 )
 
 // newTestSessionWith is newTestSession with client options, for clients that
@@ -114,7 +114,7 @@ func TestPromoteAsksTheHumanWhenTheClientCan(t *testing.T) {
 	}
 	answer = "decline"
 	pr = structured[PromoteOut](t, callTool(t, cs, "promote", map[string]any{"uri": rem.URI, "to": "curated"}))
-	if pr.Applied || !strings.Contains(pr.Command, "memo-mcp trust promote") || !strings.Contains(pr.Reason, "declined") {
+	if pr.Applied || !strings.Contains(pr.Command, "memors-mcp trust promote") || !strings.Contains(pr.Reason, "declined") {
 		t.Fatalf("declined elicitation: %+v", pr)
 	}
 	// Audit says who confirmed.

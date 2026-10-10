@@ -2,14 +2,14 @@
 # windows/amd64. Pure Go, stripped, version from the tag. `make snapshot`
 # runs the same build locally without publishing.
 version: 2
-project_name: memo-mcp
+project_name: memors-mcp
 before:
   hooks:
     - go mod tidy
 builds:
-  - id: memo-mcp
-    main: ./cmd/memo-mcp
-    binary: memo-mcp
+  - id: memors-mcp
+    main: ./cmd/memors-mcp
+    binary: memors-mcp
     env:
       - CGO_ENABLED=0
     goos: [linux, darwin, windows]
@@ -47,9 +47,9 @@ changelog:
 release:
   draft: false
   footer: |
-    memo-mcp is a pure-Go binary with no runtime dependencies. On first start
+    memors-mcp is a pure-Go binary with no runtime dependencies. On first start
     it downloads the default embedding model (granite-embedding-small-english-r2,
-    Apache-2.0). The optional macOS menu-bar app, memo-tray, is attached as
-    `memo-tray_{{ .Version }}_darwin_universal.zip` (unsigned: allow it under
+    Apache-2.0). The optional macOS menu-bar app, memors-tray, is attached as
+    `memors-tray_{{ .Version }}_darwin_universal.zip` (unsigned: allow it under
     System Settings > Privacy & Security on first open).
     Eval numbers for this tag: `docs/eval/v{{ .Version }}.md`.

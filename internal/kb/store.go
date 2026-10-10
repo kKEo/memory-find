@@ -15,9 +15,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/kKEo/memory-find/internal/chunk"
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/obs"
+	"github.com/kKEo/memors/internal/chunk"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/obs"
 )
 
 // Trust tiers and origins (docs/schema.md §7). Trust is assigned by the
@@ -704,7 +704,7 @@ func (s *Store) SetDefaultModel(ctx context.Context, modelID, actor, channel str
 		return err
 	}
 	if n == 0 {
-		return fmt.Errorf("model %q has no vectors here yet; run `memo-mcp reindex --model %s` first", modelID, modelID)
+		return fmt.Errorf("model %q has no vectors here yet; run `memors-mcp reindex --model %s` first", modelID, modelID)
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE models SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END`, modelID); err != nil {
 		return err

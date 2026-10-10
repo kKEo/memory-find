@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kKEo/memory-find/internal/retrieve"
+	"github.com/kKEo/memors/internal/retrieve"
 )
 
 // longFiller generates repeated, topic-flavored filler text long enough

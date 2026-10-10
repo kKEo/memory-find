@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/rerank"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/rerank"
 )
 
 func main() {

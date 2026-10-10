@@ -1,5 +1,5 @@
-BINARY = memo-mcp
-PKG = ./cmd/memo-mcp/
+BINARY = memors-mcp
+PKG = ./cmd/memors-mcp/
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 .PHONY: build snapshot test test-verbose test-race cover fmt vet lint check clean eval golden-update baseline-update spike docs docs-check docs-serve start-http tray tray-test tray-app
@@ -69,7 +69,7 @@ test-race:
 
 # Only packages with test files: some Go toolchain installs fail with
 # "no such tool covdata" when asked to report coverage for a package that
-# has none. cmd/memo-mcp currently has no tests (tracked in docs/roadmap.md);
+# has none. cmd/memors-mcp currently has no tests (tracked in docs/roadmap.md);
 # once it does, it will show up here automatically.
 cover:
 	go test $$(go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./...) -count=1 -coverprofile=coverage.out
@@ -94,22 +94,22 @@ lint:
 # the CI planned in docs/roadmap.md (P0 minimal, P6 full matrix).
 check: fmt vet lint test-race
 
-# memo-tray, the macOS menu-bar app, is its own Go module under tray/ and
-# the only cgo build in the repository; memo-mcp itself stays pure Go.
+# memors-tray, the macOS menu-bar app, is its own Go module under tray/ and
+# the only cgo build in the repository; memors-mcp itself stays pure Go.
 tray:
-	cd tray && CGO_ENABLED=1 go build -ldflags "-s -w -X main.version=$(VERSION)" -o memo-tray ./cmd/memo-tray
+	cd tray && CGO_ENABLED=1 go build -ldflags "-s -w -X main.version=$(VERSION)" -o memors-tray ./cmd/memors-tray
 
 tray-test:
 	cd tray && go vet ./... && go test ./... -race -count=1
 
-# tray-app builds tray/dist/memo-tray.app (universal, ad-hoc signed) and its
+# tray-app builds tray/dist/memors-tray.app (universal, ad-hoc signed) and its
 # release zip.
 tray-app:
 	./tray/scripts/build-app.sh $(VERSION)
 
 clean:
-	rm -f $(BINARY) coverage.out tray/memo-tray
+	rm -f $(BINARY) coverage.out tray/memors-tray
 	rm -rf site tray/dist
 
 start-http:
-	MEMO_KB=crportal memo-mcp serve --http 127.0.0.1:8765
+	MEMORS_KB=crportal memors-mcp serve --http 127.0.0.1:8765

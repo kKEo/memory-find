@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memors/internal/kb"
 )
 
 // Result is what the agent submits for a work item.

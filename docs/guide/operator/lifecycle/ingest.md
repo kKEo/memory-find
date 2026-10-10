@@ -25,11 +25,11 @@ same URI with changed content, or with a new `version`, creates a new revision o
 ## From the CLI
 
 ```bash
-memo-mcp ingest ./docs --ns handbook --kind doc
-memo-mcp ingest page.md --uri https://pkg.go.dev/google.golang.org/grpc \
+memors-mcp ingest ./docs --ns handbook --kind doc
+memors-mcp ingest page.md --uri https://pkg.go.dev/google.golang.org/grpc \
   --library grpc/grpc-go --version v1.64.0 --context "gRPC-Go API docs for deadlines"
-cat notes.md | memo-mcp ingest - --kind note --title "Standup 2026-10-03"
-memo-mcp ingest ./big-folder --embed=false && memo-mcp backfill   # fast load, embed later
+cat notes.md | memors-mcp ingest - --kind note --title "Standup 2026-10-03"
+memors-mcp ingest ./big-folder --embed=false && memors-mcp backfill   # fast load, embed later
 ```
 
 CLI writes are trust `user`, or `curated` with `--trust curated`. Origin defaults to `web`
@@ -53,12 +53,12 @@ when `--uri` is set, and to `user-said` otherwise.
 | Embedding with `potion` | Near instant |
 | Disk | About 4.4 KB per passage before vectors, plus about 1.5 KB per passage per 384-dimension model |
 
-For bulk loads, ingest with `--embed=false`, then run `memo-mcp backfill`, or let the server
+For bulk loads, ingest with `--embed=false`, then run `memors-mcp backfill`, or let the server
 embed in the background. See [Capacity and performance](../operations/capacity.md).
 
 ## Observing it
 
-`memo_store_ingests_total{outcome=new|revision|dedup|error}`,
-`memo_store_ingest_duration_seconds`, `memo_store_chunks_written_total`,
-`memo_store_embed_batches_total{outcome}`, and `memo_kb_pending_embeddings{model}` for the
+`memors_store_ingests_total{outcome=new|revision|dedup|error}`,
+`memors_store_ingest_duration_seconds`, `memors_store_chunks_written_total`,
+`memors_store_embed_batches_total{outcome}`, and `memors_kb_pending_embeddings{model}` for the
 backlog.

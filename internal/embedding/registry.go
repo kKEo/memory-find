@@ -3,13 +3,13 @@ package embedding
 import (
 	"context"
 	"fmt"
-	"github.com/kKEo/memory-find/internal/obs"
+	"github.com/kKEo/memors/internal/obs"
 	"sort"
 	"strings"
 )
 
-// Known is the model registry: every embedder memo-mcp knows how to load.
-// `memo-mcp model ls` prints it; `model smoke` proves which ones actually run
+// Known is the model registry: every embedder memors-mcp knows how to load.
+// `memors-mcp model ls` prints it; `model smoke` proves which ones actually run
 // under the pure-Go backend (spike S4 found that most ONNX exports need the
 // exact file paths recorded here). Licences matter: the default must be
 // Apache-2.0 or MIT (research decision 4); EmbeddingGemma is opt-in.
@@ -52,7 +52,7 @@ var Known = []ModelInfo{
 // Chosen by the owner on 2026-10-02 from the P3 bake-off (docs/eval/v0.7.0.md):
 // granite-small-r2 passed the OD-6 rule (Apache-2.0, loads, +0.05 nDCG@10 on
 // the knowledge-base corpus, 1.6× MiniLM query latency) and is the only
-// candidate that answers paraphrase queries. MEMO_MODEL overrides it.
+// candidate that answers paraphrase queries. MEMORS_MODEL overrides it.
 const DefaultModelID = "granite-small-r2"
 
 // DefaultModel returns the registry entry for DefaultModelID.

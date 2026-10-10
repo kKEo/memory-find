@@ -1,6 +1,6 @@
 # Trust: who vouched for what
 
-Every item in memo-mcp carries a **trust level**. It answers one question: *who has vouched for
+Every item in memors-mcp carries a **trust level**. It answers one question: *who has vouched for
 this?*
 
 | Level | Meaning | How something gets it |
@@ -12,13 +12,13 @@ this?*
 The level appears next to every search result, in the browser view and in what Claude tells
 you.
 
-![Three levels from low to high: Agent, where everything Claude saves starts; User, where your terminal saves start; and Curated. Only a person can raise trust, by accepting a dialog or running memo-mcp trust promote; Claude can only ask. A person can lower trust with memo-mcp trust demote.](images/trust-levels.svg)
+![Three levels from low to high: Agent, where everything Claude saves starts; User, where your terminal saves start; and Curated. Only a person can raise trust, by accepting a dialog or running memors-mcp trust promote; Claude can only ask. A person can lower trust with memors-mcp trust demote.](images/trust-levels.svg)
 
 ## Why Claude cannot raise trust by itself
 
 If an assistant could mark its own notes as verified, the label would mean nothing. A
 web page with misleading instructions could also persuade it to "verify" something false. So
-memo-mcp has one firm rule: **only a person can raise trust.**
+memors-mcp has one firm rule: **only a person can raise trust.**
 
 Claude can *ask*. When it believes a note deserves more trust, it requests a promotion, and
 one of two things happens:
@@ -29,7 +29,7 @@ one of two things happens:
   example:
 
   ```bash
-  memo-mcp trust promote memo://doc/01a1... --to user
+  memors-mcp trust promote memo://doc/01a1... --to user
   ```
 
 Every change of trust is recorded: who made it, when and why.
@@ -42,7 +42,7 @@ Every change of trust is recorded: who made it, when and why.
 If something you trusted turns out to be wrong, lower it:
 
 ```bash
-memo-mcp trust demote memo://doc/01a1... --to agent
+memors-mcp trust demote memo://doc/01a1... --to agent
 ```
 
 ## How trust affects answers

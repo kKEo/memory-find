@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kKEo/memory-find/tray/internal/config"
-	"github.com/kKEo/memory-find/tray/internal/installer"
+	"github.com/kKEo/memors/tray/internal/config"
+	"github.com/kKEo/memors/tray/internal/installer"
 )
 
 type fakeReleases struct {
@@ -33,8 +33,8 @@ func (f *fakeReleases) Latest(context.Context) (installer.Release, error) {
 	if f.latestErr != nil {
 		return installer.Release{}, f.latestErr
 	}
-	return installer.Release{Tag: "v9.9.9", PageURL: "https://github.com/kKEo/memory-find/releases/tag/v9.9.9", Published: time.Now(),
-		Assets: []installer.Asset{{Name: "memo-mcp_9.9.9_darwin_arm64.tar.gz", URL: "https://example.invalid/a", Size: 9 << 20}}}, nil
+	return installer.Release{Tag: "v9.9.9", PageURL: "https://github.com/kKEo/memors/releases/tag/v9.9.9", Published: time.Now(),
+		Assets: []installer.Asset{{Name: "memors-mcp_9.9.9_darwin_arm64.tar.gz", URL: "https://example.invalid/a", Size: 9 << 20}}}, nil
 }
 
 func (f *fakeReleases) Install(_ context.Context, rel installer.Release, goarch, dir string, progress func(installer.Progress)) (string, error) {
@@ -46,11 +46,11 @@ func (f *fakeReleases) Install(_ context.Context, rel installer.Release, goarch,
 	if f.installErr != nil {
 		return "", f.installErr
 	}
-	path := filepath.Join(dir, "memo-mcp")
+	path := filepath.Join(dir, "memors-mcp")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	return path, os.WriteFile(path, []byte("#!/bin/sh\necho 'memo-mcp 9.9.9'\n"), 0o755)
+	return path, os.WriteFile(path, []byte("#!/bin/sh\necho 'memors-mcp 9.9.9'\n"), 0o755)
 }
 
 type fakeLogin struct {
@@ -69,40 +69,40 @@ func (f *fakeLogin) Enable() error {
 func (f *fakeLogin) Disable() error { f.on = false; return nil }
 
 type harness struct {
-	t      *testing.T
-	s      *Server
-	c      *http.Client
-	home   string
-	rel    *fakeReleases
-	login  *fakeLogin
-	memoOK bool
-	mu     sync.Mutex
-	events []Event
-	copied []string
-	opened []string
+	t        *testing.T
+	s        *Server
+	c        *http.Client
+	home     string
+	rel      *fakeReleases
+	login    *fakeLogin
+	memorsOK bool
+	mu       sync.Mutex
+	events   []Event
+	copied   []string
+	opened   []string
 }
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	h := &harness{t: t, home: t.TempDir(), rel: &fakeReleases{}, login: &fakeLogin{}, memoOK: true}
+	h := &harness{t: t, home: t.TempDir(), rel: &fakeReleases{}, login: &fakeLogin{}, memorsOK: true}
 	s, err := New(Deps{
 		Home:        h.home,
 		TrayVersion: "test",
 		GOARCH:      "arm64",
 		Releases:    h.rel,
-		FindMemo: func(configured string) (string, error) {
+		FindMemors: func(configured string) (string, error) {
 			if configured != "" {
 				if _, err := os.Stat(configured); err != nil {
-					return "", errors.New("memo_binary in tray.json is not an executable: " + configured)
+					return "", errors.New("memors_binary in tray.json is not an executable: " + configured)
 				}
 				return configured, nil
 			}
-			if !h.memoOK {
-				return "", errors.New("memo-mcp not found: install it, or set memo_binary in tray.json")
+			if !h.memorsOK {
+				return "", errors.New("memors-mcp not found: install it, or set memors_binary in tray.json")
 			}
-			return "/opt/fake/memo-mcp", nil
+			return "/opt/fake/memors-mcp", nil
 		},
-		MemoVersion: func(context.Context, string) (string, error) { return "1.4.0", nil },
+		MemorsVersion: func(context.Context, string) (string, error) { return "1.4.0", nil },
 		Models: func(context.Context, string) ([]Model, error) {
 			return []Model{{ID: "granite-small-r2", Note: "IBM; 47M params", Default: true}, {ID: "potion", Note: "instant; weaker"}}, nil
 		},
@@ -239,34 +239,34 @@ func TestAccessControl(t *testing.T) {
 
 func TestSettingsSave(t *testing.T) {
 	h := newHarness(t)
-	old := &config.Config{Servers: []config.Server{{KB: "crportal", Addr: "127.0.0.1:8765", Env: map[string]string{"MEMO_PROFILE": "precise"}}}}
+	old := &config.Config{Servers: []config.Server{{KB: "crportal", Addr: "127.0.0.1:8765", Env: map[string]string{"MEMORS_PROFILE": "precise"}}}}
 	if err := old.Save(config.Path(h.home)); err != nil {
 		t.Fatal(err)
 	}
 	body := h.enter("/settings")
-	for _, want := range []string{`value="crportal"`, `Default (granite-small-r2)`, `potion — instant`, "memo-mcp 1.4.0 at /opt/fake/memo-mcp"} {
+	for _, want := range []string{`value="crportal"`, `Default (granite-small-r2)`, `potion — instant`, "memors-mcp 1.4.0 at /opt/fake/memors-mcp"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("settings page lacks %q", want)
 		}
 	}
-	bin := filepath.Join(t.TempDir(), "memo-mcp")
+	bin := filepath.Join(t.TempDir(), "memors-mcp")
 	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	code, body := h.post("/settings", url.Values{
-		"rev": {rev(t, body)}, "login": {"on"}, "memo_mode": {"path"}, "memo_path": {bin}, "model": {"potion"},
+		"rev": {rev(t, body)}, "login": {"on"}, "memors_mode": {"path"}, "memors_path": {bin}, "model": {"potion"},
 		"servers": {"1"}, "kb_0": {"crportal"}, "addr_0": {"127.0.0.1:8770"}, "auth_0": {"token"}, "autostart_0": {"on"},
-		"new_kb": {"work"}, "new_auth": {"none"}, "new_autostart": {"on"}, "env": {"MEMO_QUERY_LOG=1\n# comment\n"}, "debug": {"on"},
+		"new_kb": {"work"}, "new_auth": {"none"}, "new_autostart": {"on"}, "env": {"MEMORS_QUERY_LOG=1\n# comment\n"}, "debug": {"on"},
 	})
 	if code != 200 || !strings.Contains(body, "Settings saved.") {
 		t.Fatalf("save: %d\n%s", code, body)
 	}
 	c := h.cfg()
-	if c.MemoBinary != bin || c.Env["MEMO_MODEL"] != "potion" || c.Env["MEMO_QUERY_LOG"] != "1" || c.StopsOnQuit() || !c.Debug {
+	if c.MemorsBinary != bin || c.Env["MEMORS_MODEL"] != "potion" || c.Env["MEMORS_QUERY_LOG"] != "1" || c.StopsOnQuit() || !c.Debug {
 		t.Errorf("saved config = %+v", c)
 	}
 	cr, work := c.Find("crportal"), c.Find("work")
-	if cr == nil || cr.Addr != "127.0.0.1:8770" || cr.Auth != "token" || !cr.Autostart || cr.Env["MEMO_PROFILE"] != "precise" {
+	if cr == nil || cr.Addr != "127.0.0.1:8770" || cr.Auth != "token" || !cr.Autostart || cr.Env["MEMORS_PROFILE"] != "precise" {
 		t.Errorf("crportal = %+v", cr)
 	}
 	if work == nil || work.Addr != "127.0.0.1:8765" || work.Auth != "" || !work.Autostart {
@@ -278,10 +278,10 @@ func TestSettingsSave(t *testing.T) {
 
 	// Removing a server and going back to automatic discovery.
 	_, body = h.get(h.s.Origin() + "/settings")
-	h.post("/settings", url.Values{"rev": {rev(t, body)}, "memo_mode": {"auto"}, "stop_on_quit": {"on"},
+	h.post("/settings", url.Values{"rev": {rev(t, body)}, "memors_mode": {"auto"}, "stop_on_quit": {"on"},
 		"servers": {"2"}, "kb_0": {"crportal"}, "addr_0": {"127.0.0.1:8770"}, "remove_0": {"on"}, "kb_1": {"work"}, "addr_1": {"127.0.0.1:8765"}})
 	c = h.cfg()
-	if c.MemoBinary != "" || len(c.Servers) != 1 || c.Servers[0].KB != "work" || !c.StopsOnQuit() || c.Env != nil || h.login.on {
+	if c.MemorsBinary != "" || len(c.Servers) != 1 || c.Servers[0].KB != "work" || !c.StopsOnQuit() || c.Env != nil || h.login.on {
 		t.Errorf("after the second save: %+v (login %v)", c, h.login.on)
 	}
 }
@@ -295,11 +295,11 @@ func TestSettingsRefusesBadInput(t *testing.T) {
 		want string
 	}{
 		{url.Values{"new_kb": {"a b"}}, "not a valid knowledge-base name"},
-		{url.Values{"env": {"MEMO_HTTP_AUTH=none"}}, "set by memo-tray"},
-		{url.Values{"env": {"MEMO_MODEL=potion"}}, "embedding model with the field above"},
+		{url.Values{"env": {"MEMORS_HTTP_AUTH=none"}}, "set by memors-tray"},
+		{url.Values{"env": {"MEMORS_MODEL=potion"}}, "embedding model with the field above"},
 		{url.Values{"env": {"no equals sign"}}, "NAME=value"},
-		{url.Values{"memo_mode": {"path"}, "memo_path": {"relative/memo-mcp"}}, "full path"},
-		{url.Values{"memo_mode": {"path"}, "memo_path": {"/does/not/exist"}}, "not an executable"},
+		{url.Values{"memors_mode": {"path"}, "memors_path": {"relative/memors-mcp"}}, "full path"},
+		{url.Values{"memors_mode": {"path"}, "memors_path": {"/does/not/exist"}}, "not an executable"},
 		{url.Values{"new_kb": {"x"}, "new_addr": {"10.0.0.1:1"}}, "loopback"},
 	} {
 		c.form.Set("rev", rev(t, body))
@@ -340,13 +340,13 @@ func TestSettingsConflict(t *testing.T) {
 
 func TestWizardInstall(t *testing.T) {
 	h := newHarness(t)
-	h.memoOK = false
+	h.memorsOK = false
 	body := h.enter("/wizard")
-	if !strings.Contains(body, "Install memo-mcp") || !strings.Contains(body, "memo-mcp not found") {
+	if !strings.Contains(body, "Install memors-mcp") || !strings.Contains(body, "memors-mcp not found") {
 		t.Fatalf("welcome:\n%s", body)
 	}
 	_, body = h.get(h.s.Origin() + "/wizard/install")
-	for _, want := range []string{"v9.9.9", "memo-mcp_9.9.9_darwin_arm64.tar.gz", "9.0 MB", "not installed", "Download and install", `value="~/.local/bin"`} {
+	for _, want := range []string{"v9.9.9", "memors-mcp_9.9.9_darwin_arm64.tar.gz", "9.0 MB", "not installed", "Download and install", `value="~/.local/bin"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("install page lacks %q", want)
 		}
@@ -354,7 +354,7 @@ func TestWizardInstall(t *testing.T) {
 	h.rel.gate = make(chan struct{})
 	dir := filepath.Join(t.TempDir(), "bin")
 	code, body := h.post("/wizard/install", url.Values{"dir": {dir}})
-	if code != 200 || !strings.Contains(body, "Installing memo-mcp 9.9.9") || !strings.Contains(body, `http-equiv="refresh"`) || !strings.Contains(body, "3.0 MB of 9.0 MB") {
+	if code != 200 || !strings.Contains(body, "Installing memors-mcp 9.9.9") || !strings.Contains(body, `http-equiv="refresh"`) || !strings.Contains(body, "3.0 MB of 9.0 MB") {
 		t.Fatalf("progress while running: %d\n%s", code, body)
 	}
 	close(h.rel.gate)
@@ -363,11 +363,11 @@ func TestWizardInstall(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 		_, body = h.get(h.s.Origin() + "/wizard/progress")
 	}
-	if !strings.Contains(body, "memo-mcp 1.4.0 is installed") || strings.Contains(body, `http-equiv="refresh"`) {
+	if !strings.Contains(body, "memors-mcp 1.4.0 is installed") || strings.Contains(body, `http-equiv="refresh"`) {
 		t.Fatalf("progress when done:\n%s", body)
 	}
-	if c := h.cfg(); c.MemoBinary != filepath.Join(dir, "memo-mcp") {
-		t.Errorf("tray.json memo_binary = %q", c.MemoBinary)
+	if c := h.cfg(); c.MemorsBinary != filepath.Join(dir, "memors-mcp") {
+		t.Errorf("tray.json memors_binary = %q", c.MemorsBinary)
 	}
 	h.post("/wizard/restart", nil)
 	if k := h.kinds(); !slices.Equal(k, []EventKind{ConfigSaved, RestartServers}) {
@@ -416,7 +416,7 @@ func TestWizardKnowledgeBase(t *testing.T) {
 		t.Fatalf("save: %d\n%s", code, body)
 	}
 	c := h.cfg()
-	if s := c.Find("work"); s == nil || s.Addr != "127.0.0.1:8765" || s.Auth != "token" || !s.Autostart || c.Env["MEMO_MODEL"] != "potion" {
+	if s := c.Find("work"); s == nil || s.Addr != "127.0.0.1:8765" || s.Auth != "token" || !s.Autostart || c.Env["MEMORS_MODEL"] != "potion" {
 		t.Errorf("config = %+v", c)
 	}
 	h.mu.Lock()
@@ -425,7 +425,7 @@ func TestWizardKnowledgeBase(t *testing.T) {
 	if !slices.Equal(events, []Event{{Kind: ConfigSaved}, {Kind: StartServer, KB: "work"}}) {
 		t.Errorf("events = %v", events)
 	}
-	want := `claude mcp add --transport http memo-work 'http://127.0.0.1:8765/mcp' --header "Authorization: Bearer $(memo-mcp http-token)"`
+	want := `claude mcp add --transport http memors-work 'http://127.0.0.1:8765/mcp' --header "Authorization: Bearer $(memors-mcp http-token)"`
 	if !strings.Contains(body, html.EscapeString(want)) || !strings.Contains(body, "http://127.0.0.1:8765/mcp") {
 		t.Errorf("done page lacks the command:\n%s", body)
 	}
@@ -442,7 +442,7 @@ granite-small-r2   384   Apache-2.0           0          IBM, 47M params, 384-d.
 gemma-256          256   Gemma Terms of Use   -          Google, 308M params; opt-in only.
 potion             512   MIT                  -          model2vec lookup table: instant; weaker on paraphrase.
 
-* = selected by MEMO_MODEL (or the registry default).`
+* = selected by MEMORS_MODEL (or the registry default).`
 	models := ParseModels(out)
 	if len(models) != 4 {
 		t.Fatalf("models = %+v", models)
@@ -479,7 +479,7 @@ func TestInstallAndKnowledgeBaseTogether(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	c := h.cfg()
-	if c.MemoBinary != filepath.Join(dir, "memo-mcp") || c.Find("work") == nil {
+	if c.MemorsBinary != filepath.Join(dir, "memors-mcp") || c.Find("work") == nil {
 		t.Errorf("a write was lost: %+v", c)
 	}
 }

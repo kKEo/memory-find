@@ -13,13 +13,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/httpauth"
-	"github.com/kKEo/memory-find/internal/live"
+	"github.com/kKEo/memors/internal/httpauth"
+	"github.com/kKEo/memors/internal/live"
 )
 
 const token = "0123456789abcdef0123456789abcdef-tray-test"
 
-// fakeServer answers like memo-mcp serve --http in token mode.
+// fakeServer answers like memors-mcp serve --http in token mode.
 func fakeServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()

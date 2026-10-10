@@ -1,8 +1,8 @@
 ---
 theme: default
-title: "memo-mcp: A Measurable Local Knowledge Base for Agents"
+title: "memors-mcp: A Measurable Local Knowledge Base for Agents"
 info: |
-  An introduction to memo-mcp — a local MCP server that gives agents
+  An introduction to memors-mcp — a local MCP server that gives agents
   a measurable, explainable knowledge base.
 highlighter: shiki
 drawings:
@@ -10,7 +10,7 @@ drawings:
 transition: slide-left
 ---
 
-# memo-mcp
+# memors-mcp
 
 ## A Measurable Local Knowledge Base for Agents
 
@@ -35,7 +35,7 @@ h1 {
 <v-clicks>
 
 **Part 1 · The Essentials**
-What memo-mcp is, the ideas behind it (MCP, embeddings, semantic search), and how to set it up.
+What memors-mcp is, the ideas behind it (MCP, embeddings, semantic search), and how to set it up.
 *No machine-learning background needed.*
 
 **Part 2 · Going Deeper**
@@ -103,7 +103,7 @@ You could `grep` your notes for a word. But memory isn't only about *words* — 
 
 **Semantic search** matches by meaning, not spelling — but it has the opposite failure
 mode: it can blur past an exact error code or identifier that keyword search would
-nail instantly. memo-mcp doesn't pick one; it runs **both** and combines the results.
+nail instantly. memors-mcp doesn't pick one; it runs **both** and combines the results.
 Understanding each half separately is still the fastest way to see why that combination
 works, so that's where we start.
 
@@ -126,7 +126,7 @@ flowchart LR
 <v-clicks>
 
 - Text with **similar meaning** lands at **nearby points** — even with no shared words.
-- memo-mcp uses 384 numbers per entry (a "384-dimensional vector"). Hard to picture, same idea.
+- memors-mcp uses 384 numbers per entry (a "384-dimensional vector"). Hard to picture, same idea.
 - **Search = find the nearest points** to your query's location on the map.
 
 </v-clicks>
@@ -149,7 +149,7 @@ Keep these handy; they'll show up again.
 
 ---
 
-# What memo-mcp Does
+# What memors-mcp Does
 
 A local MCP server with **4 tools** over one knowledge base:
 
@@ -162,7 +162,7 @@ A local MCP server with **4 tools** over one knowledge base:
 
 <v-click>
 
-Plus a terminal face: `memo-mcp ingest | search | explain | read | ls | export --md | verify`.
+Plus a terminal face: `memors-mcp ingest | search | explain | read | ls | export --md | verify`.
 
 All data stays on **your machine**. The only network call ever is the one-time model download.
 
@@ -197,7 +197,7 @@ Every piece of knowledge knows where it came from:
 flowchart TB
     Agent["Claude Desktop / Claude Code"]
     Human["Terminal / Obsidian"]
-    subgraph Server["memo-mcp binary"]
+    subgraph Server["memors-mcp binary"]
         MCP["MCP Server<br/>(4 typed tools, stdio)"]
         CLI["CLI<br/>(ingest, search, explain, export)"]
         KB["kb: store, chunks, jobs, audit"]
@@ -258,7 +258,7 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     participant C as Agent
-    participant S as memo-mcp
+    participant S as memors-mcp
     participant DB as SQLite
 
     C->>S: search(query, scope, response_format)
@@ -286,17 +286,17 @@ sequenceDiagram
 Each knowledge base is one SQLite file; namespaces are shelves inside it:
 
 ```
-~/.memo-mcp/kb/
-├── default.db      ← MEMO_KB=default   (namespaces: grpc-go, personal, …)
-└── work.db         ← MEMO_KB=work
+~/.memors-mcp/kb/
+├── default.db      ← MEMORS_KB=default   (namespaces: grpc-go, personal, …)
+└── work.db         ← MEMORS_KB=work
 ```
 
 <v-clicks>
 
-- **`MEMO_KB`** picks the file; **`namespace`** on each write picks the shelf
+- **`MEMORS_KB`** picks the file; **`namespace`** on each write picks the shelf
 - A search spans every shelf by default; `scope.namespaces` narrows it
 - Separate files are the privacy boundary; shelves are a search scope
-- Back up or share a knowledge base: copy the `.db` file, or `memo-mcp export --md`
+- Back up or share a knowledge base: copy the `.db` file, or `memors-mcp export --md`
 
 </v-clicks>
 
@@ -326,18 +326,18 @@ The entire stack is pure Go. No C compiler, no shared libraries, no Docker neede
 
 ```bash
 # Clone and build
-git clone https://github.com/kKEo/memory-find.git
-cd memo-mcp
+git clone https://github.com/kKEo/memors.git
+cd memors-mcp
 make build
 
 # Result: a single binary
-ls -lh memo-mcp
-# -rwxr-xr-x  31M  memo-mcp
+ls -lh memors-mcp
+# -rwxr-xr-x  31M  memors-mcp
 ```
 
 <v-click>
 
-First run downloads the embedding model (~90MB) to `~/.cache/memo-mcp/models/`.
+First run downloads the embedding model (~90MB) to `~/.cache/memors-mcp/models/`.
 
 This only happens **once**.
 
@@ -352,10 +352,10 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 ```json
 {
   "mcpServers": {
-    "memo": {
-      "command": "/path/to/memo-mcp",
+    "memors": {
+      "command": "/path/to/memors-mcp",
       "env": {
-        "JOURNAL_TOKEN": "my-project"
+        "MEMORS_KB": "my-project"
       }
     }
   }
@@ -369,9 +369,9 @@ Or for Claude Code, add to `.mcp.json`:
 ```json
 {
   "mcpServers": {
-    "memo": {
-      "command": "/path/to/memo-mcp",
-      "env": { "JOURNAL_TOKEN": "my-project" }
+    "memors": {
+      "command": "/path/to/memors-mcp",
+      "env": { "MEMORS_KB": "my-project" }
     }
   }
 }
@@ -563,7 +563,7 @@ The server never writes a page. It proposes, stores, checks and marks stale.
 
 # A Knowledge Base You Can Read
 
-`memo-mcp ui` → `http://127.0.0.1:PORT` · read-only · no JavaScript
+`memors-mcp ui` → `http://127.0.0.1:PORT` · read-only · no JavaScript
 
 <v-clicks>
 
@@ -605,10 +605,10 @@ layout: center
 
 <br>
 
-**memo-mcp** — a private journal for Claude
+**memors-mcp** — a private journal for Claude
 
 Built with Go, SQLite, and sentence-transformers
 
 <br>
 
-github.com/kKEo/memory-find
+github.com/kKEo/memors

@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/graph"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/obs"
+	"github.com/kKEo/memors/internal/graph"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/obs"
 )
 
 // The entity arm and the graph arm (roadmap P7). Both use the mention graph

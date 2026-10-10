@@ -5,7 +5,7 @@ person, completes. The server checks the result before storing it.
 
 ## Work items
 
-`compact`, through the tool or `memo-mcp compact`, scans a namespace and creates items:
+`compact`, through the tool or `memors-mcp compact`, scans a namespace and creates items:
 
 | Kind | Created when |
 |---|---|
@@ -21,12 +21,12 @@ page. No second call is needed.
 ## Submitting
 
 ```bash
-memo-mcp compact --ns default --kinds page,stale --json
-memo-mcp submit 42 --content-file page.md --title "Quorum replication" --dry-run
-memo-mcp submit 42 --content-file page.md --title "Quorum replication"
-memo-mcp submit 43 --keep memo://fact/0199…
-memo-mcp submit 44 --accept            # merge item
-memo-mcp submit 45 --skip --reason "not worth a page"
+memors-mcp compact --ns default --kinds page,stale --json
+memors-mcp submit 42 --content-file page.md --title "Quorum replication" --dry-run
+memors-mcp submit 42 --content-file page.md --title "Quorum replication"
+memors-mcp submit 43 --keep memo://fact/0199…
+memors-mcp submit 44 --accept            # merge item
+memors-mcp submit 45 --skip --reason "not worth a page"
 ```
 
 Every page submission reports:
@@ -43,7 +43,7 @@ Pages are stored as `is_inference = 1`, with the passages they cite. They are se
 ## Lint
 
 ```bash
-memo-mcp lint --json
+memors-mcp lint --json
 ```
 
 Reports contradictions, orphan entities, missing pages, stale pages and expired facts, with
@@ -54,16 +54,16 @@ addresses. Lint changes nothing.
 For unattended page writing from the terminal:
 
 ```bash
-MEMO_OLLAMA_MODEL=qwen2.5:7b-instruct memo-mcp compact --kinds page --executor ollama          # dry run
-MEMO_OLLAMA_MODEL=qwen2.5:7b-instruct memo-mcp compact --kinds page --executor ollama --apply  # submit
+MEMORS_OLLAMA_MODEL=qwen2.5:7b-instruct memors-mcp compact --kinds page --executor ollama          # dry run
+MEMORS_OLLAMA_MODEL=qwen2.5:7b-instruct memors-mcp compact --kinds page --executor ollama --apply  # submit
 ```
 
-- The endpoint is `MEMO_OLLAMA_URL`, default `http://127.0.0.1:11434`. It must be loopback
+- The endpoint is `MEMORS_OLLAMA_URL`, default `http://127.0.0.1:11434`. It must be loopback
   unless `--allow-remote` is passed.
 - Use a non-thinking instruction model. Every page still goes through the same checks.
 - No MCP code path can reach the executor.
 
 ## Observing it
 
-`memo_kb_work_items_open`, `memo_kb_pages`, `memo_kb_pages_stale`,
-`memo_store_work_items_total{kind,event}` and `memo_store_pages_marked_stale_total`.
+`memors_kb_work_items_open`, `memors_kb_pages`, `memors_kb_pages_stale`,
+`memors_store_work_items_total{kind,event}` and `memors_store_pages_marked_stale_total`.

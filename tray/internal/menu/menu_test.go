@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/live"
+	"github.com/kKEo/memors/internal/live"
 )
 
 var now = time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
@@ -35,15 +35,15 @@ func running(snap *live.Snapshot) ServerView {
 }
 
 func TestEmpty(t *testing.T) {
-	got := titles(Build(Input{Now: now, Memo: "memo-mcp v1 at /bin/memo-mcp", MemoOK: true}), "")
-	want := `No memo-mcp servers running [off]
+	got := titles(Build(Input{Now: now, Memors: "memors-mcp v1 at /bin/memors-mcp", MemorsOK: true}), "")
+	want := `No memors-mcp servers running [off]
 ---
 Start Server
-  > No knowledge bases yet (memo-mcp ingest creates one) [off]
+  > No knowledge bases yet (memors-mcp ingest creates one) [off]
 Settings…
-Install or Update memo-mcp…
+Install or Update memors-mcp…
 ---
-Quit memo-tray
+Quit memors-tray
 `
 	if got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
@@ -57,7 +57,7 @@ func TestServerWithAgents(t *testing.T) {
 		{Key: "k3", Client: "gone", Since: now.Add(-time.Hour), LastSeen: now.Add(-time.Minute)},
 		{Key: "k4", Client: "new", Since: now, LastSeen: now, Open: true, Stream: true},
 	}, InFlight: []live.Call{{Tool: "search", SessionKey: "k2", Started: now.Add(-3 * time.Second)}}}
-	in := Input{Now: now, Servers: []ServerView{running(snap)}, KBs: []string{"crportal", "default"}, Memo: "m", MemoOK: true, StopsOnQuit: 1}
+	in := Input{Now: now, Servers: []ServerView{running(snap)}, KBs: []string{"crportal", "default"}, Memors: "m", MemorsOK: true, StopsOnQuit: 1}
 	got := titles(Build(in), "")
 	want := `crportal · 127.0.0.1:8765 · running
   > Open Stats Window
@@ -75,9 +75,9 @@ func TestServerWithAgents(t *testing.T) {
 Start Server
   > default
 Settings…
-Install or Update memo-mcp…
+Install or Update memors-mcp…
 ---
-Quit memo-tray (stops 1 server)
+Quit memors-tray (stops 1 server)
 `
 	if got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
@@ -95,14 +95,14 @@ Quit memo-tray (stops 1 server)
 }
 
 func TestStoppedCrashedAndProblems(t *testing.T) {
-	in := Input{Now: now, MemoOK: false, Memo: "memo-mcp not found", Problem: "tray.json: bad", KBs: []string{"a", "b"}, Servers: []ServerView{
+	in := Input{Now: now, MemorsOK: false, Memors: "memors-mcp not found", Problem: "tray.json: bad", KBs: []string{"a", "b"}, Servers: []ServerView{
 		{Key: "kb:a", KB: "a", State: Crashed, Detail: "exit status 3", Configured: true, HasLog: true},
 		{Key: "kb:b", KB: "b", State: Stopped, Configured: true},
 		{Key: "https://box:9", KB: "c", URL: "https://box:9", Auth: "token", State: Unreachable, Detail: "token refused", MTLS: true},
 	}}
 	got := titles(Build(in), "")
-	if items := Build(in); items[0].Title != "Install memo-mcp…" || items[0].Action.Kind != OpenSetup || items[0].Tooltip != "memo-mcp not found" {
-		t.Errorf("first item when memo-mcp is missing = %+v", items[0])
+	if items := Build(in); items[0].Title != "Install memors-mcp…" || items[0].Action.Kind != OpenSetup || items[0].Tooltip != "memors-mcp not found" {
+		t.Errorf("first item when memors-mcp is missing = %+v", items[0])
 	}
 	for _, want := range []string{
 		"⚠ tray.json: bad [off]",
@@ -122,7 +122,7 @@ func TestStoppedCrashedAndProblems(t *testing.T) {
 
 func TestSameShape(t *testing.T) {
 	snap := &live.Snapshot{Sessions: []live.Session{{Key: "k1", Client: "c", LastSeen: now, LastCall: now, Calls: 2, Open: true}}}
-	in := Input{Now: now, Servers: []ServerView{running(snap)}, MemoOK: true}
+	in := Input{Now: now, Servers: []ServerView{running(snap)}, MemorsOK: true}
 	a := Build(in)
 	in.Now = now.Add(time.Minute) // titles change, shape does not
 	b := Build(in)
@@ -139,9 +139,9 @@ func TestClaudeAddCommand(t *testing.T) {
 	for _, c := range []struct {
 		kb, url, auth, file, want string
 	}{
-		{"default", "http://127.0.0.1:8765", "none", "", `claude mcp add --transport http memo 'http://127.0.0.1:8765/mcp'`},
-		{"crportal", "http://127.0.0.1:8766", "token", "/h/http-token", `claude mcp add --transport http memo-crportal 'http://127.0.0.1:8766/mcp' --header "Authorization: Bearer $(memo-mcp http-token)"`},
-		{"my.kb", "http://127.0.0.1:1", "token", "/etc/it's", `claude mcp add --transport http memo-my-kb 'http://127.0.0.1:1/mcp' --header "Authorization: Bearer $(memo-mcp http-token --file '/etc/it'\''s')"`},
+		{"default", "http://127.0.0.1:8765", "none", "", `claude mcp add --transport http memors 'http://127.0.0.1:8765/mcp'`},
+		{"crportal", "http://127.0.0.1:8766", "token", "/h/http-token", `claude mcp add --transport http memors-crportal 'http://127.0.0.1:8766/mcp' --header "Authorization: Bearer $(memors-mcp http-token)"`},
+		{"my.kb", "http://127.0.0.1:1", "token", "/etc/it's", `claude mcp add --transport http memors-my-kb 'http://127.0.0.1:1/mcp' --header "Authorization: Bearer $(memors-mcp http-token --file '/etc/it'\''s')"`},
 	} {
 		if got := ClaudeAddCommand(c.kb, c.url, c.auth, c.file, "/h/http-token"); got != c.want {
 			t.Errorf("ClaudeAddCommand(%s) =\n%s\nwant\n%s", c.kb, got, c.want)

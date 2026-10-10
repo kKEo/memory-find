@@ -1,6 +1,6 @@
-// Package loginitem starts memo-tray when you log in, with a per-user
-// LaunchAgent (~/Library/LaunchAgents/io.github.kkeo.memo-tray.plist).
-// The agent takes effect at the next login; memo-tray never loads it into
+// Package loginitem starts memors-tray when you log in, with a per-user
+// LaunchAgent (~/Library/LaunchAgents/io.github.kkeo.memors-tray.plist).
+// The agent takes effect at the next login; memors-tray never loads it into
 // the running session, so turning it on does not start a second copy.
 package loginitem
 
@@ -17,16 +17,19 @@ import (
 )
 
 // Label identifies the LaunchAgent.
-const Label = "io.github.kkeo.memo-tray"
+const Label = "io.github.kkeo.memors-tray"
 
-// ErrTranslocated means macOS is running memo-tray from a temporary copy
+// LegacyLabel is the LaunchAgent memors-tray had when it was memo-tray.
+const LegacyLabel = "io.github.kkeo.memo-tray"
+
+// ErrTranslocated means macOS is running memors-tray from a temporary copy
 // (App Translocation), a path that will not exist at the next login.
-var ErrTranslocated = errors.New("macOS is running memo-tray from a temporary location; move memo-tray.app to Applications and open it from there")
+var ErrTranslocated = errors.New("macOS is running memors-tray from a temporary location; move memors-tray.app to Applications and open it from there")
 
 // Agent manages the LaunchAgent for one user.
 type Agent struct {
 	Home       string // the user's home directory
-	Executable string // memo-tray's executable, as it should start at login
+	Executable string // memors-tray's executable, as it should start at login
 }
 
 // Path is the agent's plist.
@@ -34,7 +37,7 @@ func (a Agent) Path() string {
 	return filepath.Join(a.Home, "Library", "LaunchAgents", Label+".plist")
 }
 
-// Enabled reports whether memo-tray starts at login.
+// Enabled reports whether memors-tray starts at login.
 func (a Agent) Enabled() bool {
 	_, err := os.Stat(a.Path())
 	return err == nil
@@ -79,7 +82,7 @@ func (a Agent) Enable() error {
 	if err := os.MkdirAll(filepath.Dir(a.Path()), 0o755); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(a.Path()), ".memo-tray-*.tmp")
+	tmp, err := os.CreateTemp(filepath.Dir(a.Path()), ".memors-tray-*.tmp")
 	if err != nil {
 		return err
 	}
@@ -133,7 +136,27 @@ func (a Agent) Program() string {
 	return ""
 }
 
-// Repair points an enabled agent at Executable again, after memo-tray
+// AdoptLegacy carries "open at login" over from memo-tray: when its
+// LaunchAgent exists, this agent is enabled in its place and the old one is
+// removed. A start from a temporary location (App Translocation) leaves the
+// old agent for a later start to adopt.
+func (a Agent) AdoptLegacy() error {
+	old := filepath.Join(a.Home, "Library", "LaunchAgents", LegacyLabel+".plist")
+	if _, err := os.Stat(old); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if strings.Contains(a.Executable, "/AppTranslocation/") {
+		return nil
+	}
+	if err := a.Enable(); err != nil {
+		return err
+	}
+	return os.Remove(old)
+}
+
+// Repair points an enabled agent at Executable again, after memors-tray
 // was moved; it does nothing when the agent is off or already right.
 func (a Agent) Repair() error {
 	if !a.Enabled() || a.Program() == a.Executable || strings.Contains(a.Executable, "/AppTranslocation/") {

@@ -2,11 +2,11 @@
 
 ## How to ask
 
-Ask the way you would ask a colleague, and mention memo so Claude checks the memory first:
+Ask the way you would ask a colleague, and mention memors so Claude checks the memory first:
 
-> What does memo say about how we handle failed payments?
+> What does memors say about how we handle failed payments?
 
-> Check memo: which version of the gRPC library do we use, and what changed in it?
+> Check memors: which version of the gRPC library do we use, and what changed in it?
 
 Claude searches and reads the most relevant passages. It then answers and names its sources.
 
@@ -33,7 +33,7 @@ the browser view. See [Looking inside](../looking-inside.md).
 
 ## When nothing is found
 
-If the memory holds nothing relevant, memo-mcp says so plainly and does not offer the closest
+If the memory holds nothing relevant, memors-mcp says so plainly and does not offer the closest
 guess. That is deliberate. "We don't have this" is more useful than a confident wrong answer.
 Claude then knows to look elsewhere. Once it finds the answer, ask it to save it, so the next
 person does not have to search again.
@@ -51,4 +51,4 @@ to narrow it, for example by version or by shelf. You can say:
 
 Because old versions are kept, you can ask what the memory said at an earlier date:
 
-> What did memo say our database version was on 1 March?
+> What did memors say our database version was on 1 March?

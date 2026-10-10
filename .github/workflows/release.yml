@@ -2,7 +2,7 @@
 # version from the tag, then the server.json gets the archive checksum and is
 # published to the MCP registry with GitHub OIDC (no stored secret; the
 # `mcp-name` marker in README.md proves ownership of io.github.kKEo/*).
-# Once the release exists, a macOS job adds memo-tray.app (zip + SHA-256);
+# Once the release exists, a macOS job adds memors-tray.app (zip + SHA-256);
 # it runs separately, so a tray failure never holds back the server.
 name: release
 on:
@@ -34,7 +34,7 @@ jobs:
         run: |
           set -eu
           TAG="${GITHUB_REF_NAME#v}"
-          SUM=$(grep "memo-mcp_${TAG}_linux_amd64.tar.gz" dist/checksums.txt | cut -d' ' -f1)
+          SUM=$(grep "memors-mcp_${TAG}_linux_amd64.tar.gz" dist/checksums.txt | cut -d' ' -f1)
           sed -e "s/__VERSION__/${TAG}/g" -e "s/__SHA256_LINUX_AMD64__/${SUM}/g" server.json > dist/server.json
           cat dist/server.json
       - name: install mcp-publisher
@@ -56,7 +56,7 @@ jobs:
           cache-dependency-path: tray/go.sum
       - name: tests
         run: make tray-test
-      - name: build memo-tray.app
+      - name: build memors-tray.app
         run: make tray-app VERSION="$GITHUB_REF_NAME"
       - name: attach to the release
         env:

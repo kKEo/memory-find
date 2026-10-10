@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/kKEo/memory-find/internal/chunk"
-	"github.com/kKEo/memory-find/internal/graph"
+	"github.com/kKEo/memors/internal/chunk"
+	"github.com/kKEo/memors/internal/graph"
 )
 
 // Layer L4: entities, mentions, merge candidates, edges (roadmap P7). The

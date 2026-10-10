@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kKEo/memory-find/internal/embedding"
+	"github.com/kKEo/memors/internal/embedding"
 )
 
 func openTestStore(t *testing.T, emb embedding.Embedder) (*Store, *sql.DB) {

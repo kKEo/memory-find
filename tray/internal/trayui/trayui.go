@@ -9,7 +9,7 @@ import (
 
 	"fyne.io/systray"
 
-	"github.com/kKEo/memory-find/tray/internal/menu"
+	"github.com/kKEo/memors/tray/internal/menu"
 )
 
 // UI is the menu bar. Render may be called from any goroutine except the

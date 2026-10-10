@@ -4,7 +4,7 @@ Sometimes a note is wrong, out of date, or should never have been saved.
 
 ## Asking Claude to forget
 
-> Forget the old onboarding note in memo; it describes the previous tooling.
+> Forget the old onboarding note in memors; it describes the previous tooling.
 
 Claude asks for, or supplies, a short reason. The note then disappears from searches.
 
@@ -20,7 +20,7 @@ own records.
 To remove something yourself, use the terminal with the item's address:
 
 ```bash
-memo-mcp forget memo://doc/01a1... --reason "replaced by the 2026 policy"
+memors-mcp forget memo://doc/01a1... --reason "replaced by the 2026 policy"
 ```
 
 ## Removing text completely
@@ -29,7 +29,7 @@ Forgetting hides an item and keeps its text in history. If text must be erased, 
 password pasted by mistake, add `--redact`:
 
 ```bash
-memo-mcp forget memo://doc/01a1... --reason "contained a secret" --redact
+memors-mcp forget memo://doc/01a1... --reason "contained a secret" --redact
 ```
 
 The record that something was removed stays. The text itself is gone.

@@ -14,24 +14,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kKEo/memory-find/tray/internal/config"
-	"github.com/kKEo/memory-find/tray/internal/installer"
-	"github.com/kKEo/memory-find/tray/internal/locate"
+	"github.com/kKEo/memors/tray/internal/config"
+	"github.com/kKEo/memors/tray/internal/installer"
+	"github.com/kKEo/memors/tray/internal/locate"
 )
 
-// With MEMO_TRAY_LIVE_GITHUB=1, walk the whole assistant the way a window
-// does, against the real latest release: install memo-mcp into a temporary
+// With MEMORS_TRAY_LIVE_GITHUB=1, walk the whole assistant the way a window
+// does, against the real latest release: install memors-mcp into a temporary
 // folder, list its embedding models, save a knowledge base, get the
 // command that connects Claude Code.
 func TestLiveWizard(t *testing.T) {
-	if os.Getenv("MEMO_TRAY_LIVE_GITHUB") != "1" {
-		t.Skip("set MEMO_TRAY_LIVE_GITHUB=1 to download the real latest release")
+	if os.Getenv("MEMORS_TRAY_LIVE_GITHUB") != "1" {
+		t.Skip("set MEMORS_TRAY_LIVE_GITHUB=1 to download the real latest release")
 	}
 	homeDir := t.TempDir()
 	var events []Event
 	s, err := New(Deps{
 		Home: homeDir, TrayVersion: "test", GOARCH: runtime.GOARCH,
-		Releases: installer.New("memo-tray-test"), FindMemo: locate.MemoBinary, MemoVersion: locate.Version,
+		Releases: installer.New("memors-tray-test"), FindMemors: locate.MemorsBinary, MemorsVersion: locate.Version,
 		Models: ListModels(homeDir), Login: &fakeLogin{}, PortFree: config.PortFree,
 		Copy: func(string) error { return nil }, OpenFile: func(string, string) error { return nil },
 		Notify: func(e Event) { events = append(events, e) }, Logf: t.Logf,
@@ -66,7 +66,7 @@ func TestLiveWizard(t *testing.T) {
 		return string(b)
 	}
 
-	if body := get(s.Entry("/wizard/install")); !strings.Contains(body, "memo-mcp_") {
+	if body := get(s.Entry("/wizard/install")); !strings.Contains(body, "memors-mcp_") {
 		t.Fatalf("install page:\n%s", body)
 	}
 	dir := filepath.Join(t.TempDir(), "bin")
@@ -81,19 +81,19 @@ func TestLiveWizard(t *testing.T) {
 	}
 	body = get(s.Origin() + "/wizard/kb")
 	if !strings.Contains(body, `<option value="potion"`) {
-		t.Fatalf("models were not listed from the installed memo-mcp:\n%s", body)
+		t.Fatalf("models were not listed from the installed memors-mcp:\n%s", body)
 	}
 	body = post("/wizard/kb", url.Values{"name": {"live"}, "auth": {"none"}, "autostart": {"on"}})
-	if !strings.Contains(body, "claude mcp add --transport http memo-live") {
+	if !strings.Contains(body, "claude mcp add --transport http memors-live") {
 		t.Fatalf("done page:\n%s", body)
 	}
 	cfg, err := config.Load(config.Path(homeDir))
-	if err != nil || cfg.MemoBinary != filepath.Join(dir, "memo-mcp") || cfg.Find("live") == nil {
+	if err != nil || cfg.MemorsBinary != filepath.Join(dir, "memors-mcp") || cfg.Find("live") == nil {
 		t.Fatalf("tray.json = %+v, %v", cfg, err)
 	}
-	if v, err := locate.Version(context.Background(), cfg.MemoBinary); err != nil {
+	if v, err := locate.Version(context.Background(), cfg.MemorsBinary); err != nil {
 		t.Fatal(err)
 	} else {
-		t.Logf("installed memo-mcp %s; events %v", v, events)
+		t.Logf("installed memors-mcp %s; events %v", v, events)
 	}
 }

@@ -1,6 +1,6 @@
 # Welcome
 
-**memo-mcp gives your AI assistant a memory it can show its work from.**
+**memors-mcp gives your AI assistant a memory it can show its work from.**
 
 You tell Claude something once: how your team deploys, why a decision was made, which version
 of a library you use. Claude saves it. Next week, in a new conversation, Claude finds it again
@@ -8,7 +8,7 @@ and tells you exactly where the answer came from, who wrote it down, and when.
 
 Everything lives in one file on your own computer. Nothing is sent to a cloud service.
 
-![You tell and ask Claude; Claude saves to and searches memo-mcp, which keeps one memory file on your computer. Every result carries where it came from, who vouched for it, when it was saved and how strong the match is.](images/how-it-works.svg)
+![You tell and ask Claude; Claude saves to and searches memors-mcp, which keeps one memory file on your computer. Every result carries where it came from, who vouched for it, when it was saved and how strong the match is.](images/how-it-works.svg)
 
 ## Who this is for
 
@@ -21,7 +21,7 @@ Everything lives in one file on your own computer. Nothing is sent to a cloud se
 
 ## What it is not
 
-- It is not a chat app. You keep using Claude as usual; memo-mcp works in the background.
+- It is not a chat app. You keep using Claude as usual; memors-mcp works in the background.
 - It is not a cloud service. There is no account, no subscription and no upload.
 - It does not browse the web. Claude finds information and hands it over to be saved.
 - It does not decide what is true on your behalf. Notes Claude writes are marked as Claude's

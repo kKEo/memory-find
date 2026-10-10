@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- memo-tray.app. @SHORT_VERSION@ is filled in by scripts/build-app.sh. -->
+<!-- memors-tray.app. @SHORT_VERSION@ is filled in by scripts/build-app.sh. -->
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>memo-tray</string>
+	<string>memors-tray</string>
 	<key>CFBundleDisplayName</key>
-	<string>memo-tray</string>
+	<string>memors-tray</string>
 	<key>CFBundleIdentifier</key>
-	<string>io.github.kkeo.memo-tray</string>
+	<string>io.github.kkeo.memors-tray</string>
 	<key>CFBundleExecutable</key>
-	<string>memo-tray</string>
+	<string>memors-tray</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>
@@ -30,8 +30,8 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>MIT License · github.com/kKEo/memory-find</string>
-	<!-- Stats windows load memo-mcp's pages over plain HTTP on loopback. -->
+	<string>MIT License · github.com/kKEo/memors</string>
+	<!-- Stats windows load memors-mcp's pages over plain HTTP on loopback. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

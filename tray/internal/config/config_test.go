@@ -16,7 +16,7 @@ func TestLoadSave(t *testing.T) {
 		t.Fatalf("missing file: %+v %v", c, err)
 	}
 	no := false
-	c.Servers = []Server{{KB: "crportal", Addr: "127.0.0.1:8765", Auth: "token", Autostart: true, Env: map[string]string{"MEMO_MODEL": "potion"}}}
+	c.Servers = []Server{{KB: "crportal", Addr: "127.0.0.1:8765", Auth: "token", Autostart: true, Env: map[string]string{"MEMORS_MODEL": "potion"}}}
 	c.StopOnQuit = &no
 	if err := c.Save(path); err != nil {
 		t.Fatal(err)
@@ -28,7 +28,7 @@ func TestLoadSave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s := back.Find("crportal"); s == nil || s.Addr != "127.0.0.1:8765" || s.Auth != "token" || !s.Autostart || s.Env["MEMO_MODEL"] != "potion" || back.StopsOnQuit() {
+	if s := back.Find("crportal"); s == nil || s.Addr != "127.0.0.1:8765" || s.Auth != "token" || !s.Autostart || s.Env["MEMORS_MODEL"] != "potion" || back.StopsOnQuit() {
 		t.Errorf("round trip = %+v", back)
 	}
 	if err := os.WriteFile(path, []byte(`{"servers":[{"kb":"x","addr":"0.0.0.0:1"}]}`), 0o600); err != nil {
@@ -53,8 +53,8 @@ func TestValidate(t *testing.T) {
 		{"no port", Config{Servers: []Server{{KB: "a", Addr: "127.0.0.1"}}}, "addr"},
 		{"bad port", Config{Servers: []Server{{KB: "a", Addr: "127.0.0.1:99999"}}}, "bad port"},
 		{"bad auth", Config{Servers: []Server{{KB: "a", Addr: "127.0.0.1:1", Auth: "basic"}}}, "none or token"},
-		{"reserved env", Config{Env: map[string]string{"MEMO_HTTP_AUTH": "none"}}, "set by memo-tray"},
-		{"reserved server env", Config{Servers: []Server{{KB: "a", Addr: "127.0.0.1:1", Env: map[string]string{"MEMO_KB": "b"}}}}, "set by memo-tray"},
+		{"reserved env", Config{Env: map[string]string{"MEMORS_HTTP_AUTH": "none"}}, "set by memors-tray"},
+		{"reserved server env", Config{Servers: []Server{{KB: "a", Addr: "127.0.0.1:1", Env: map[string]string{"MEMORS_KB": "b"}}}}, "set by memors-tray"},
 		{"bad env name", Config{Env: map[string]string{"A=B": "x"}}, "variable name"},
 	} {
 		t.Run(c.name, func(t *testing.T) {

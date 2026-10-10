@@ -10,9 +10,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kKEo/memory-find/internal/chunk"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/obs"
+	"github.com/kKEo/memors/internal/chunk"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/obs"
 )
 
 // Observability of the MCP surface (roadmap P10): one receiving middleware
@@ -35,15 +35,15 @@ type mcpMetrics struct {
 func (s *Server) registerMetrics() {
 	r := s.registry
 	s.m = &mcpMetrics{
-		requests:     r.Counter("memo_mcp_requests_total", "MCP requests received, by method and outcome.", "method", "outcome"),
-		inFlight:     r.Gauge("memo_mcp_requests_in_flight", "MCP requests being served right now.").With(),
-		toolCalls:    r.Counter("memo_mcp_tool_calls_total", "Tool calls, by tool and outcome (ok, tool_error, input_required, error).", "tool", "outcome"),
-		toolSeconds:  r.Histogram("memo_mcp_tool_call_duration_seconds", "Tool call latency.", obs.LatencyBuckets, "tool"),
-		toolTokens:   r.Histogram("memo_mcp_tool_result_tokens", "Estimated tokens in a tool result's text.", obs.TokenBuckets, "tool"),
-		toolErrors:   r.Counter("memo_mcp_tool_errors_total", "Tool errors by class (not_found, forgotten, needs_human, canceled, invalid_args, internal).", "tool", "class"),
-		elicitations: r.Counter("memo_mcp_elicitations_total", "Human questions asked by tools, by outcome (asked, accept, decline, cancel, unsupported).", "tool", "outcome"),
-		resources:    r.Counter("memo_mcp_resource_reads_total", "Resource reads, by address kind and outcome.", "kind", "outcome"),
-		sessions:     r.Counter("memo_mcp_sessions_total", "Sessions initialised, by client name.", "client"),
+		requests:     r.Counter("memors_mcp_requests_total", "MCP requests received, by method and outcome.", "method", "outcome"),
+		inFlight:     r.Gauge("memors_mcp_requests_in_flight", "MCP requests being served right now.").With(),
+		toolCalls:    r.Counter("memors_mcp_tool_calls_total", "Tool calls, by tool and outcome (ok, tool_error, input_required, error).", "tool", "outcome"),
+		toolSeconds:  r.Histogram("memors_mcp_tool_call_duration_seconds", "Tool call latency.", obs.LatencyBuckets, "tool"),
+		toolTokens:   r.Histogram("memors_mcp_tool_result_tokens", "Estimated tokens in a tool result's text.", obs.TokenBuckets, "tool"),
+		toolErrors:   r.Counter("memors_mcp_tool_errors_total", "Tool errors by class (not_found, forgotten, needs_human, canceled, invalid_args, internal).", "tool", "class"),
+		elicitations: r.Counter("memors_mcp_elicitations_total", "Human questions asked by tools, by outcome (asked, accept, decline, cancel, unsupported).", "tool", "outcome"),
+		resources:    r.Counter("memors_mcp_resource_reads_total", "Resource reads, by address kind and outcome.", "kind", "outcome"),
+		sessions:     r.Counter("memors_mcp_sessions_total", "Sessions initialised, by client name.", "client"),
 	}
 }
 

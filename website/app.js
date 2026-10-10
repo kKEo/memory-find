@@ -53,7 +53,7 @@
     resultsEl.replaceChildren();
     if (!scored.length) {
       resultsEl.appendChild(el('li', 'empty',
-        'Zero results — no arm is running. memo-mcp says so instead of returning noise.'));
+        'Zero results — no arm is running. memors-mcp says so instead of returning noise.'));
       return;
     }
     scored.forEach((d, i) => {

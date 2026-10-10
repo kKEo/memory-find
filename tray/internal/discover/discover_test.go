@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/runfile"
+	"github.com/kKEo/memors/internal/runfile"
 )
 
 func TestScan(t *testing.T) {
@@ -22,10 +22,10 @@ func TestScan(t *testing.T) {
 	}
 	past, future := time.Now().Add(-time.Hour), time.Now().Add(time.Hour)
 	procs := map[int]Process{
-		101: {Alive: true, Name: "memo-mcp", Started: past},   // ours
-		102: {},                                               // gone
-		103: {Alive: true, Name: "Safari", Started: past},     // pid reused by another program
-		104: {Alive: true, Name: "memo-mcp", Started: future}, // pid reused by a later memo-mcp
+		101: {Alive: true, Name: "memors-mcp", Started: past},   // ours
+		102: {},                                                 // gone
+		103: {Alive: true, Name: "Safari", Started: past},       // pid reused by another program
+		104: {Alive: true, Name: "memors-mcp", Started: future}, // pid reused by a later memors-mcp
 	}
 	entries, err := Scan(dir, func(pid int) Process { return procs[pid] })
 	if err != nil {

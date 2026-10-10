@@ -1,4 +1,4 @@
-// Package app is memo-tray's controller. One goroutine owns all state: it
+// Package app is memors-tray's controller. One goroutine owns all state: it
 // rescans and polls the servers every couple of seconds (and whenever the
 // menu opens), rebuilds the menu model, and carries out what the user
 // picks. Everything it touches outside itself (the menu bar, windows,
@@ -16,13 +16,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/live"
-	"github.com/kKEo/memory-find/internal/runfile"
-	"github.com/kKEo/memory-find/tray/internal/client"
-	"github.com/kKEo/memory-find/tray/internal/config"
-	"github.com/kKEo/memory-find/tray/internal/home"
-	"github.com/kKEo/memory-find/tray/internal/menu"
-	"github.com/kKEo/memory-find/tray/internal/supervisor"
+	"github.com/kKEo/memors/internal/live"
+	"github.com/kKEo/memors/internal/runfile"
+	"github.com/kKEo/memors/tray/internal/client"
+	"github.com/kKEo/memors/tray/internal/config"
+	"github.com/kKEo/memors/tray/internal/home"
+	"github.com/kKEo/memors/tray/internal/menu"
+	"github.com/kKEo/memors/tray/internal/supervisor"
 )
 
 // Supervisor is the part of *supervisor.Supervisor the controller uses.
@@ -35,7 +35,7 @@ type Supervisor interface {
 	LogPath(kb string) string
 }
 
-// Windows shows server pages in windows of memo-tray's own.
+// Windows shows server pages in windows of memors-tray's own.
 type Windows interface {
 	// Open shows url in the window for key (a server's base URL), creating
 	// it or bringing it to the front. origin is where it may navigate.
@@ -48,34 +48,34 @@ type Windows interface {
 
 // Deps is everything the controller reaches outside itself.
 type Deps struct {
-	Home         string
-	Now          func() time.Time
-	Scan         func(runDir string) ([]runfile.Entry, error)
-	Live         func(ctx context.Context, t client.Target) (live.Snapshot, error)
-	StatsURL     func(ctx context.Context, t client.Target, path string) (string, error)
-	StopExternal func(ctx context.Context, e runfile.Entry) error
-	Gone         func(pid int) bool // the process has exited
-	Supervisor   Supervisor
-	FindMemo     func(configured string) (string, error)
-	MemoVersion  func(ctx context.Context, bin string) (string, error)
-	PortFree     func(addr string) bool
-	Render       func(items []menu.Item, title string)
-	Windows      Windows
-	OpenURL      func(url string) error              // default browser
-	OpenFile     func(path string, how string) error // how: "log", "text", "folder"
-	Copy         func(text string) error
-	Quit         func() // ends the menu-bar loop
-	Logf         func(format string, args ...any)
-	Setup        Pages // memo-tray's own pages: settings and the setup assistant
+	Home          string
+	Now           func() time.Time
+	Scan          func(runDir string) ([]runfile.Entry, error)
+	Live          func(ctx context.Context, t client.Target) (live.Snapshot, error)
+	StatsURL      func(ctx context.Context, t client.Target, path string) (string, error)
+	StopExternal  func(ctx context.Context, e runfile.Entry) error
+	Gone          func(pid int) bool // the process has exited
+	Supervisor    Supervisor
+	FindMemors    func(configured string) (string, error)
+	MemorsVersion func(ctx context.Context, bin string) (string, error)
+	PortFree      func(addr string) bool
+	Render        func(items []menu.Item, title string)
+	Windows       Windows
+	OpenURL       func(url string) error              // default browser
+	OpenFile      func(path string, how string) error // how: "log", "text", "folder"
+	Copy          func(text string) error
+	Quit          func() // ends the menu-bar loop
+	Logf          func(format string, args ...any)
+	Setup         Pages // memors-tray's own pages: settings and the setup assistant
 }
 
-// Pages are memo-tray's own pages (*setup.Server).
+// Pages are memors-tray's own pages (*setup.Server).
 type Pages interface {
 	Entry(page string) string // the link a window opens to land on page
 	Origin() string
 }
 
-// Window keys of memo-tray's own pages; servers' windows use their URL.
+// Window keys of memors-tray's own pages; servers' windows use their URL.
 const (
 	settingsWindow = "tray:settings"
 	setupWindow    = "tray:setup"
@@ -100,17 +100,17 @@ type App struct {
 	cfg        *config.Config
 	cfgErr     error
 	cfgMod     time.Time
-	memoBin    string
-	memoVer    string
-	memoErr    error
-	memoAt     time.Time
+	memorsBin  string
+	memorsVer  string
+	memorsErr  error
+	memorsAt   time.Time
 	polls      map[string]*poll // by base URL
 	views      map[string]view  // last menu rows, by key
 	instances  map[string]string
 	note       string
 	noteUntil  time.Time
 	autostart  bool
-	firstRun   bool // offer the setup assistant once, if memo-mcp is missing
+	firstRun   bool // offer the setup assistant once, if memors-mcp is missing
 	quitting   bool
 	busyMu     sync.Mutex
 	busy       map[string]bool // knowledge bases with a start/stop in progress
@@ -145,14 +145,14 @@ func (a *App) Do(act menu.Action) {
 
 // MenuOpened asks for an immediate refresh.
 // ConfigChanged makes the controller reread tray.json and look for
-// memo-mcp again now (the settings pages saved them).
+// memors-mcp again now (the settings pages saved them).
 func (a *App) ConfigChanged() { a.Do(menu.Action{Kind: reloadAction}) }
 
 // StartIfStopped starts a knowledge base's server unless one runs.
 func (a *App) StartIfStopped(kb string) { a.Do(menu.Action{Kind: startIfStopped, KB: kb}) }
 
-// RestartManaged restarts the servers memo-tray started (to run a new
-// memo-mcp).
+// RestartManaged restarts the servers memors-tray started (to run a new
+// memors-mcp).
 func (a *App) RestartManaged() { a.Do(menu.Action{Kind: restartManaged}) }
 
 func (a *App) MenuOpened() {
@@ -193,7 +193,7 @@ func (a *App) Run(ctx context.Context) {
 	}
 }
 
-// Shutdown stops the servers memo-tray started, when tray.json says so.
+// Shutdown stops the servers memors-tray started, when tray.json says so.
 // It is safe to call more than once and from any goroutine, and it never
 // touches the menu bar.
 func (a *App) Shutdown() {
@@ -208,11 +208,11 @@ func (a *App) Shutdown() {
 func (a *App) tick(ctx context.Context) {
 	now := a.d.Now()
 	a.loadConfig()
-	a.findMemo(ctx, now)
+	a.findMemors(ctx, now)
 	if a.firstRun {
 		a.firstRun = false
-		if _, err := os.Stat(config.Path(a.d.Home)); a.memoErr != nil && errors.Is(err, os.ErrNotExist) && a.d.Setup != nil {
-			a.openPage(setupWindow, "Set up memo-mcp", "/wizard") // first launch, nothing installed yet
+		if _, err := os.Stat(config.Path(a.d.Home)); a.memorsErr != nil && errors.Is(err, os.ErrNotExist) && a.d.Setup != nil {
+			a.openPage(setupWindow, "Set up memors-mcp", "/wizard") // first launch, nothing installed yet
 		}
 	}
 	entries, scanErr := a.d.Scan(runfile.Dir(a.d.Home))
@@ -246,7 +246,7 @@ func (a *App) tick(ctx context.Context) {
 	if a.cfg.StopsOnQuit() {
 		stops = a.d.Supervisor.Running()
 	}
-	in := menu.Input{Now: now, Servers: rows, KBs: kbs, Memo: a.memoLine(), MemoOK: a.memoErr == nil, Problem: problem,
+	in := menu.Input{Now: now, Servers: rows, KBs: kbs, Memors: a.memorsLine(), MemorsOK: a.memorsErr == nil, Problem: problem,
 		StopsOnQuit: stops, DefaultTokenFile: filepath.Join(a.d.Home, "http-token")}
 	a.d.Render(menu.Build(in), menu.Title(in))
 }
@@ -271,31 +271,31 @@ func (a *App) loadConfig() {
 		return // keep the last good settings
 	}
 	a.cfg = cfg
-	a.memoAt = time.Time{} // memo_binary may have changed
+	a.memorsAt = time.Time{} // memors_binary may have changed
 }
 
-// findMemo locates memo-mcp at most once a minute.
-func (a *App) findMemo(ctx context.Context, now time.Time) {
-	if !a.memoAt.IsZero() && now.Sub(a.memoAt) < time.Minute {
+// findMemors locates memors-mcp at most once a minute.
+func (a *App) findMemors(ctx context.Context, now time.Time) {
+	if !a.memorsAt.IsZero() && now.Sub(a.memorsAt) < time.Minute {
 		return
 	}
-	a.memoAt = now
-	a.memoBin, a.memoErr = a.d.FindMemo(a.cfg.MemoBinary)
-	a.memoVer = ""
-	if a.memoErr == nil {
-		a.memoVer, _ = a.d.MemoVersion(ctx, a.memoBin)
+	a.memorsAt = now
+	a.memorsBin, a.memorsErr = a.d.FindMemors(a.cfg.MemorsBinary)
+	a.memorsVer = ""
+	if a.memorsErr == nil {
+		a.memorsVer, _ = a.d.MemorsVersion(ctx, a.memorsBin)
 	}
 }
 
-func (a *App) memoLine() string {
-	if a.memoErr != nil {
-		return a.memoErr.Error()
+func (a *App) memorsLine() string {
+	if a.memorsErr != nil {
+		return a.memorsErr.Error()
 	}
-	v := a.memoVer
+	v := a.memorsVer
 	if v == "" {
 		v = "(version unknown)"
 	}
-	return "memo-mcp " + v + " at " + a.memoBin
+	return "memors-mcp " + v + " at " + a.memorsBin
 }
 
 // pollAll fetches /live.json from every server at once.
@@ -345,7 +345,7 @@ func (a *App) pollAll(ctx context.Context, entries []runfile.Entry) {
 	}
 }
 
-// merge joins run files, the servers memo-tray started and tray.json into
+// merge joins run files, the servers memors-tray started and tray.json into
 // menu rows.
 func (a *App) merge(now time.Time, entries []runfile.Entry) ([]view, string) {
 	children := a.d.Supervisor.Snapshot()
@@ -404,7 +404,7 @@ func (a *App) merge(now time.Time, entries []runfile.Entry) ([]view, string) {
 		case supervisor.Running:
 			v.State = menu.Starting
 			if now.Sub(c.Started) > runFileWait {
-				v.Detail = "no run file yet: is memo-mcp older than memo-tray?"
+				v.Detail = "no run file yet: is memors-mcp older than memors-tray?"
 			}
 		case supervisor.Stopping:
 			v.State = menu.Stopping
@@ -447,7 +447,7 @@ func (a *App) followRestarts(ctx context.Context, views []view) {
 		if !current[url] {
 			delete(a.instances, url)
 			if a.d.Windows.Has(url) {
-				a.d.Windows.ShowMessage(url, "This memo-mcp server has stopped. The window updates when it is back.")
+				a.d.Windows.ShowMessage(url, "This memors-mcp server has stopped. The window updates when it is back.")
 			}
 		}
 	}
@@ -470,7 +470,7 @@ func (a *App) startAutostart(views []view) {
 func (a *App) handle(ctx context.Context, act menu.Action) {
 	if a.cfg == nil { // before the first tick
 		a.loadConfig()
-		a.findMemo(ctx, a.d.Now())
+		a.findMemors(ctx, a.d.Now())
 	}
 	v, hasView := a.views[act.Server]
 	switch act.Kind {
@@ -522,15 +522,15 @@ func (a *App) handle(ctx context.Context, act menu.Action) {
 		a.quitting = true
 		a.d.Quit()
 	case menu.OpenSettings:
-		a.openPage(settingsWindow, "memo-tray Settings", "/settings")
+		a.openPage(settingsWindow, "memors-tray Settings", "/settings")
 	case menu.OpenSetup:
-		a.openPage(setupWindow, "Set up memo-mcp", "/wizard")
+		a.openPage(setupWindow, "Set up memors-mcp", "/wizard")
 	case reloadAction:
-		a.cfgMod, a.memoAt = time.Time{}, time.Time{}
+		a.cfgMod, a.memorsAt = time.Time{}, time.Time{}
 	case startIfStopped:
-		a.cfgMod, a.memoAt = time.Time{}, time.Time{}
+		a.cfgMod, a.memorsAt = time.Time{}, time.Time{}
 		a.loadConfig()
-		a.findMemo(ctx, a.d.Now())
+		a.findMemors(ctx, a.d.Now())
 		for _, v := range a.views {
 			if v.KB == act.KB && v.State != menu.Stopped && v.State != menu.Crashed {
 				return
@@ -538,7 +538,7 @@ func (a *App) handle(ctx context.Context, act menu.Action) {
 		}
 		a.start(act.KB)
 	case restartManaged:
-		a.memoAt = time.Time{}
+		a.memorsAt = time.Time{}
 		for _, v := range a.views {
 			if v.Managed && v.State != menu.Stopped && v.State != menu.Crashed {
 				a.stop(ctx, v, true)
@@ -562,14 +562,14 @@ func (a *App) openStats(ctx context.Context, v view) {
 		a.report("open stats window", err)
 		return
 	}
-	a.d.Windows.Open(v.URL, "memo-mcp · "+v.KB, u, v.URL)
+	a.d.Windows.Open(v.URL, "memors-mcp · "+v.KB, u, v.URL)
 }
 
 // start runs a knowledge base's server from tray.json, giving it an
 // address first if it has none.
 func (a *App) start(kb string) {
-	if a.memoErr != nil {
-		a.report("start "+kb, a.memoErr)
+	if a.memorsErr != nil {
+		a.report("start "+kb, a.memorsErr)
 		return
 	}
 	if !home.ValidName(kb) {
@@ -603,7 +603,7 @@ func (a *App) start(kb string) {
 	for k, v := range s.Env {
 		env[k] = v
 	}
-	if err := a.d.Supervisor.Start(a.memoBin, supervisor.Spec{KB: kb, Addr: addr, Auth: s.Auth, Env: env}); err != nil {
+	if err := a.d.Supervisor.Start(a.memorsBin, supervisor.Spec{KB: kb, Addr: addr, Auth: s.Auth, Env: env}); err != nil {
 		a.report("start "+kb, err)
 		return
 	}
@@ -694,7 +694,7 @@ const (
 	restartManaged
 )
 
-// openPage shows one of memo-tray's own pages in its window.
+// openPage shows one of memors-tray's own pages in its window.
 func (a *App) openPage(key, title, page string) {
 	if a.d.Setup == nil {
 		return

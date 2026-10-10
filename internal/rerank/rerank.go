@@ -15,7 +15,7 @@ import (
 	"github.com/knights-analytics/hugot"
 	"github.com/knights-analytics/hugot/pipelines"
 
-	"github.com/kKEo/memory-find/internal/embedding"
+	"github.com/kKEo/memors/internal/embedding"
 )
 
 // Reranker scores (query, passage) pairs; higher is more relevant.
@@ -24,7 +24,7 @@ type Reranker interface {
 	Name() string
 }
 
-// Known lists the rerankers memo-mcp can load. ms-marco-MiniLM shares its
+// Known lists the rerankers memors-mcp can load. ms-marco-MiniLM shares its
 // architecture with the MiniLM embedder, so it is the one known to run under
 // the pure-Go backend; the Ettin models are candidates for the bake-off.
 var Known = []embedding.ModelInfo{
@@ -64,7 +64,7 @@ func Load(ctx context.Context, info embedding.ModelInfo, modelDir string) (*Cros
 	// it is ranking by the model's relevance score.
 	pipe, err := hugot.NewPipeline(session, hugot.TextClassificationConfig{
 		ModelPath:    path,
-		Name:         "memo-rerank-" + info.ID,
+		Name:         "memors-rerank-" + info.ID,
 		OnnxFilename: filepath.Base(info.OnnxPath),
 		Options:      []hugot.TextClassificationOption{pipelines.WithSigmoid(), pipelines.WithSingleLabel()},
 	})

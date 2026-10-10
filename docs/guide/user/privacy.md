@@ -2,17 +2,17 @@
 
 ## Where your information lives
 
-Everything is stored in **one file on your computer**, in a folder called `.memo-mcp` in your
+Everything is stored in **one file on your computer**, in a folder called `.memors-mcp` in your
 home folder. Only your user account can open that folder. There is no cloud copy, no account
 and no sync.
 
 ## What leaves your computer
 
-**Almost nothing.** The first time memo-mcp starts, it downloads a language model of about
+**Almost nothing.** The first time memors-mcp starts, it downloads a language model of about
 140 MB from Hugging Face, a public model library. That is the only time it contacts the
 internet. After that it works fully offline.
 
-memo-mcp itself never visits websites. When you ask Claude to save a web page, Claude fetches
+memors-mcp itself never visits websites. When you ask Claude to save a web page, Claude fetches
 it and hands over the text.
 
 There is no telemetry, no usage reporting and no analytics.
@@ -23,7 +23,7 @@ There is no telemetry, no usage reporting and no analytics.
    it. Do not store passwords or secrets in it. If you saved one by mistake, remove it
    completely; see [Forgetting things](everyday/forgetting.md).
 2. **Claude sees what it saves and searches.** The words go through Claude, as everything in a
-   conversation does. memo-mcp adds no extra exposure, but it does not hide anything from Claude
+   conversation does. memors-mcp adds no extra exposure, but it does not hide anything from Claude
    either.
 
 ## Safety rules built in

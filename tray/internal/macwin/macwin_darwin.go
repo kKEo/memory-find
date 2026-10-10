@@ -15,7 +15,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/kKEo/memory-find/tray/internal/webpolicy"
+	"github.com/kKEo/memors/tray/internal/webpolicy"
 )
 
 // Windows implements app.Windows with native windows.

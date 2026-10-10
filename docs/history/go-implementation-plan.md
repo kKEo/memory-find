@@ -2,7 +2,9 @@
 > written against a working name of `private-journal-mcp-go`, with paths
 > under `~/.private-journal/` and `~/.cache/private-journal-mcp/models/`.
 > The project shipped as **memo-mcp**, storing data under `~/.memo-mcp/`
-> and caching the model under `~/.cache/memo-mcp/models/`. Several other
+> and caching the model under `~/.cache/memo-mcp/models/`; on 2026-10-10 it
+> was renamed again, to **memors-mcp** (`~/.memors-mcp/`,
+> `~/.cache/memors-mcp/models/`). Several other
 > details here are also stale versus what shipped: it describes 5 MCP
 > tools (a 6th, `journal_stats`, was added), a pure-vector search design
 > (the shipped version is hybrid vector + BM25 with reciprocal rank

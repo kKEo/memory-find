@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/kb"
+	"github.com/kKEo/memors/internal/kb"
 )
 
 // Finding is one lint result with the address to look at.

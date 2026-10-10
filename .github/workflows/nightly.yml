@@ -20,12 +20,12 @@ jobs:
       - name: model cache
         uses: actions/cache@v4
         with:
-          path: ~/.cache/memo-mcp/models
+          path: ~/.cache/memors-mcp/models
           key: models-granite-small-r2-${{ hashFiles('internal/embedding/registry.go') }}
       - name: eval with the real model
         run: |
           mkdir -p out
-          go run ./cmd/memo-mcp eval --models hash,granite-small-r2 --corpus all --format md > out/eval.md
+          go run ./cmd/memors-mcp eval --models hash,granite-small-r2 --corpus all --format md > out/eval.md
           tail -n +1 out/eval.md | head -60
       - uses: actions/upload-artifact@v4
         with:

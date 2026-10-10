@@ -7,7 +7,7 @@ import (
 	"runtime/debug"
 	"syscall"
 
-	"github.com/kKEo/memory-find/internal/cli"
+	"github.com/kKEo/memors/internal/cli"
 )
 
 // version is set at build time: -ldflags "-X main.version=$(git describe --tags)".

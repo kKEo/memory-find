@@ -16,7 +16,7 @@ import (
 // Ollama is the optional local executor for page items: it asks a model
 // running on the machine to write the page from the payload. Nothing else
 // depends on it; the server never calls it. Constrained JSON output, a
-// non-thinking model, loopback by default (MEMO_OLLAMA_URL).
+// non-thinking model, loopback by default (MEMORS_OLLAMA_URL).
 type Ollama struct {
 	URL   string // http://127.0.0.1:11434
 	Model string // e.g. qwen2.5:7b-instruct
@@ -37,7 +37,7 @@ func NewOllama(rawURL, model string, allowRemote bool) (*Ollama, error) {
 		return nil, fmt.Errorf("ollama url %s is not loopback; pass --allow-remote to use it", rawURL)
 	}
 	if model == "" {
-		return nil, errors.New("an ollama model name is required (MEMO_OLLAMA_MODEL)")
+		return nil, errors.New("an ollama model name is required (MEMORS_OLLAMA_MODEL)")
 	}
 	return &Ollama{URL: strings.TrimRight(rawURL, "/"), Model: model, HTTP: &http.Client{Timeout: 5 * time.Minute}}, nil
 }

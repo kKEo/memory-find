@@ -1,5 +1,7 @@
 # memo-mcp as a Domain Knowledge Base — State of the Art & Target Architecture
 
+> **Renamed.** This document predates the rename to memors (2026-10-10): `memo-mcp` is now `memors-mcp`, `memo-tray` is `memors-tray`, `MEMO_*` is `MEMORS_*` and `~/.memo-mcp` is `~/.memors-mcp`. `memo://` addresses are unchanged.
+
 *Research synthesis, 2026-10-01. Supersedes the design premises of
 [`history/graphrag-evolution-plan.md`](history/graphrag-evolution-plan.md) and
 extends the 2026-09-04 review (Phases 0–1 largely shipped on 2026-09-04,

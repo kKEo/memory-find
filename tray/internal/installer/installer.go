@@ -1,5 +1,5 @@
-// Package installer downloads memo-mcp from the project's GitHub releases
-// and installs it for memo-tray: the archive for this Mac, checked against
+// Package installer downloads memors-mcp from the project's GitHub releases
+// and installs it for memors-tray: the archive for this Mac, checked against
 // the release's checksums.txt, unpacked, tried out, and only then moved
 // into place, atomically. Nothing runs before its checksum matched.
 package installer
@@ -23,8 +23,8 @@ import (
 	"time"
 )
 
-// LatestAPI is the GitHub API address of the newest memo-mcp release.
-const LatestAPI = "https://api.github.com/repos/kKEo/memory-find/releases/latest"
+// LatestAPI is the GitHub API address of the newest memors-mcp release.
+const LatestAPI = "https://api.github.com/repos/kKEo/memors/releases/latest"
 
 // Limits on what is downloaded and unpacked.
 const (
@@ -57,9 +57,9 @@ type Asset struct {
 // Version is the release's version without the leading v.
 func (r Release) Version() string { return strings.TrimPrefix(r.Tag, "v") }
 
-// ArchiveName is the memo-mcp archive for macOS on goarch (arm64, amd64).
+// ArchiveName is the memors-mcp archive for macOS on goarch (arm64, amd64).
 func (r Release) ArchiveName(goarch string) string {
-	return fmt.Sprintf("memo-mcp_%s_darwin_%s.tar.gz", r.Version(), goarch)
+	return fmt.Sprintf("memors-mcp_%s_darwin_%s.tar.gz", r.Version(), goarch)
 }
 
 // Asset finds an attached file by name.
@@ -133,8 +133,8 @@ func (c *Client) Latest(ctx context.Context) (Release, error) {
 }
 
 // Install downloads rel's archive for goarch, checks it against the
-// release's checksums.txt, unpacks memo-mcp, makes sure it runs, and moves
-// it to dir/memo-mcp, replacing any older one. It returns the path.
+// release's checksums.txt, unpacks memors-mcp, makes sure it runs, and moves
+// it to dir/memors-mcp, replacing any older one. It returns the path.
 func (c *Client) Install(ctx context.Context, rel Release, goarch, dir string, progress func(Progress)) (string, error) {
 	if progress == nil {
 		progress = func(Progress) {}
@@ -152,7 +152,7 @@ func (c *Client) Install(ctx context.Context, rel Release, goarch, dir string, p
 		return "", err
 	}
 
-	work, err := os.MkdirTemp("", "memo-tray-install-*")
+	work, err := os.MkdirTemp("", "memors-tray-install-*")
 	if err != nil {
 		return "", err
 	}
@@ -177,9 +177,9 @@ func (c *Client) Install(ctx context.Context, rel Release, goarch, dir string, p
 	}
 	defer os.Remove(tmp) // no-op after the rename
 	if err := runs(ctx, tmp); err != nil {
-		return "", fmt.Errorf("the downloaded memo-mcp does not run on this Mac: %w", err)
+		return "", fmt.Errorf("the downloaded memors-mcp does not run on this Mac: %w", err)
 	}
-	dst := filepath.Join(dir, "memo-mcp")
+	dst := filepath.Join(dir, "memors-mcp")
 	if err := os.Rename(tmp, dst); err != nil {
 		return "", err
 	}
@@ -234,7 +234,7 @@ func (c *Client) download(ctx context.Context, a Asset, path string, progress fu
 	return hex.EncodeToString(h.Sum(nil)), f.Close()
 }
 
-// extract copies the memo-mcp binary at the top of the archive to a
+// extract copies the memors-mcp binary at the top of the archive to a
 // temporary executable file in dir and returns its path. Nothing else in
 // the archive is written anywhere.
 func extract(tgz, dir string) (string, error) {
@@ -251,18 +251,18 @@ func extract(tgz, dir string) (string, error) {
 	for {
 		hdr, err := tr.Next()
 		if errors.Is(err, io.EOF) {
-			return "", errors.New("the archive has no memo-mcp binary")
+			return "", errors.New("the archive has no memors-mcp binary")
 		}
 		if err != nil {
 			return "", fmt.Errorf("reading the archive: %w", err)
 		}
-		if strings.TrimPrefix(hdr.Name, "./") != "memo-mcp" || hdr.Typeflag != tar.TypeReg {
+		if strings.TrimPrefix(hdr.Name, "./") != "memors-mcp" || hdr.Typeflag != tar.TypeReg {
 			continue
 		}
 		if hdr.Size <= 0 || hdr.Size > maxBinary {
-			return "", fmt.Errorf("memo-mcp in the archive has an implausible size (%d bytes)", hdr.Size)
+			return "", fmt.Errorf("memors-mcp in the archive has an implausible size (%d bytes)", hdr.Size)
 		}
-		out, err := os.CreateTemp(dir, ".memo-mcp-*.tmp")
+		out, err := os.CreateTemp(dir, ".memors-mcp-*.tmp")
 		if err != nil {
 			return "", err
 		}
@@ -284,7 +284,7 @@ func extract(tgz, dir string) (string, error) {
 	}
 }
 
-// runs makes sure a binary starts: `memo-mcp version` must succeed.
+// runs makes sure a binary starts: `memors-mcp version` must succeed.
 func runs(ctx context.Context, bin string) error {
 	ctx, cancel := context.WithTimeout(ctx, versionWait)
 	defer cancel()
@@ -292,8 +292,8 @@ func runs(ctx context.Context, bin string) error {
 	if err != nil {
 		return fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
 	}
-	if !strings.HasPrefix(string(out), "memo-mcp ") {
-		return errors.New("it does not report a memo-mcp version")
+	if !strings.HasPrefix(string(out), "memors-mcp ") {
+		return errors.New("it does not report a memors-mcp version")
 	}
 	return nil
 }

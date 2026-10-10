@@ -1,8 +1,8 @@
-# memo-mcp architecture
+# memors-mcp architecture
 
 *The 1.0 contract (2026-10-02). What this file describes is stable across 1.x releases: tool
 names and parameters, the `memo://` address scheme, the explain field names, the export front
-matter, and the formulas below. Numbers quoted are the shipped defaults; `memo-mcp profiles
+matter, and the formulas below. Numbers quoted are the shipped defaults; `memors-mcp profiles
 show` prints the live values with their derivations.*
 
 Plain words first. Terms in *italics* are defined in the roadmap glossary (`roadmap.md` §15).
@@ -149,7 +149,7 @@ its best passage; `fact` returns facts, ordered by score with trust as the tiebr
 conflicting facts score within 10% of each other; `page` (1.2) returns curated pages by keyword
 and meaning, each marked `is_inference` and `stale` when a source changed since it was built.
 
-**Reranking.** Opt-in (`MEMO_RERANK=1`, profile `precise`): a cross-encoder re-scores the top 30.
+**Reranking.** Opt-in (`MEMORS_RERANK=1`, profile `precise`): a cross-encoder re-scores the top 30.
 It did not pass its promotion gate in the bake-off (`docs/eval/v0.7.0.md`, spike S8) and is
 off by default.
 
@@ -160,7 +160,7 @@ A profile is the set of constants above with a one-paragraph derivation each. Sh
 no recency), `keyword-only`, `semantic-only`, `text-only` (the 1.0 arms), `no-graph` (entity
 arm without the walk), `minmax`. `GraphAuto` (default on) is the routing switch for the
 structural arms. Overrides live in
-`$MEMO_HOME/profiles.json`; `MEMO_PROFILE` selects one for the server. The profile is not an
+`$MEMORS_HOME/profiles.json`; `MEMORS_PROFILE` selects one for the server. The profile is not an
 MCP parameter in 1.0.
 
 ## 7. The explain contract
@@ -204,7 +204,7 @@ CLI and MCP render the same two structures; a test asserts the numbers are ident
 - `forget(uri, reason, redact?)` tombstones a document or fact: it leaves every index, stays
   hidden under `as_of`, and its address explains itself. `redact` also clears the text.
 - Trust transitions by channel: a tool call may create `agent` records and forget or supersede
-  only `agent` records; raising trust needs a human, through the CLI (`memo-mcp trust promote`)
+  only `agent` records; raising trust needs a human, through the CLI (`memors-mcp trust promote`)
   or an elicitation dialog the client shows (`promote`). The table is in `schema.md` §7.
 
 ## 9. Embedding models
@@ -213,7 +213,7 @@ CLI and MCP render the same two structures; a test asserts the numbers are ident
 prefixes and bands. The default is `granite-small-r2` (IBM granite-embedding-small-english-r2,
 384 dimensions, Apache-2.0), chosen by the rule in roadmap OD-6 from the bake-off in
 `docs/eval/v0.7.0.md`. Vectors for several models coexist in `chunk_vecs(chunk_id, model_id,
-embedding)`, so switching (`MEMO_MODEL`, `memo-mcp model use`) is a resumable `reindex`, not a
+embedding)`, so switching (`MEMORS_MODEL`, `memors-mcp model use`) is a resumable `reindex`, not a
 re-chunk. Models run in-process through hugot's pure-Go ONNX backend; `potion` is a static
 model2vec table with no ONNX at all, the instant tier.
 
@@ -226,7 +226,7 @@ model2vec table with no ONNX at all, the instant tier.
   Re-importing the export produces zero new revisions.
 - `export --index` prints the ≤ 8 KB index for `AGENTS.md`/`CLAUDE.md`; `SKILL.md` tells an
   agent how to use the tools.
-- `memo-mcp ui` (1.3) serves the same store read-only on loopback: search with the explain
+- `memors-mcp ui` (1.3) serves the same store read-only on loopback: search with the explain
   table, documents, passages, facts timeline, entities, pages, status, lint, log, eval. It
   calls the same `retrieve.Service` with the same request shape the agent gets, and a test
   asserts the rendered numbers equal the service's. GET only; Host header checked against the
@@ -239,7 +239,7 @@ plus 6 facts, 27 queries) with categories (lookup, exact, long-document, paraphr
 knowledge-update, temporal, conflict, revocation, poisoning, …). The CI gate runs them with a
 deterministic hash embedder and compares query by query against `testdata/baseline.json`: a
 single query may not drop a rank band and no category mean may fall by more than 0.02. Reports
-per tag live in `docs/eval/`. `memo-mcp eval` runs the same harness with real models.
+per tag live in `docs/eval/`. `memors-mcp eval` runs the same harness with real models.
 
 Current baselines (hash embedder, `default` profile, `docs/eval/v0.9.0.md`):
 
@@ -275,7 +275,7 @@ subject whose content words are mostly absent from the page) and the corruption 
 sentences that share fewer than half their content words with any source). `lint` reports
 contradictions, orphan entities, missing pages, stale pages and expired facts with addresses.
 Raw rows are never touched; `docs/eval/v1.2.0.md` holds the checksum proof. An optional local
-model (`memo-mcp compact --executor ollama`) can write page items from the terminal; no other
+model (`memors-mcp compact --executor ollama`) can write page items from the terminal; no other
 code path knows it exists.
 
 ## 11c. Observability (1.4)
@@ -285,40 +285,40 @@ the call log is a table in the knowledge-base file. None of it is telemetry.
 
 **Metrics** come from a stdlib-only registry (`internal/obs`: counters, gauges, histograms with
 labels, Prometheus text format 0.0.4, a curated `runtime/metrics` subset). Names follow
-Prometheus conventions (`memo_` prefix, `_total` for counters, `_seconds`/`_bytes` units) and
+Prometheus conventions (`memors_` prefix, `_total` for counters, `_seconds`/`_bytes` units) and
 map onto OpenTelemetry names by replacing `_` with `.`. Labels are bounded enums only.
 
 | Family | Labels | Meaning |
 |---|---|---|
-| `memo_mcp_requests_total`, `memo_mcp_requests_in_flight` | method, outcome | every MCP request |
-| `memo_mcp_tool_calls_total`, `memo_mcp_tool_call_duration_seconds`, `memo_mcp_tool_result_tokens` | tool, outcome (ok, tool_error, input_required, error) | tool calls and their size |
-| `memo_mcp_tool_errors_total` | tool, class (not_found, forgotten, needs_human, canceled, invalid_args, internal) | why tool calls failed |
-| `memo_mcp_elicitations_total` | tool, outcome (asked, accept, decline, cancel, unsupported) | human questions |
-| `memo_mcp_resource_reads_total`, `memo_mcp_sessions_total` | kind, outcome; client | resources and sessions |
-| `memo_search_total`, `memo_search_duration_seconds`, `memo_search_results` | mode_requested, mode_resolved, granularity, outcome | searches |
-| `memo_search_arm_duration_seconds`, `memo_search_arm_candidates` | arm | each retrieval arm |
-| `memo_search_cutoff_total`, `memo_search_truncated_results_total`, `memo_search_abstentions_total`, `memo_search_degraded_total` | kind; reason | how lists ended and why nothing came back |
-| `memo_search_entities_matched`, `memo_search_rerank_duration_seconds`, `memo_graph_cache_total`, `memo_graph_build_duration_seconds` | model; event | structure and reranking |
-| `memo_store_writes_total` | op, channel | every audited write |
-| `memo_store_ingests_total`, `memo_store_ingest_duration_seconds`, `memo_store_chunks_written_total`, `memo_store_document_bytes`, `memo_store_vectors_stored_total`, `memo_store_embed_batches_total`, `memo_store_jobs_total`, `memo_store_mentions_linked_total`, `memo_store_pages_marked_stale_total`, `memo_store_work_items_total` | outcome; model; kind, event | the write path |
-| `memo_embed_duration_seconds`, `memo_embed_texts_total`, `memo_embed_errors_total`, `memo_embed_batch_size`, `memo_embed_model_downloads_total`, `memo_embed_model_load_seconds`, `memo_embed_model_loaded` | model, role (query, doc); outcome; backend | the embedder |
-| `memo_kb_*` gauges (`documents_live`, `chunks`, `facts`, `entities`, `pages`, `pages_stale`, `work_items_open`, `jobs_queued`, `pending_embeddings{model}`, `db_size_bytes`, `namespace_documents{namespace}`, …) | — | table counts, read at scrape time and cached for 5 s |
-| `memo_ui_requests_total`, `memo_ui_request_duration_seconds` | route, status | the web UI |
-| `go_*`, `process_start_time_seconds`, `memo_build_info{version, go_version, mcp_protocol, goos, goarch}` | — | runtime and build |
+| `memors_mcp_requests_total`, `memors_mcp_requests_in_flight` | method, outcome | every MCP request |
+| `memors_mcp_tool_calls_total`, `memors_mcp_tool_call_duration_seconds`, `memors_mcp_tool_result_tokens` | tool, outcome (ok, tool_error, input_required, error) | tool calls and their size |
+| `memors_mcp_tool_errors_total` | tool, class (not_found, forgotten, needs_human, canceled, invalid_args, internal) | why tool calls failed |
+| `memors_mcp_elicitations_total` | tool, outcome (asked, accept, decline, cancel, unsupported) | human questions |
+| `memors_mcp_resource_reads_total`, `memors_mcp_sessions_total` | kind, outcome; client | resources and sessions |
+| `memors_search_total`, `memors_search_duration_seconds`, `memors_search_results` | mode_requested, mode_resolved, granularity, outcome | searches |
+| `memors_search_arm_duration_seconds`, `memors_search_arm_candidates` | arm | each retrieval arm |
+| `memors_search_cutoff_total`, `memors_search_truncated_results_total`, `memors_search_abstentions_total`, `memors_search_degraded_total` | kind; reason | how lists ended and why nothing came back |
+| `memors_search_entities_matched`, `memors_search_rerank_duration_seconds`, `memors_graph_cache_total`, `memors_graph_build_duration_seconds` | model; event | structure and reranking |
+| `memors_store_writes_total` | op, channel | every audited write |
+| `memors_store_ingests_total`, `memors_store_ingest_duration_seconds`, `memors_store_chunks_written_total`, `memors_store_document_bytes`, `memors_store_vectors_stored_total`, `memors_store_embed_batches_total`, `memors_store_jobs_total`, `memors_store_mentions_linked_total`, `memors_store_pages_marked_stale_total`, `memors_store_work_items_total` | outcome; model; kind, event | the write path |
+| `memors_embed_duration_seconds`, `memors_embed_texts_total`, `memors_embed_errors_total`, `memors_embed_batch_size`, `memors_embed_model_downloads_total`, `memors_embed_model_load_seconds`, `memors_embed_model_loaded` | model, role (query, doc); outcome; backend | the embedder |
+| `memors_kb_*` gauges (`documents_live`, `chunks`, `facts`, `entities`, `pages`, `pages_stale`, `work_items_open`, `jobs_queued`, `pending_embeddings{model}`, `db_size_bytes`, `namespace_documents{namespace}`, …) | — | table counts, read at scrape time and cached for 5 s |
+| `memors_ui_requests_total`, `memors_ui_request_duration_seconds` | route, status | the web UI |
+| `go_*`, `process_start_time_seconds`, `memors_build_info{version, go_version, mcp_protocol, goos, goarch}` | — | runtime and build |
 
 Metrics are per process. The serving process is the scrape target
-(`memo-mcp serve --metrics-addr 127.0.0.1:PORT`, loopback only, GET `/metrics` only, Host
-header checked); the UI serves its own `/metrics`; `memo-mcp metrics` prints a file-backed
+(`memors-mcp serve --metrics-addr 127.0.0.1:PORT`, loopback only, GET `/metrics` only, Host
+header checked); the UI serves its own `/metrics`; `memors-mcp metrics` prints a file-backed
 snapshot (the gauges plus call-log statistics) and says so.
 
-**Logs** are `log/slog` on stderr (`MEMO_LOG_FORMAT`, `MEMO_LOG_LEVEL`): one Info line per
+**Logs** are `log/slog` on stderr (`MEMORS_LOG_FORMAT`, `MEMORS_LOG_LEVEL`): one Info line per
 tool call and per search, Warn for degraded modes, downloads and licence notes. The MCP
 `logging` capability is not advertised (deprecated in 2026-07-28; decision D-O).
 
-**Call log** (migration 4, `call_log`): with `MEMO_QUERY_LOG=1`, one row per tool call with
+**Call log** (migration 4, `call_log`): with `MEMORS_QUERY_LOG=1`, one row per tool call with
 client, tool, latency, outcome, error class, result count, tokens out and an allowlisted
-argument summary (never `content`, `statement`, `reason` or `context`). `memo-mcp log calls`,
-`memo-mcp log tail`, UI `/log`; pruned with the search log at 10k rows or 30 days.
+argument summary (never `content`, `statement`, `reason` or `context`). `memors-mcp log calls`,
+`memors-mcp log tail`, UI `/log`; pruned with the search log at 10k rows or 30 days.
 
 ## 12. Not in 1.0
 

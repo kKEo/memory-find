@@ -16,11 +16,11 @@ uses it to walk from one name.
 ## Commands
 
 ```bash
-memo-mcp explore "Quorum Replication" --hops 2
-memo-mcp graph merges                 # open candidates with their similarity
-memo-mcp graph merge 17               # same thing: merge the names
-memo-mcp graph reject 18              # different things: keep apart
-memo-mcp graph rebuild --ns default   # re-extract mentions
+memors-mcp explore "Quorum Replication" --hops 2
+memors-mcp graph merges                 # open candidates with their similarity
+memors-mcp graph merge 17               # same thing: merge the names
+memors-mcp graph reject 18              # different things: keep apart
+memors-mcp graph rebuild --ns default   # re-extract mentions
 ```
 
 Nothing is merged without a decision. Agents can propose decisions through `compact` and
@@ -30,7 +30,7 @@ Nothing is merged without a decision. Agents can propose decisions through `comp
 
 - Once, after upgrading a file written before 1.1.
 - After a release whose notes mention an extraction change.
-- If `memo-mcp lint` reports many orphan entities after large deletions.
+- If `memors-mcp lint` reports many orphan entities after large deletions.
 
 Rebuild keeps merge decisions. It re-reads every live passage, so on large knowledge bases
 run it when the system is quiet.
@@ -41,5 +41,5 @@ The server keeps an in-memory mention graph per namespace. It is built on first 
 reused while the namespace's count of live mentions is unchanged; any ingest, revision or
 forget that changes that count triggers a rebuild on the next routed query. `as_of` queries
 always build a graph for that point in time and do not cache it.
-`memo_graph_cache_total{event=hit|build|build_asof}` and `memo_graph_build_duration_seconds`
+`memors_graph_cache_total{event=hit|build|build_asof}` and `memors_graph_build_duration_seconds`
 show how often this happens and what it costs.

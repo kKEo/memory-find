@@ -1,4 +1,4 @@
-// Package obs is memo-mcp's observability toolkit: a small metrics registry
+// Package obs is memors-mcp's observability toolkit: a small metrics registry
 // (counters, gauges, histograms with labels) rendered in the Prometheus text
 // format, a curated set of Go runtime metrics, an HTTP handler that binds
 // loopback only, and structured-logging setup. Standard library only.

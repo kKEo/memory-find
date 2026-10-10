@@ -57,7 +57,7 @@ func migrateOne(ctx context.Context, db *sql.DB) (bool, error) {
 	case current < 0:
 		return false, fmt.Errorf("database schema version %d is invalid", current)
 	case current > len(migrations):
-		return false, fmt.Errorf("database schema is at version %d, but this binary only supports up to version %d; upgrade memo-mcp", current, len(migrations))
+		return false, fmt.Errorf("database schema is at version %d, but this binary only supports up to version %d; upgrade memors-mcp", current, len(migrations))
 	case current == len(migrations):
 		return false, nil
 	}

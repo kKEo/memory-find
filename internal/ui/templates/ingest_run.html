@@ -4,7 +4,7 @@
 <tr><th>started</th><td>{{dt .StartedAt}}{{if not .FinishedAt.IsZero}} · finished {{dt .FinishedAt}}{{end}} · {{dur .Elapsed}}</td></tr>
 <tr><th>progress</th><td><progress max="{{.Total}}" value="{{.Done}}">{{.Percent}}%</progress> {{.Done}}/{{.Total}} ({{.Percent}}%) · {{f1 .DocsPerSecond}} docs/s</td></tr>
 <tr><th>documents</th><td>{{.Written}} written · {{.Unchanged}} unchanged · {{if .Failed}}<span class="warn">{{.Failed}} failed</span>{{else}}0 failed{{end}}</td></tr>
-<tr><th>passages</th><td>{{.Chunks}} chunks · {{.Embedded}} embedded · {{if .Pending}}<span class="warn">{{.Pending}} pending</span> (run <code>memo-mcp backfill</code>){{else}}0 pending{{end}} · {{bytes .Bytes}}</td></tr>
+<tr><th>passages</th><td>{{.Chunks}} chunks · {{.Embedded}} embedded · {{if .Pending}}<span class="warn">{{.Pending}} pending</span> (run <code>memors-mcp backfill</code>){{else}}0 pending{{end}} · {{bytes .Bytes}}</td></tr>
 {{if .Error}}<tr><th>error</th><td class="warn">{{.Error}}</td></tr>{{end}}</table>{{end}}
 <h2>Documents</h2>
 <table><tr><th class="num">#</th><th>name</th><th>address</th><th>outcome</th><th class="num">rev</th><th class="num">chunks</th><th class="num">embedded</th><th class="num">pending</th><th class="num">size</th><th class="num">ms</th><th>error</th></tr>

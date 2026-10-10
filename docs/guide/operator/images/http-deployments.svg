@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="372" viewBox="0 0 760 372" role="img" aria-labelledby="t d">
-<title id="t">Ways to run memo-mcp serve --http</title>
+<title id="t">Ways to run memors-mcp serve --http</title>
 <desc id="d">Four setups. Loopback, the default: only this machine connects and no auth is required; --auth token keeps other OS users out. Behind a reverse proxy: the proxy terminates TLS and forwards to a loopback --http; token auth, needs --public-url. Remote with TLS on the server: --allow-remote with a certificate and --public-url; token auth. Mutual TLS: clients present a certificate signed by --tls-client-ca; the token is optional. The server refuses to expose the knowledge base without authentication or to send the token unencrypted.</desc>
 <style>
 text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
@@ -46,7 +46,7 @@ text{fill:#eceeec}
 <path class="ln" d="M129,84 H195" marker-end="url(#an)"/>
 <text class="xs t2" x="162" y="77" text-anchor="middle">loopback</text>
 <rect class="green" x="198" y="66" width="158" height="36" rx="8"/>
-<text class="s h tg" x="212" y="81">memo-mcp</text>
+<text class="s h tg" x="212" y="81">memors-mcp</text>
 <text class="xs mono t2" x="212" y="96">--http 127.0.0.1</text>
 <text class="xs t2" x="36" y="126">Only this machine can connect.</text>
 <text class="xs t2" x="36" y="141">--auth token also keeps other OS users out.</text>
@@ -66,7 +66,7 @@ text{fill:#eceeec}
 <path class="ln" d="M585,84 H607" marker-end="url(#an)"/>
 <text class="xs t2" x="597" y="62" text-anchor="middle">http</text>
 <rect class="green" x="610" y="66" width="114" height="36" rx="8"/>
-<text class="s h tg" x="622" y="81">memo-mcp</text>
+<text class="s h tg" x="622" y="81">memors-mcp</text>
 <text class="xs mono t2" x="622" y="96">--behind-proxy</text>
 <text class="xs t2" x="404" y="126">TLS ends at the proxy, which forwards to a</text>
 <text class="xs t2" x="404" y="141">loopback --http. Needs --public-url.</text>
@@ -81,7 +81,7 @@ text{fill:#eceeec}
 <path class="ln" d="M129,236 H195" marker-end="url(#an)"/>
 <text class="xs t2" x="162" y="229" text-anchor="middle">https</text>
 <rect class="green" x="198" y="218" width="158" height="36" rx="8"/>
-<text class="s h tg" x="212" y="233">memo-mcp</text>
+<text class="s h tg" x="212" y="233">memors-mcp</text>
 <text class="xs mono t2" x="212" y="248">--allow-remote</text>
 <text class="xs t2" x="36" y="278">Needs --tls-cert, --tls-key and --public-url.</text>
 <text class="xs t2" x="36" y="293">Plain HTTP is refused.</text>
@@ -97,7 +97,7 @@ text{fill:#eceeec}
 <path class="ln" d="M515,236 H581" marker-end="url(#an)"/>
 <text class="xs t2" x="548" y="229" text-anchor="middle">https</text>
 <rect class="green" x="584" y="218" width="140" height="36" rx="8"/>
-<text class="s h tg" x="598" y="233">memo-mcp</text>
+<text class="s h tg" x="598" y="233">memors-mcp</text>
 <text class="xs mono t2" x="598" y="248">--tls-client-ca</text>
 <text class="xs t2" x="404" y="278">Clients present a certificate signed by that CA;</text>
 <text class="xs t2" x="404" y="293">the token is optional on top.</text>

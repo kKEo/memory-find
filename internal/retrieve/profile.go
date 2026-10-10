@@ -62,7 +62,7 @@ type Profile struct {
 	Rerank     bool
 	RerankTopN int
 	// Derivation explains in one paragraph why the constants are what they
-	// are; `memo-mcp profiles show` prints it.
+	// are; `memors-mcp profiles show` prints it.
 	Derivation string
 }
 

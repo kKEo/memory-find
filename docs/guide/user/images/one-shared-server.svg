@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="312" viewBox="0 0 760 312" role="img" aria-labelledby="t d">
 <title id="t">A copy per session, or one shared server</title>
-<desc id="d">Usually Claude Code starts its own copy of memo-mcp for each session, and every copy opens the same memory file. Optionally you run one memo-mcp server yourself at 127.0.0.1:8765; every session connects to it, and your browser shows its Live page.</desc>
+<desc id="d">Usually Claude Code starts its own copy of memors-mcp for each session, and every copy opens the same memory file. Optionally you run one memors-mcp server yourself at 127.0.0.1:8765; every session connects to it, and your browser shows its Live page.</desc>
 <style>
 text{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:13px;fill:#171a1f}
 .mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -52,11 +52,11 @@ text{fill:#eceeec}
 <path class="ln" d="M309,101 V123" marker-end="url(#an)"/>
 
 <rect class="green" x="40" y="126" width="90" height="32" rx="9"/>
-<text class="s h tg" x="85" y="146" text-anchor="middle">memo-mcp</text>
+<text class="s h tg" x="85" y="146" text-anchor="middle">memors-mcp</text>
 <rect class="green" x="152" y="126" width="90" height="32" rx="9"/>
-<text class="s h tg" x="197" y="146" text-anchor="middle">memo-mcp</text>
+<text class="s h tg" x="197" y="146" text-anchor="middle">memors-mcp</text>
 <rect class="green" x="264" y="126" width="90" height="32" rx="9"/>
-<text class="s h tg" x="309" y="146" text-anchor="middle">memo-mcp</text>
+<text class="s h tg" x="309" y="146" text-anchor="middle">memors-mcp</text>
 
 <path class="ln" d="M85,159 L172,210" marker-end="url(#an)"/>
 <path class="ln" d="M197,159 V210" marker-end="url(#an)"/>
@@ -84,7 +84,7 @@ text{fill:#eceeec}
 <path class="ln" d="M675,101 L606,126" marker-end="url(#an)"/>
 
 <rect class="green" x="463" y="130" width="200" height="48" rx="10"/>
-<text class="s h mono tg" x="563" y="150" text-anchor="middle">memo-mcp serve --http</text>
+<text class="s h mono tg" x="563" y="150" text-anchor="middle">memors-mcp serve --http</text>
 <text class="xs mono t2" x="563" y="167" text-anchor="middle">127.0.0.1:8765</text>
 
 <path class="ln" d="M485,179 V210" marker-end="url(#an)"/>

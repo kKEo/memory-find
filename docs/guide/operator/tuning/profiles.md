@@ -1,12 +1,12 @@
 # Profiles and constants
 
-A **profile** is a named set of ranking constants. The server and the UI use `MEMO_PROFILE`,
+A **profile** is a named set of ranking constants. The server and the UI use `MEMORS_PROFILE`,
 default `default`. The CLI takes `search --profile <name>`. MCP clients cannot pick a profile per
 request in 1.x.
 
 ```bash
-memo-mcp profiles show            # every profile, every constant, with its derivation
-memo-mcp profiles show precise
+memors-mcp profiles show            # every profile, every constant, with its derivation
+memors-mcp profiles show precise
 ```
 
 ## Shipped profiles
@@ -63,5 +63,5 @@ lookups. That is why routing is not a tunable constant.
 
 Overrides go in [`profiles.json`](../config/profiles-json.md). The derivations behind each
 default are in
-[architecture §5–§6](https://github.com/kKEo/memory-find/blob/master/docs/architecture.md#5-the-read-path-how-search-decides)
-and the [eval reports](https://github.com/kKEo/memory-find/tree/master/docs/eval).
+[architecture §5–§6](https://github.com/kKEo/memors/blob/master/docs/architecture.md#5-the-read-path-how-search-decides)
+and the [eval reports](https://github.com/kKEo/memors/tree/master/docs/eval).

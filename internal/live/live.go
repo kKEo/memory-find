@@ -5,7 +5,7 @@
 // source; the UI then reads the knowledge-base file alone.
 //
 // The same types are the /live.json contract for companion apps
-// (memo-tray, a separate module that imports this package), so the package
+// (memors-tray, a separate module that imports this package), so the package
 // depends on the standard library only, and the JSON shape changes only by
 // adding fields; anything else bumps Schema.
 package live
@@ -30,7 +30,7 @@ type Snapshot struct {
 	Instance   string    `json:"instance"` // random per server process
 	PID        int       `json:"pid"`
 	Version    string    `json:"version"`
-	KB         string    `json:"kb"` // knowledge-base name (MEMO_KB)
+	KB         string    `json:"kb"` // knowledge-base name (MEMORS_KB)
 	KBPath     string    `json:"kb_path"`
 	Model      string    `json:"model"` // embedding model id; empty when keyword-only
 	Started    time.Time `json:"started"`

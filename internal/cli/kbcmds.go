@@ -15,14 +15,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/compact"
-	"github.com/kKEo/memory-find/internal/embedding"
-	"github.com/kKEo/memory-find/internal/eval"
-	"github.com/kKEo/memory-find/internal/kb"
-	"github.com/kKEo/memory-find/internal/obs"
-	"github.com/kKEo/memory-find/internal/rerank"
-	"github.com/kKEo/memory-find/internal/retrieve"
-	"github.com/kKEo/memory-find/internal/ui"
+	"github.com/kKEo/memors/internal/compact"
+	"github.com/kKEo/memors/internal/embedding"
+	"github.com/kKEo/memors/internal/eval"
+	"github.com/kKEo/memors/internal/kb"
+	"github.com/kKEo/memors/internal/obs"
+	"github.com/kKEo/memors/internal/rerank"
+	"github.com/kKEo/memors/internal/retrieve"
+	"github.com/kKEo/memors/internal/ui"
 )
 
 // openStore resolves the configuration and opens the knowledge base. embedder
@@ -31,9 +31,6 @@ func openStore(ctx context.Context, stderr io.Writer, opts kb.Options, embedder 
 	cfg, err := ResolveConfig(os.Getenv)
 	if err != nil {
 		return nil, nil, err
-	}
-	for _, d := range cfg.Deprecations {
-		slog.Warn(d)
 	}
 	db, err := kb.Open(ctx, cfg.KBDir, cfg.DBName, opts)
 	if err != nil {
@@ -50,7 +47,7 @@ func loadEmbedder(ctx context.Context, want bool, stderr io.Writer) (embedding.E
 	}
 	e, cleanup, err := buildEmbedder(ctx)
 	if err != nil {
-		slog.Warn("embedding unavailable; vectors will be queued for `memo-mcp backfill`", "err", err)
+		slog.Warn("embedding unavailable; vectors will be queued for `memors-mcp backfill`", "err", err)
 		return nil, func() {}
 	}
 	return e, cleanup
@@ -68,13 +65,13 @@ func runIngest(ctx context.Context, args []string, stdout, stderr io.Writer) err
 	trust := fs.String("trust", kb.TrustUser, "user|curated (CLI writes default to user)")
 	origin := fs.String("origin", "", "web|user-said|agent-derived (default: web when --uri is set, else user-said)")
 	docCtx := fs.String("context", "", "one sentence of context prepended to every chunk")
-	embed := fs.Bool("embed", true, "embed chunks now (false: queue vectors for `memo-mcp backfill`)")
+	embed := fs.Bool("embed", true, "embed chunks now (false: queue vectors for `memors-mcp backfill`)")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(positional) != 1 {
-		return errors.New("usage: memo-mcp ingest <file|dir|-> [flags]")
+		return errors.New("usage: memors-mcp ingest <file|dir|-> [flags]")
 	}
 	if *trust != kb.TrustUser && *trust != kb.TrustCurated {
 		return fmt.Errorf("--trust must be user or curated (agent is reserved for tool calls)")
@@ -211,7 +208,7 @@ func runIngest(ctx context.Context, args []string, stdout, stderr io.Writer) err
 	}
 	fmt.Fprintf(stdout, "%d written, %d unchanged", written, dedup)
 	if pending > 0 {
-		fmt.Fprintf(stdout, ", %d chunk vectors pending (run `memo-mcp backfill`)", pending)
+		fmt.Fprintf(stdout, ", %d chunk vectors pending (run `memors-mcp backfill`)", pending)
 	}
 	fmt.Fprintln(stdout)
 	return finish(nil)
@@ -226,7 +223,7 @@ func runRead(ctx context.Context, args []string, stdout, stderr io.Writer) error
 		return err
 	}
 	if len(positional) != 1 {
-		return errors.New("usage: memo-mcp read <memo://doc/...|memo://chunk/...|memo://source/...|memo://fact/...> [--history]")
+		return errors.New("usage: memors-mcp read <memo://doc/...|memo://chunk/...|memo://source/...|memo://fact/...> [--history]")
 	}
 	store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
 	if err != nil {
@@ -359,7 +356,7 @@ func runVerify(ctx context.Context, args []string, stdout, stderr io.Writer) err
 		fmt.Fprintln(stdout, "repaired:", r)
 	}
 	if !*repair {
-		fmt.Fprintln(stdout, "run `memo-mcp verify --repair` to fix what can be fixed")
+		fmt.Fprintln(stdout, "run `memors-mcp verify --repair` to fix what can be fixed")
 	}
 	return nil
 }
@@ -376,7 +373,7 @@ func runExport(ctx context.Context, args []string, stdout, stderr io.Writer) err
 		return err
 	}
 	if *md == "" && !*index {
-		return errors.New("usage: memo-mcp export --md <dir> [--ns <name>] | export --index [--ns <name>] [--library x@v] [--max-bytes 8192]")
+		return errors.New("usage: memors-mcp export --md <dir> [--ns <name>] | export --index [--ns <name>] [--library x@v] [--max-bytes 8192]")
 	}
 	store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
 	if err != nil {
@@ -425,7 +422,7 @@ func printStatus(w io.Writer, st *kb.Status) {
 	} else {
 		fmt.Fprintf(w, "Embedding model: %s", st.DefaultModel)
 		if p := st.PendingEmbeddings[st.DefaultModel]; p > 0 {
-			fmt.Fprintf(w, "   pending vectors: %d (run `memo-mcp backfill`)", p)
+			fmt.Fprintf(w, "   pending vectors: %d (run `memors-mcp backfill`)", p)
 		}
 		fmt.Fprintln(w)
 	}
@@ -475,7 +472,7 @@ func orUntitled(t string) string {
 }
 
 // parseInterspersed parses flags that may appear before or after positional
-// arguments (`memo-mcp ingest file.md --ns grpc`), which the standard flag
+// arguments (`memors-mcp ingest file.md --ns grpc`), which the standard flag
 // package does not do on its own. It returns the positional arguments.
 func parseInterspersed(fs *flag.FlagSet, args []string) ([]string, error) {
 	var positional []string
@@ -523,14 +520,14 @@ func runSearch(ctx context.Context, args []string, stdout, stderr io.Writer, exp
 	explain := fs.Bool("explain", explainCmd, "include why each result ranked and the per-query trace")
 	maxTokens := fs.Int("max-tokens", 8000, "response budget in estimated tokens")
 	noEmbed := fs.Bool("no-model", false, "do not load the embedding model (keyword-only)")
-	profileName := fs.String("profile", os.Getenv("MEMO_PROFILE"), "ranking profile (see `memo-mcp profiles show`)")
-	withRerank := fs.Bool("rerank", os.Getenv("MEMO_RERANK") == "1", "attach the cross-encoder reranker (used by profiles with rerank on, e.g. precise)")
+	profileName := fs.String("profile", os.Getenv("MEMORS_PROFILE"), "ranking profile (see `memors-mcp profiles show`)")
+	withRerank := fs.Bool("rerank", os.Getenv("MEMORS_RERANK") == "1", "attach the cross-encoder reranker (used by profiles with rerank on, e.g. precise)")
 	positional, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(positional) < 1 || len(positional) > 2 {
-		return fmt.Errorf("usage: memo-mcp %s \"<query>\" [memo://uri] [flags]", name)
+		return fmt.Errorf("usage: memors-mcp %s \"<query>\" [memo://uri] [flags]", name)
 	}
 	query := positional[0]
 	var focus string
@@ -690,7 +687,7 @@ func splitCSV(s string) []string {
 
 func runLog(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: memo-mcp log tail [--n 20] | calls [--n 50] | show <id> | replay [--n 200] | prune")
+		return errors.New("usage: memors-mcp log tail [--n 20] | calls [--n 50] | show <id> | replay [--n 200] | prune")
 	}
 	sub, rest := args[0], args[1:]
 	store, closeFn, err := openStore(ctx, stderr, kb.Options{NoCreate: true}, nil)
@@ -711,7 +708,7 @@ func runLog(ctx context.Context, args []string, stdout, stderr io.Writer) error 
 			return err
 		}
 		if len(entries) == 0 {
-			fmt.Fprintln(stdout, "(query log is empty; enable it with MEMO_QUERY_LOG=1)")
+			fmt.Fprintln(stdout, "(query log is empty; enable it with MEMORS_QUERY_LOG=1)")
 			return nil
 		}
 		fmt.Fprintln(stdout, "searches:")
@@ -739,14 +736,14 @@ func runLog(ctx context.Context, args []string, stdout, stderr io.Writer) error 
 			return err
 		}
 		if len(calls) == 0 {
-			fmt.Fprintln(stdout, "(call log is empty; enable it with MEMO_QUERY_LOG=1 on the server)")
+			fmt.Fprintln(stdout, "(call log is empty; enable it with MEMORS_QUERY_LOG=1 on the server)")
 			return nil
 		}
 		printCalls(stdout, calls)
 		return nil
 	case "show":
 		if len(rest) != 1 {
-			return errors.New("usage: memo-mcp log show <id>")
+			return errors.New("usage: memors-mcp log show <id>")
 		}
 		var id int64
 		if _, err := fmt.Sscanf(rest[0], "%d", &id); err != nil {
@@ -840,7 +837,7 @@ func runModelLs(ctx context.Context, stdout, stderr io.Writer) error {
 			fmt.Fprintf(stdout, "%-18s %-5d %-20s %-10s %s%s\n", m.ID, m.Dim, m.Licence, "-", m.Note, marks)
 		}
 	}
-	fmt.Fprintln(stdout, "\n* = selected by MEMO_MODEL (or the registry default). `model smoke --all` tests which models load.")
+	fmt.Fprintln(stdout, "\n* = selected by MEMORS_MODEL (or the registry default). `model smoke --all` tests which models load.")
 	return nil
 }
 
@@ -864,7 +861,7 @@ func runModelSmoke(ctx context.Context, args []string, stdout, stderr io.Writer)
 		}
 	}
 	if len(ids) == 0 {
-		return errors.New("usage: memo-mcp model smoke <id>... | --all")
+		return errors.New("usage: memors-mcp model smoke <id>... | --all")
 	}
 	fmt.Fprintln(stdout, "| model | loads | sane | dim | p50 ms (1 × ~256 tok) | p50 ms (batch 16) | note |")
 	fmt.Fprintln(stdout, "|---|---|---|---|---|---|---|")
@@ -881,12 +878,12 @@ func runModelSmoke(ctx context.Context, args []string, stdout, stderr io.Writer)
 func runReindex(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("reindex", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	model := fs.String("model", "", "model id (default: MEMO_MODEL or minilm)")
+	model := fs.String("model", "", "model id (default: MEMORS_MODEL or minilm)")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return err
 	}
 	if *model != "" {
-		if err := os.Setenv("MEMO_MODEL", *model); err != nil {
+		if err := os.Setenv("MEMORS_MODEL", *model); err != nil {
 			return err
 		}
 	}
@@ -914,7 +911,7 @@ func runReindex(ctx context.Context, args []string, stdout, stderr io.Writer) er
 
 func runProfiles(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 || args[0] != "show" {
-		return errors.New("usage: memo-mcp profiles show [<name>]")
+		return errors.New("usage: memors-mcp profiles show [<name>]")
 	}
 	if len(args) == 2 {
 		p, err := retrieve.Lookup(args[1])
@@ -985,7 +982,7 @@ func runEval(ctx context.Context, args []string, stdout, stderr io.Writer) error
 			}
 			emb, cleanup = e, c
 		}
-		dir, err := os.MkdirTemp("", "memo-eval-")
+		dir, err := os.MkdirTemp("", "memors-eval-")
 		if err != nil {
 			cleanup()
 			return err
@@ -1112,10 +1109,10 @@ func runEval(ctx context.Context, args []string, stdout, stderr io.Writer) error
 	}
 }
 
-// loadReranker loads the registry's default cross-encoder (MEMO_RERANKER
+// loadReranker loads the registry's default cross-encoder (MEMORS_RERANKER
 // names another id).
 func loadReranker(ctx context.Context, stderr io.Writer) (rerank.Reranker, func(), error) {
-	id := os.Getenv("MEMO_RERANKER")
+	id := os.Getenv("MEMORS_RERANKER")
 	if id == "" {
 		id = "ms-marco-minilm"
 	}
@@ -1150,7 +1147,7 @@ func runRemember(ctx context.Context, args []string, stdout, stderr io.Writer) e
 		return err
 	}
 	if len(positional) != 1 {
-		return errors.New("usage: memo-mcp remember \"<statement>\" [flags]")
+		return errors.New("usage: memors-mcp remember \"<statement>\" [flags]")
 	}
 	if *trust != kb.TrustUser && *trust != kb.TrustCurated {
 		return errors.New("--trust must be user or curated")
@@ -1192,7 +1189,7 @@ func runForget(ctx context.Context, args []string, stdout, stderr io.Writer) err
 		return err
 	}
 	if len(positional) != 1 || *reason == "" {
-		return errors.New("usage: memo-mcp forget <memo://doc/...|memo://fact/...> --reason \"<why>\" [--redact]")
+		return errors.New("usage: memors-mcp forget <memo://doc/...|memo://fact/...> --reason \"<why>\" [--redact]")
 	}
 	store, closeFn, err := openStore(ctx, stderr, kb.Options{NoCreate: true}, nil)
 	if err != nil {
@@ -1208,7 +1205,7 @@ func runForget(ctx context.Context, args []string, stdout, stderr io.Writer) err
 
 func runFacts(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 || args[0] != "ls" {
-		return errors.New("usage: memo-mcp facts ls [--ns <name>] [--as-of YYYY-MM-DD] [--history] [--json]")
+		return errors.New("usage: memors-mcp facts ls [--ns <name>] [--as-of YYYY-MM-DD] [--history] [--json]")
 	}
 	fs := flag.NewFlagSet("facts ls", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -1262,7 +1259,7 @@ func runFacts(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 
 func runTrust(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: memo-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user")
+		return errors.New("usage: memors-mcp trust ls | promote <uri> --to user|curated | demote <uri> --to agent|user")
 	}
 	sub, rest := args[0], args[1:]
 	switch sub {
@@ -1290,7 +1287,7 @@ func runTrust(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 			return err
 		}
 		if len(positional) != 1 || *to == "" {
-			return fmt.Errorf("usage: memo-mcp trust %s <uri> --to <trust>", sub)
+			return fmt.Errorf("usage: memors-mcp trust %s <uri> --to <trust>", sub)
 		}
 		store, closeFn, err := openStore(ctx, stderr, kb.Options{NoCreate: true}, nil)
 		if err != nil {
@@ -1339,7 +1336,7 @@ func runExplore(ctx context.Context, args []string, stdout, stderr io.Writer) er
 		return err
 	}
 	if len(positional) != 1 {
-		return errors.New("usage: memo-mcp explore <name|memo://entity/id> [--ns <name>] [--hops 1|2] [--as-of YYYY-MM-DD] [--json]")
+		return errors.New("usage: memors-mcp explore <name|memo://entity/id> [--ns <name>] [--hops 1|2] [--as-of YYYY-MM-DD] [--json]")
 	}
 	store, closeFn, err := openStore(ctx, stderr, kb.Options{ReadOnly: true}, nil)
 	if err != nil {
@@ -1391,7 +1388,7 @@ func runExplore(ctx context.Context, args []string, stdout, stderr io.Writer) er
 // near-duplicate names, and the decision to merge or keep apart.
 func runGraph(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: memo-mcp graph merges [--state open|merged|rejected] | merge <id> | reject <id> | rebuild [--ns <name>]")
+		return errors.New("usage: memors-mcp graph merges [--state open|merged|rejected] | merge <id> | reject <id> | rebuild [--ns <name>]")
 	}
 	sub, rest := args[0], args[1:]
 	switch sub {
@@ -1421,7 +1418,7 @@ func runGraph(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 		for _, m := range list {
 			fmt.Fprintf(stdout, "%4d  %.2f  %-9s %q <> %q  (%s; %s)\n", m.ID, m.Score, m.State, m.A.Canonical, m.B.Canonical, m.A.Namespace, m.Reason)
 		}
-		fmt.Fprintln(stdout, "decide with: memo-mcp graph merge <id> | reject <id>")
+		fmt.Fprintln(stdout, "decide with: memors-mcp graph merge <id> | reject <id>")
 		return nil
 	case "rebuild":
 		fs := flag.NewFlagSet("graph rebuild", flag.ContinueOnError)
@@ -1443,7 +1440,7 @@ func runGraph(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 		return nil
 	case "merge", "reject":
 		if len(rest) != 1 {
-			return fmt.Errorf("usage: memo-mcp graph %s <id>", sub)
+			return fmt.Errorf("usage: memors-mcp graph %s <id>", sub)
 		}
 		var id int64
 		if _, err := fmt.Sscanf(rest[0], "%d", &id); err != nil {
@@ -1474,9 +1471,9 @@ func runCompact(ctx context.Context, args []string, stdout, stderr io.Writer) er
 	kinds := fs.String("kinds", "", "comma-separated: page,stale,conflict,merge,duplicate (default: all)")
 	lint := fs.Bool("lint", false, "also print lint findings")
 	asJSON := fs.Bool("json", false, "print JSON")
-	executor := fs.String("executor", "", "ollama: write page items with a local model (MEMO_OLLAMA_URL, MEMO_OLLAMA_MODEL)")
+	executor := fs.String("executor", "", "ollama: write page items with a local model (MEMORS_OLLAMA_URL, MEMORS_OLLAMA_MODEL)")
 	apply := fs.Bool("apply", false, "with --executor: submit the pages instead of a dry run")
-	allowRemote := fs.Bool("allow-remote", false, "with --executor: allow a non-loopback MEMO_OLLAMA_URL")
+	allowRemote := fs.Bool("allow-remote", false, "with --executor: allow a non-loopback MEMORS_OLLAMA_URL")
 	if _, err := parseInterspersed(fs, args); err != nil {
 		return err
 	}
@@ -1518,7 +1515,7 @@ func runCompact(ctx context.Context, args []string, stdout, stderr io.Writer) er
 		if *executor != "ollama" {
 			return fmt.Errorf("unknown executor %q (only ollama)", *executor)
 		}
-		ol, err := compact.NewOllama(os.Getenv("MEMO_OLLAMA_URL"), os.Getenv("MEMO_OLLAMA_MODEL"), *allowRemote)
+		ol, err := compact.NewOllama(os.Getenv("MEMORS_OLLAMA_URL"), os.Getenv("MEMORS_OLLAMA_MODEL"), *allowRemote)
 		if err != nil {
 			return err
 		}
@@ -1560,7 +1557,7 @@ func runCompact(ctx context.Context, args []string, stdout, stderr io.Writer) er
 		fmt.Fprintf(stdout, "lint %-13s %s  %s\n", f.Kind, f.URI, f.Message)
 	}
 	if len(items) > 0 {
-		fmt.Fprintln(stdout, "next: memo-mcp submit <id> --content-file page.md [--dry-run] | --keep <memo://fact/..> | --accept|--reject | --skip")
+		fmt.Fprintln(stdout, "next: memors-mcp submit <id> --content-file page.md [--dry-run] | --keep <memo://fact/..> | --accept|--reject | --skip")
 	}
 	return nil
 }
@@ -1611,7 +1608,7 @@ func runSubmit(ctx context.Context, args []string, stdout, stderr io.Writer) err
 		return err
 	}
 	if len(positional) != 1 {
-		return errors.New("usage: memo-mcp submit <item-id> [--content-file f.md --title t | --keep <memo://fact/..> | --accept | --reject | --skip] [--reason ..] [--dry-run]")
+		return errors.New("usage: memors-mcp submit <item-id> [--content-file f.md --title t | --keep <memo://fact/..> | --accept | --reject | --skip] [--reason ..] [--dry-run]")
 	}
 	res := compact.Result{Title: *title, Keep: *keep, Reason: *reason, Skip: *skip}
 	if *contentFile != "" {
@@ -1689,7 +1686,7 @@ func runLint(ctx context.Context, args []string, stdout, stderr io.Writer) error
 // runPages lists curated pages.
 func runPages(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 || args[0] != "ls" {
-		return errors.New("usage: memo-mcp pages ls [--ns <name>] [--stale] [--json]")
+		return errors.New("usage: memors-mcp pages ls [--ns <name>] [--stale] [--json]")
 	}
 	fs := flag.NewFlagSet("pages ls", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -1751,7 +1748,7 @@ func runUI(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	defer closeFn()
-	profile, err := retrieve.Lookup(os.Getenv("MEMO_PROFILE"))
+	profile, err := retrieve.Lookup(os.Getenv("MEMORS_PROFILE"))
 	if err != nil {
 		return err
 	}
@@ -1765,7 +1762,7 @@ func runUI(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "memo-mcp ui: http://%s  (read-only; Ctrl-C to stop)\n", ln.Addr())
+	fmt.Fprintf(stdout, "memors-mcp ui: http://%s  (read-only; Ctrl-C to stop)\n", ln.Addr())
 	hs := &http.Server{Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
@@ -1782,7 +1779,7 @@ func runUI(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 // evalReportMarkdown runs the labelled corpora with the hash embedder in a
 // throwaway knowledge base (the CI gate) and returns the markdown report.
 func evalReportMarkdown(ctx context.Context) (string, error) {
-	dir, err := os.MkdirTemp("", "memo-eval-*")
+	dir, err := os.MkdirTemp("", "memors-eval-*")
 	if err != nil {
 		return "", err
 	}

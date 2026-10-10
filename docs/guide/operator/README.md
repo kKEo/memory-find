@@ -1,9 +1,9 @@
-# memo-mcp operator guide
+# memors-mcp operator guide
 
-This guide is for the people who install, configure, tune and run memo-mcp. It is written for
+This guide is for the people who install, configure, tune and run memors-mcp. It is written for
 readers comfortable with a terminal, SQLite, environment variables and Prometheus.
 
-memo-mcp is a single, pure-Go binary. It exposes a knowledge base to AI agents over the
+memors-mcp is a single, pure-Go binary. It exposes a knowledge base to AI agents over the
 [Model Context Protocol](https://modelcontextprotocol.io) (MCP) on stdio. It stores
 everything in one SQLite file per knowledge base, and it ships with a CLI and a read-only web
 UI over the same store. There is no daemon to deploy, no external database and no network
@@ -23,20 +23,20 @@ dependency after a one-time model download.
 
 ## Conventions
 
-- Commands are shown as `memo-mcp <command>`. Every command reads the same environment
-  (`MEMO_HOME`, `MEMO_KB`, …), so set it the same way the MCP client does.
+- Commands are shown as `memors-mcp <command>`. Every command reads the same environment
+  (`MEMORS_HOME`, `MEMORS_KB`, …), so set it the same way the MCP client does.
 - "Knowledge base" (KB) means one SQLite file. A "namespace" is a label inside one file.
 - Addresses such as `memo://chunk/42` identify records; every CLI command and the UI accept
   them.
-- Defaults quoted here are the shipped values for v1.4. `memo-mcp profiles show` and
-  `memo-mcp --help` print the live values for your build.
+- Defaults quoted here are the shipped values for v1.4. `memors-mcp profiles show` and
+  `memors-mcp --help` print the live values for your build.
 
 ## Deeper references
 
 This guide states what to do and what it costs. The design documents explain why:
 
-- [Architecture](https://github.com/kKEo/memory-find/blob/master/docs/architecture.md): the 1.x contract, formulas and defaults.
-- [Schema](https://github.com/kKEo/memory-find/blob/master/docs/schema.md): every table and column, trust transitions, time rules.
-- [Eval reports](https://github.com/kKEo/memory-find/blob/master/docs/eval/): measured quality and cost per release.
+- [Architecture](https://github.com/kKEo/memors/blob/master/docs/architecture.md): the 1.x contract, formulas and defaults.
+- [Schema](https://github.com/kKEo/memors/blob/master/docs/schema.md): every table and column, trust transitions, time rules.
+- [Eval reports](https://github.com/kKEo/memors/blob/master/docs/eval/): measured quality and cost per release.
 
 > **Looking for the non-technical introduction?** See the [user guide](../user/).

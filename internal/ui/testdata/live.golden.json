@@ -4,7 +4,7 @@
   "pid": 4242,
   "version": "v1.5.0",
   "kb": "crportal",
-  "kb_path": "/home/u/.memo-mcp/kb/crportal.db",
+  "kb_path": "/home/u/.memors-mcp/kb/crportal.db",
   "model": "granite-small-r2",
   "started": "2026-10-08T12:00:00Z",
   "background": "idle",

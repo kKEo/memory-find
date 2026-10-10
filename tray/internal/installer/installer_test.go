@@ -53,7 +53,7 @@ func tgz(t *testing.T, entries ...entry) []byte {
 	return buf.Bytes()
 }
 
-const goodBinary = "#!/bin/sh\necho 'memo-mcp 9.9.9'\n"
+const goodBinary = "#!/bin/sh\necho 'memors-mcp 9.9.9'\n"
 
 // fakeGitHub serves a release API and its assets over TLS.
 type fakeGitHub struct {
@@ -67,7 +67,7 @@ type fakeGitHub struct {
 func newFake(t *testing.T, archive []byte) *fakeGitHub {
 	t.Helper()
 	f := &fakeGitHub{archive: archive, extra: map[string]http.HandlerFunc{}}
-	f.sums = sumLine(archive) + strings.Repeat("0", 64) + "  memo-mcp_9.9.9_linux_amd64.tar.gz\n"
+	f.sums = sumLine(archive) + strings.Repeat("0", 64) + "  memors-mcp_9.9.9_linux_amd64.tar.gz\n"
 	f.ts = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if h := f.extra[r.URL.Path]; h != nil {
 			h(w, r)
@@ -79,7 +79,7 @@ func newFake(t *testing.T, archive []byte) *fakeGitHub {
 				http.Error(w, "no user agent", http.StatusForbidden)
 				return
 			}
-			assets := []Asset{{Name: "memo-mcp_9.9.9_darwin_arm64.tar.gz", URL: f.ts.URL + "/dl/archive", Size: int64(len(f.archive))}}
+			assets := []Asset{{Name: "memors-mcp_9.9.9_darwin_arm64.tar.gz", URL: f.ts.URL + "/dl/archive", Size: int64(len(f.archive))}}
 			if !f.noSums {
 				assets = append(assets, Asset{Name: "checksums.txt", URL: f.ts.URL + "/dl/sums", Size: int64(len(f.sums))})
 			}
@@ -98,11 +98,11 @@ func newFake(t *testing.T, archive []byte) *fakeGitHub {
 
 func sumLine(archive []byte) string {
 	sum := sha256.Sum256(archive)
-	return hex.EncodeToString(sum[:]) + "  memo-mcp_9.9.9_darwin_arm64.tar.gz\n"
+	return hex.EncodeToString(sum[:]) + "  memors-mcp_9.9.9_darwin_arm64.tar.gz\n"
 }
 
 func (f *fakeGitHub) client() *Client {
-	c := New("memo-tray-test")
+	c := New("memors-tray-test")
 	c.HTTP.Transport = f.ts.Client().Transport
 	c.API = f.ts.URL + "/api"
 	return c
@@ -127,21 +127,21 @@ func install(t *testing.T, f *fakeGitHub, dir string) (string, []Phase, error) {
 
 func TestInstall(t *testing.T) {
 	archive := tgz(t, entry{"LICENSE", "MIT", tar.TypeReg}, entry{"../escape", "x", tar.TypeReg},
-		entry{"memo-mcp", goodBinary, tar.TypeReg}, entry{"README.md", "readme", tar.TypeReg})
+		entry{"memors-mcp", goodBinary, tar.TypeReg}, entry{"README.md", "readme", tar.TypeReg})
 	f := newFake(t, archive)
 	dir := filepath.Join(t.TempDir(), "bin")
 	path, phases, err := install(t, f, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if path != filepath.Join(dir, "memo-mcp") || !slices.Equal(phases, []Phase{Downloading, Verifying, Installing}) {
+	if path != filepath.Join(dir, "memors-mcp") || !slices.Equal(phases, []Phase{Downloading, Verifying, Installing}) {
 		t.Errorf("path %s, phases %v", path, phases)
 	}
 	if fi, err := os.Stat(path); err != nil || fi.Mode().Perm() != 0o755 {
 		t.Fatalf("installed binary: %v %v", fi, err)
 	}
 	if des, _ := os.ReadDir(dir); len(des) != 1 {
-		t.Errorf("dir holds more than memo-mcp: %v", des)
+		t.Errorf("dir holds more than memors-mcp: %v", des)
 	}
 	if _, err := os.Stat(filepath.Join(filepath.Dir(dir), "escape")); err == nil {
 		t.Error("an entry escaped the install directory")
@@ -152,30 +152,30 @@ func TestInstall(t *testing.T) {
 }
 
 func TestInstallRefusesBadDownloads(t *testing.T) {
-	good := tgz(t, entry{"memo-mcp", goodBinary, tar.TypeReg})
+	good := tgz(t, entry{"memors-mcp", goodBinary, tar.TypeReg})
 	for _, c := range []struct {
 		name  string
 		setup func(f *fakeGitHub)
 		want  string
 	}{
-		{"checksum mismatch", func(f *fakeGitHub) { f.archive = tgz(t, entry{"memo-mcp", goodBinary + "#tampered\n", tar.TypeReg}) }, "checksum"},
+		{"checksum mismatch", func(f *fakeGitHub) { f.archive = tgz(t, entry{"memors-mcp", goodBinary + "#tampered\n", tar.TypeReg}) }, "checksum"},
 		{"no checksums.txt", func(f *fakeGitHub) { f.noSums = true }, "no checksums.txt"},
 		{"no entry for the archive", func(f *fakeGitHub) { f.sums = strings.Repeat("0", 64) + "  other.tar.gz\n" }, "no entry"},
 		{"no binary inside", func(f *fakeGitHub) {
 			f.archive = tgz(t, entry{"README.md", "x", tar.TypeReg})
 			f.sums = sumLine(f.archive)
-		}, "no memo-mcp"},
+		}, "no memors-mcp"},
 		{"binary is a symlink", func(f *fakeGitHub) {
-			f.archive = tgz(t, entry{"memo-mcp", "", tar.TypeSymlink})
+			f.archive = tgz(t, entry{"memors-mcp", "", tar.TypeSymlink})
 			f.sums = sumLine(f.archive)
-		}, "no memo-mcp"},
+		}, "no memors-mcp"},
 		{"binary does not run", func(f *fakeGitHub) {
-			f.archive = tgz(t, entry{"memo-mcp", "#!/bin/sh\nexit 3\n", tar.TypeReg})
+			f.archive = tgz(t, entry{"memors-mcp", "#!/bin/sh\nexit 3\n", tar.TypeReg})
 			f.sums = sumLine(f.archive)
 		}, "does not run"},
 		{"redirect to plain http", func(f *fakeGitHub) {
 			f.extra["/dl/archive"] = func(w http.ResponseWriter, r *http.Request) {
-				http.Redirect(w, r, "http://example.com/memo-mcp.tar.gz", http.StatusFound)
+				http.Redirect(w, r, "http://example.com/memors-mcp.tar.gz", http.StatusFound)
 			}
 		}, "refusing a redirect"},
 		{"more bytes than announced", func(f *fakeGitHub) {
@@ -186,7 +186,7 @@ func TestInstallRefusesBadDownloads(t *testing.T) {
 			f := newFake(t, good)
 			c.setup(f)
 			dir := t.TempDir()
-			old := filepath.Join(dir, "memo-mcp")
+			old := filepath.Join(dir, "memors-mcp")
 			if err := os.WriteFile(old, []byte("old binary"), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -216,7 +216,7 @@ func TestLatestErrors(t *testing.T) {
 		t.Errorf("plain http API accepted: %v", err)
 	}
 	rel := Release{Tag: "v1.5.0"}
-	if _, err := New("x").Install(context.Background(), rel, "arm64", t.TempDir(), nil); err == nil || !strings.Contains(err.Error(), "memo-mcp_1.5.0_darwin_arm64.tar.gz") {
+	if _, err := New("x").Install(context.Background(), rel, "arm64", t.TempDir(), nil); err == nil || !strings.Contains(err.Error(), "memors-mcp_1.5.0_darwin_arm64.tar.gz") {
 		t.Errorf("missing archive: %v", err)
 	}
 	if !errors.Is(fmt.Errorf("x: %w", ErrChecksum), ErrChecksum) {
@@ -224,15 +224,15 @@ func TestLatestErrors(t *testing.T) {
 	}
 }
 
-// With MEMO_TRAY_LIVE_GITHUB=1, install the real latest release into a
+// With MEMORS_TRAY_LIVE_GITHUB=1, install the real latest release into a
 // temporary directory: proves the asset names, checksums.txt format and
 // GitHub's redirects still match what Install expects.
 func TestLiveGitHub(t *testing.T) {
-	if os.Getenv("MEMO_TRAY_LIVE_GITHUB") != "1" {
-		t.Skip("set MEMO_TRAY_LIVE_GITHUB=1 to download the real latest release")
+	if os.Getenv("MEMORS_TRAY_LIVE_GITHUB") != "1" {
+		t.Skip("set MEMORS_TRAY_LIVE_GITHUB=1 to download the real latest release")
 	}
 	ctx := context.Background()
-	c := New("memo-tray-test")
+	c := New("memors-tray-test")
 	rel, err := c.Latest(ctx)
 	if err != nil {
 		t.Fatal(err)

@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/live"
-	"github.com/kKEo/memory-find/internal/runfile"
-	"github.com/kKEo/memory-find/tray/internal/client"
-	"github.com/kKEo/memory-find/tray/internal/config"
-	"github.com/kKEo/memory-find/tray/internal/menu"
-	"github.com/kKEo/memory-find/tray/internal/supervisor"
+	"github.com/kKEo/memors/internal/live"
+	"github.com/kKEo/memors/internal/runfile"
+	"github.com/kKEo/memors/tray/internal/client"
+	"github.com/kKEo/memors/tray/internal/config"
+	"github.com/kKEo/memors/tray/internal/menu"
+	"github.com/kKEo/memors/tray/internal/supervisor"
 )
 
 type fakeSup struct {
@@ -130,19 +130,19 @@ func newHarness(t *testing.T) *harness {
 			h.stoppedX = append(h.stoppedX, e.Info.PID)
 			return nil
 		},
-		Gone:        func(int) bool { return true },
-		Supervisor:  h.sup,
-		FindMemo:    func(string) (string, error) { return "/bin/memo-mcp", nil },
-		MemoVersion: func(context.Context, string) (string, error) { return "v9", nil },
-		PortFree:    func(string) bool { return true },
-		Render:      func(items []menu.Item, title string) { h.items, h.title = items, title },
-		Windows:     h.win,
-		OpenURL:     func(u string) error { h.opened = append(h.opened, u); return nil },
-		OpenFile:    func(string, string) error { return nil },
-		Copy:        func(s string) error { h.copied = append(h.copied, s); return nil },
-		Quit:        func() { h.quit = true },
-		Logf:        func(string, ...any) {},
-		Setup:       fakePages{},
+		Gone:          func(int) bool { return true },
+		Supervisor:    h.sup,
+		FindMemors:    func(string) (string, error) { return "/bin/memors-mcp", nil },
+		MemorsVersion: func(context.Context, string) (string, error) { return "v9", nil },
+		PortFree:      func(string) bool { return true },
+		Render:        func(items []menu.Item, title string) { h.items, h.title = items, title },
+		Windows:       h.win,
+		OpenURL:       func(u string) error { h.opened = append(h.opened, u); return nil },
+		OpenFile:      func(string, string) error { return nil },
+		Copy:          func(s string) error { h.copied = append(h.copied, s); return nil },
+		Quit:          func() { h.quit = true },
+		Logf:          func(string, ...any) {},
+		Setup:         fakePages{},
 	})
 	return h
 }
@@ -198,7 +198,7 @@ func TestUnreachableAfterRepeatedFailures(t *testing.T) {
 	h.liveErr["http://127.0.0.1:8765"] = client.ErrNotSupported
 	h.a.polls = map[string]*poll{}
 	h.tick()
-	if !strings.Contains(h.menuText(), "too old for memo-tray") {
+	if !strings.Contains(h.menuText(), "too old for memors-tray") {
 		t.Errorf("old server not flagged at once:\n%s", h.menuText())
 	}
 }
@@ -212,7 +212,7 @@ func TestActions(t *testing.T) {
 	ctx := context.Background()
 	h.a.handle(ctx, menu.Action{Kind: menu.CopyURL, Server: key})
 	h.a.handle(ctx, menu.Action{Kind: menu.CopyAdd, Server: key, KB: "crportal"})
-	if len(h.copied) != 2 || h.copied[0] != key+"/mcp" || !strings.Contains(h.copied[1], `memo-crportal 'http://127.0.0.1:8765/mcp' --header "Authorization: Bearer $(memo-mcp http-token)"`) {
+	if len(h.copied) != 2 || h.copied[0] != key+"/mcp" || !strings.Contains(h.copied[1], `memors-crportal 'http://127.0.0.1:8765/mcp' --header "Authorization: Bearer $(memors-mcp http-token)"`) {
 		t.Errorf("copied = %q", h.copied)
 	}
 	h.a.handle(ctx, menu.Action{Kind: menu.OpenStats, Server: key})
@@ -254,7 +254,7 @@ func TestStartAssignsAndSavesAnAddress(t *testing.T) {
 		t.Errorf("tray.json = %+v, %v", cfg, err)
 	}
 	h.tick()
-	if !strings.Contains(h.menuText(), "crportal · starting") || !strings.Contains(h.menuText(), "Quit memo-tray (stops 1 server)") {
+	if !strings.Contains(h.menuText(), "crportal · starting") || !strings.Contains(h.menuText(), "Quit memors-tray (stops 1 server)") {
 		t.Errorf("menu:\n%s", h.menuText())
 	}
 	// Its run file appears: the same row, now running and managed.
@@ -384,28 +384,28 @@ type fakePages struct{}
 func (fakePages) Entry(page string) string { return "http://127.0.0.1:1/enter?next=" + page }
 func (fakePages) Origin() string           { return "http://127.0.0.1:1" }
 
-// First launch without memo-mcp and without settings: the setup assistant
+// First launch without memors-mcp and without settings: the setup assistant
 // opens by itself, once.
 func TestFirstRunOpensTheAssistant(t *testing.T) {
 	h := newHarness(t)
-	h.a.d.FindMemo = func(string) (string, error) { return "", errors.New("memo-mcp not found") }
+	h.a.d.FindMemors = func(string) (string, error) { return "", errors.New("memors-mcp not found") }
 	h.tick()
 	h.tick()
 	if len(h.win.opens) != 1 || h.win.opens[0] != "tray:setup|http://127.0.0.1:1/enter?next=/wizard|http://127.0.0.1:1" {
 		t.Errorf("opens = %q", h.win.opens)
 	}
-	if h.items[0].Title != "Install memo-mcp…" {
+	if h.items[0].Title != "Install memors-mcp…" {
 		t.Errorf("first menu item = %q", h.items[0].Title)
 	}
 
 	h2 := newHarness(t)
-	h2.a.d.FindMemo = h.a.d.FindMemo
+	h2.a.d.FindMemors = h.a.d.FindMemors
 	if err := (&config.Config{}).Save(config.Path(h2.a.d.Home)); err != nil {
 		t.Fatal(err)
 	}
 	h2.tick()
 	if len(h2.win.opens) != 0 {
-		t.Errorf("the assistant opened although memo-tray was set up before: %q", h2.win.opens)
+		t.Errorf("the assistant opened although memors-tray was set up before: %q", h2.win.opens)
 	}
 	h2.a.handle(context.Background(), menu.Action{Kind: menu.OpenSettings})
 	if len(h2.win.opens) != 1 || !strings.HasPrefix(h2.win.opens[0], "tray:settings|http://127.0.0.1:1/enter?next=/settings|") {
@@ -435,7 +435,7 @@ func TestStartIfStopped(t *testing.T) {
 	}
 }
 
-// After memo-mcp is updated, the servers memo-tray started restart; others
+// After memors-mcp is updated, the servers memors-tray started restart; others
 // are left alone.
 func TestRestartManaged(t *testing.T) {
 	h := newHarness(t)

@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/kKEo/memory-find/internal/embedding"
+	"github.com/kKEo/memors/internal/embedding"
 )
 
 // Trust tiers in order; a channel's cap is the highest tier it may act on
@@ -146,7 +146,7 @@ func (s *Store) Remember(ctx context.Context, in RememberInput) (*Fact, error) {
 			return nil, fmt.Errorf("%s is already superseded", in.Supersedes)
 		}
 		if trustRank[oldTrust] > trustRank[channelCap(in.Channel)] {
-			return nil, &ErrNeedsHuman{Op: "supersede", URI: in.Supersedes, Trust: oldTrust, Command: "memo-mcp remember --supersedes " + in.Supersedes + " ..."}
+			return nil, &ErrNeedsHuman{Op: "supersede", URI: in.Supersedes, Trust: oldTrust, Command: "memors-mcp remember --supersedes " + in.Supersedes + " ..."}
 		}
 		oldID = id
 	}
@@ -243,7 +243,7 @@ func (s *Store) Forget(ctx context.Context, in ForgetInput) error {
 		return nil // idempotent
 	}
 	if trustRank[trust] > trustRank[channelCap(in.Channel)] {
-		return &ErrNeedsHuman{Op: "forget", URI: in.URI, Trust: trust, Command: fmt.Sprintf("memo-mcp forget %s --reason %q", in.URI, in.Reason)}
+		return &ErrNeedsHuman{Op: "forget", URI: in.URI, Trust: trust, Command: fmt.Sprintf("memors-mcp forget %s --reason %q", in.URI, in.Reason)}
 	}
 	op := "forget"
 	if in.Redact {
@@ -303,7 +303,7 @@ func (s *Store) SetTrust(ctx context.Context, uri, to, actor, channel string) er
 		return err
 	}
 	if channel == ChannelTool {
-		return &ErrNeedsHuman{Op: "promote", URI: uri, Trust: to, Command: fmt.Sprintf("memo-mcp trust promote %s --to %s", uri, to)}
+		return &ErrNeedsHuman{Op: "promote", URI: uri, Trust: to, Command: fmt.Sprintf("memors-mcp trust promote %s --to %s", uri, to)}
 	}
 	kind, id, err := ParseURI(uri)
 	if err != nil {
@@ -569,7 +569,7 @@ func (s *Store) History(ctx context.Context, uri string) ([]HistoryEntry, error)
 	}
 }
 
-// TrustRow is one line of `memo-mcp trust ls`.
+// TrustRow is one line of `memors-mcp trust ls`.
 type TrustRow struct {
 	Trust     string
 	Documents int

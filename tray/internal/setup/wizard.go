@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kKEo/memory-find/tray/internal/config"
-	"github.com/kKEo/memory-find/tray/internal/home"
-	"github.com/kKEo/memory-find/tray/internal/installer"
-	"github.com/kKEo/memory-find/tray/internal/menu"
+	"github.com/kKEo/memors/tray/internal/config"
+	"github.com/kKEo/memors/tray/internal/home"
+	"github.com/kKEo/memors/tray/internal/installer"
+	"github.com/kKEo/memors/tray/internal/menu"
 )
 
 // releaseFor is how long a looked-up release is reused before asking
@@ -61,28 +61,28 @@ func (s *Server) currentJob() *job {
 }
 
 type welcomeData struct {
-	MemoOK      bool
-	MemoStatus  string
-	MemoVersion string
-	TrayVersion string
+	MemorsOK      bool
+	MemorsStatus  string
+	MemorsVersion string
+	TrayVersion   string
 }
 
 func (s *Server) wizardWelcome(w http.ResponseWriter, r *http.Request) {
 	cfg, _, _ := s.loadConfig()
-	bin, version, err := s.memo(r.Context(), cfg)
-	s.render(w, "wizard_welcome.html", page{Title: "Set up memo-mcp", Step: 1, Data: welcomeData{
-		MemoOK: err == nil, MemoStatus: memoLine(bin, version, err), MemoVersion: version, TrayVersion: s.d.TrayVersion}})
+	bin, version, err := s.memors(r.Context(), cfg)
+	s.render(w, "wizard_welcome.html", page{Title: "Set up memors-mcp", Step: 1, Data: welcomeData{
+		MemorsOK: err == nil, MemorsStatus: memorsLine(bin, version, err), MemorsVersion: version, TrayVersion: s.d.TrayVersion}})
 }
 
 type installData struct {
-	Release   *installer.Release
-	Archive   installer.Asset
-	HasAsset  bool
-	Err       string
-	Installed string // version of the memo-mcp found now
-	MemoPath  string
-	Current   bool // the installed version is the latest
-	Dir       string
+	Release    *installer.Release
+	Archive    installer.Asset
+	HasAsset   bool
+	Err        string
+	Installed  string // version of the memors-mcp found now
+	MemorsPath string
+	Current    bool // the installed version is the latest
+	Dir        string
 }
 
 func (s *Server) wizardInstall(w http.ResponseWriter, r *http.Request) {
@@ -99,11 +99,11 @@ func (s *Server) wizardInstall(w http.ResponseWriter, r *http.Request) {
 		d.Archive, d.HasAsset = rel.Asset(rel.ArchiveName(s.d.GOARCH))
 	}
 	cfg, _, _ := s.loadConfig()
-	if bin, version, err := s.memo(r.Context(), cfg); err == nil {
-		d.MemoPath, d.Installed = bin, version
+	if bin, version, err := s.memors(r.Context(), cfg); err == nil {
+		d.MemorsPath, d.Installed = bin, version
 		d.Current = d.Release != nil && strings.TrimPrefix(version, "v") == d.Release.Version()
 	}
-	s.render(w, "wizard_install.html", page{Title: "Install memo-mcp", Step: 2, Data: d})
+	s.render(w, "wizard_install.html", page{Title: "Install memors-mcp", Step: 2, Data: d})
 }
 
 func (s *Server) startInstall(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +130,7 @@ func (s *Server) startInstall(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/wizard/progress", http.StatusSeeOther)
 }
 
-// run installs and, on success, points tray.json at the new memo-mcp.
+// run installs and, on success, points tray.json at the new memors-mcp.
 func (s *Server) run(j *job) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -141,24 +141,24 @@ func (s *Server) run(j *job) {
 	})
 	version := ""
 	if err == nil {
-		version, _ = s.d.MemoVersion(ctx, path)
-		err = s.useMemo(path)
+		version, _ = s.d.MemorsVersion(ctx, path)
+		err = s.useMemors(path)
 	}
 	j.mu.Lock()
 	j.done, j.err, j.path, j.version = true, err, path, version
 	j.mu.Unlock()
 	if err != nil {
-		s.d.Logf("install memo-mcp %s: %v", j.release.Tag, err)
+		s.d.Logf("install memors-mcp %s: %v", j.release.Tag, err)
 		return
 	}
-	s.d.Logf("installed memo-mcp %s at %s", j.release.Tag, path)
+	s.d.Logf("installed memors-mcp %s at %s", j.release.Tag, path)
 	s.d.Notify(Event{Kind: ConfigSaved})
 }
 
-// useMemo makes memo-tray run the memo-mcp at path from now on.
-func (s *Server) useMemo(path string) error {
+// useMemors makes memors-tray run the memors-mcp at path from now on.
+func (s *Server) useMemors(path string) error {
 	_, err := config.Update(config.Path(s.d.Home), func(c *config.Config) error {
-		c.MemoBinary = path
+		c.MemorsBinary = path
 		return nil
 	})
 	return err
@@ -176,7 +176,7 @@ func (s *Server) wizardProgress(w http.ResponseWriter, r *http.Request) {
 	if v.Running {
 		refresh = 1
 	}
-	s.render(w, "wizard_progress.html", page{Title: "Install memo-mcp", Step: 2, Refresh: refresh, Data: v})
+	s.render(w, "wizard_progress.html", page{Title: "Install memors-mcp", Step: 2, Refresh: refresh, Data: v})
 }
 
 func (s *Server) restartServers(w http.ResponseWriter, r *http.Request) {
@@ -192,13 +192,13 @@ type kbData struct {
 	Model        string
 	Auth         string
 	Autostart    bool
-	MemoOK       bool
+	MemorsOK     bool
 	Err          string
 }
 
 func (s *Server) wizardKB(w http.ResponseWriter, r *http.Request) {
 	cfg, _, _ := s.loadConfig()
-	d := kbData{Name: "default", Auth: "none", Autostart: true, Model: cfg.Env["MEMO_MODEL"]}
+	d := kbData{Name: "default", Auth: "none", Autostart: true, Model: cfg.Env["MEMORS_MODEL"]}
 	d.KBs, _ = home.KBs(s.d.Home)
 	if len(d.KBs) > 0 {
 		d.Name = d.KBs[0]
@@ -211,8 +211,8 @@ func (s *Server) wizardKB(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) fillModels(ctx context.Context, cfg *config.Config, d *kbData) {
-	bin, _, err := s.memo(ctx, cfg)
-	d.MemoOK = err == nil
+	bin, _, err := s.memors(ctx, cfg)
+	d.MemorsOK = err == nil
 	if err != nil {
 		return
 	}
@@ -250,9 +250,9 @@ func (s *Server) saveKB(w http.ResponseWriter, r *http.Request) {
 			if c.Env == nil {
 				c.Env = map[string]string{}
 			}
-			c.Env["MEMO_MODEL"] = m
+			c.Env["MEMORS_MODEL"] = m
 		} else {
-			delete(c.Env, "MEMO_MODEL")
+			delete(c.Env, "MEMORS_MODEL")
 		}
 		return nil
 	})

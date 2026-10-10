@@ -16,25 +16,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kKEo/memory-find/internal/live"
-	"github.com/kKEo/memory-find/internal/runfile"
-	"github.com/kKEo/memory-find/tray/internal/client"
-	"github.com/kKEo/memory-find/tray/internal/config"
-	"github.com/kKEo/memory-find/tray/internal/discover"
+	"github.com/kKEo/memors/internal/live"
+	"github.com/kKEo/memors/internal/runfile"
+	"github.com/kKEo/memors/tray/internal/client"
+	"github.com/kKEo/memors/tray/internal/config"
+	"github.com/kKEo/memors/tray/internal/discover"
 )
 
-// The test binary doubles as a fake memo-mcp: with TRAY_FAKE_MEMO set it
-// behaves like `memo-mcp serve --http <addr>` in the way chosen by
+// The test binary doubles as a fake memors-mcp: with TRAY_FAKE_MEMORS set it
+// behaves like `memors-mcp serve --http <addr>` in the way chosen by
 // TRAY_FAKE_MODE, instead of running tests.
 func TestMain(m *testing.M) {
-	if mode := os.Getenv("TRAY_FAKE_MEMO"); mode != "" {
-		os.Exit(fakeMemo(mode))
+	if mode := os.Getenv("TRAY_FAKE_MEMORS"); mode != "" {
+		os.Exit(fakeMemors(mode))
 	}
 	os.Exit(m.Run())
 }
 
-func fakeMemo(mode string) int {
-	fmt.Printf("args=%s kb=%s home=%s auth_env=%q\n", strings.Join(os.Args[1:], " "), os.Getenv("MEMO_KB"), os.Getenv("MEMO_HOME"), os.Getenv("MEMO_HTTP_AUTH"))
+func fakeMemors(mode string) int {
+	fmt.Printf("args=%s kb=%s home=%s auth_env=%q\n", strings.Join(os.Args[1:], " "), os.Getenv("MEMORS_KB"), os.Getenv("MEMORS_HOME"), os.Getenv("MEMORS_HTTP_AUTH"))
 	switch mode {
 	case "crash":
 		fmt.Fprintln(os.Stderr, "fatal: the knowledge base is locked")
@@ -54,7 +54,7 @@ func fakeMemo(mode string) int {
 		return 1
 	}
 	instance := fmt.Sprint("fake-", os.Getpid())
-	path, err := runfile.Write(runfile.Dir(os.Getenv("MEMO_HOME")), runfile.Info{PID: os.Getpid(), Instance: instance, KB: os.Getenv("MEMO_KB"),
+	path, err := runfile.Write(runfile.Dir(os.Getenv("MEMORS_HOME")), runfile.Info{PID: os.Getpid(), Instance: instance, KB: os.Getenv("MEMORS_KB"),
 		URL: "http://" + ln.Addr().String(), Listen: ln.Addr().String(), Scheme: "http", Auth: "none", Started: time.Now()})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -75,7 +75,7 @@ func fakeMemo(mode string) int {
 func newSupervisor(t *testing.T, mode string) (*Supervisor, string) {
 	t.Helper()
 	h := t.TempDir()
-	env := append(os.Environ(), "TRAY_FAKE_MEMO="+mode, "MEMO_HTTP_AUTH=none", "MEMO_KB=wrong")
+	env := append(os.Environ(), "TRAY_FAKE_MEMORS="+mode, "MEMORS_HTTP_AUTH=none", "MEMORS_KB=wrong")
 	return New(h, env), h
 }
 
@@ -114,7 +114,7 @@ func eventually(t *testing.T, what string, cond func() bool) {
 func TestStartAndStop(t *testing.T) {
 	s, h := newSupervisor(t, "serve")
 	bin, _ := os.Executable()
-	if err := s.Start(bin, Spec{KB: "crportal", Addr: freeAddr(t), Env: map[string]string{"MEMO_MODEL": "potion"}}); err != nil {
+	if err := s.Start(bin, Spec{KB: "crportal", Addr: freeAddr(t), Env: map[string]string{"MEMORS_MODEL": "potion"}}); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.StopAll(time.Second) })
@@ -140,7 +140,7 @@ func TestStartAndStop(t *testing.T) {
 		t.Errorf("run file left: %+v", entries)
 	}
 	log, _ := os.ReadFile(c.Log)
-	for _, want := range []string{"--- memo-tray", "args=serve --http", "kb=crportal home=" + h, `auth_env=""`} {
+	for _, want := range []string{"--- memors-tray", "args=serve --http", "kb=crportal home=" + h, `auth_env=""`} {
 		if !strings.Contains(string(log), want) {
 			t.Errorf("log lacks %q:\n%s", want, log)
 		}
@@ -181,15 +181,15 @@ func TestStopKillsAStubbornServer(t *testing.T) {
 }
 
 func TestChildEnv(t *testing.T) {
-	base := []string{"PATH=/bin", "MEMO_KB=x", "MEMO_HOME=/old", "MEMO_HTTP_ADDR=0.0.0.0:1", "MEMO_TLS_CERT=c", "MEMO_PUBLIC_URL=u",
-		"MEMO_METRICS_ADDR=m", "JOURNAL_TOKEN=j", "MEMO_MODEL=granite", "MEMO_QUERY_LOG=1"}
-	got := childEnv(base, "/h", Spec{KB: "kb1", Env: map[string]string{"MEMO_MODEL": "potion", "MEMO_HTTP_AUTH": "none"}})
-	want := []string{"PATH=/bin", "MEMO_QUERY_LOG=1", "MEMO_HOME=/h", "MEMO_KB=kb1", "MEMO_MODEL=potion"}
+	base := []string{"PATH=/bin", "MEMORS_KB=x", "MEMORS_HOME=/old", "MEMORS_HTTP_ADDR=0.0.0.0:1", "MEMORS_TLS_CERT=c", "MEMORS_PUBLIC_URL=u",
+		"MEMORS_METRICS_ADDR=m", "MEMORS_MODEL=granite", "MEMORS_QUERY_LOG=1"}
+	got := childEnv(base, "/h", Spec{KB: "kb1", Env: map[string]string{"MEMORS_MODEL": "potion", "MEMORS_HTTP_AUTH": "none"}})
+	want := []string{"PATH=/bin", "MEMORS_QUERY_LOG=1", "MEMORS_HOME=/h", "MEMORS_KB=kb1", "MEMORS_MODEL=potion"}
 	if !slices.Equal(got, want) {
 		t.Errorf("childEnv =\n%q\nwant\n%q", got, want)
 	}
-	if !config.Reserved("MEMO_HTTP_AUTH") {
-		t.Error("MEMO_HTTP_AUTH must be reserved")
+	if !config.Reserved("MEMORS_HTTP_AUTH") {
+		t.Error("MEMORS_HTTP_AUTH must be reserved")
 	}
 }
 
@@ -208,7 +208,7 @@ func TestLogRotation(t *testing.T) {
 	}
 }
 
-// A server started elsewhere is stopped only once memo-tray has made sure
+// A server started elsewhere is stopped only once memors-tray has made sure
 // the pid still is that server.
 func TestStopExternal(t *testing.T) {
 	s, h := newSupervisor(t, "serve")
@@ -227,7 +227,7 @@ func TestStopExternal(t *testing.T) {
 	})
 	ctx := context.Background()
 	alive := func(int) discover.Process {
-		return discover.Process{Alive: true, Name: "memo-mcp", Started: time.Now().Add(-time.Hour)}
+		return discover.Process{Alive: true, Name: "memors-mcp", Started: time.Now().Add(-time.Hour)}
 	}
 	liveOf := func(ctx context.Context) (live.Snapshot, error) {
 		return client.New().Live(ctx, client.TargetOf(e.Info))
@@ -240,7 +240,7 @@ func TestStopExternal(t *testing.T) {
 		t.Error("stopped although another server answers")
 	}
 	if err := StopExternal(ctx, e, func(int) discover.Process { return discover.Process{Alive: true, Name: "Safari"} }, liveOf); err == nil {
-		t.Error("stopped a process that is not memo-mcp")
+		t.Error("stopped a process that is not memors-mcp")
 	}
 	unreachable := func(context.Context) (live.Snapshot, error) { return live.Snapshot{}, client.ErrUnreachable }
 	if err := StopExternal(ctx, e, func(int) discover.Process { return discover.Process{Alive: true} }, unreachable); err == nil {

@@ -1,7 +1,7 @@
 # profiles.json
 
-`$MEMO_HOME/profiles.json` changes ranking constants without rebuilding the binary. It is read
-at start-up by **`memo-mcp serve` and `memo-mcp ui`**. A missing file is fine. A malformed
+`$MEMORS_HOME/profiles.json` changes ranking constants without rebuilding the binary. It is read
+at start-up by **`memors-mcp serve` and `memors-mcp ui`**. A missing file is fine. A malformed
 file stops the process with the path and the JSON error.
 
 > **Note.** In v1.4, the CLI `search`, `explain` and `eval` commands do not read
@@ -32,7 +32,7 @@ present are applied.
 }
 ```
 
-Select it with `MEMO_PROFILE=team-docs` in the server's environment.
+Select it with `MEMORS_PROFILE=team-docs` in the server's environment.
 
 ## Fields
 
@@ -59,8 +59,8 @@ precedence over `bands`.
 ## Checking an override
 
 ```bash
-memo-mcp profiles show team-docs   # built-in profiles only in v1.4; see the note above
-memo-mcp ui                        # search there with MEMO_PROFILE=team-docs set; the trace shows the profile
+memors-mcp profiles show team-docs   # built-in profiles only in v1.4; see the note above
+memors-mcp ui                        # search there with MEMORS_PROFILE=team-docs set; the trace shows the profile
 ```
 
 Before adopting an override, measure it. See [Measuring a change](../tuning/measuring.md).

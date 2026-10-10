@@ -16,7 +16,7 @@ const (
 
 // Named profiles. Each constant has a derivation in Describe(); none is
 // exposed in the LLM-facing schema (roadmap D-K). The eval lab (P3) compares
-// them with `memo-mcp eval --profiles a,b`.
+// them with `memors-mcp eval --profiles a,b`.
 var profiles = map[string]Profile{}
 
 func init() {
@@ -109,7 +109,7 @@ func Lookup(name string) (Profile, error) {
 	return p, nil
 }
 
-// Override is the on-disk shape of $MEMO_HOME/profiles.json: a map from
+// Override is the on-disk shape of $MEMORS_HOME/profiles.json: a map from
 // profile name to the fields to change. Only the fields present are applied;
 // a name that does not exist yet creates a new profile based on Default.
 // JSON rather than TOML keeps the binary free of a parsing dependency.
@@ -207,7 +207,7 @@ func LoadOverrides(path string) error {
 }
 
 // Describe prints every constant of a profile with its meaning, for
-// `memo-mcp profiles show`: the transparency rule says every knob is
+// `memors-mcp profiles show`: the transparency rule says every knob is
 // named, derived and printable.
 func Describe(p Profile) string {
 	var sb strings.Builder

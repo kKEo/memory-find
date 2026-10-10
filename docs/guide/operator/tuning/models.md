@@ -5,7 +5,7 @@ backend (hugot / GoMLX), so no Python, no ONNX Runtime and no GPU are involved. 
 static lookup table with no neural network at all.
 
 ```bash
-memo-mcp model ls
+memors-mcp model ls
 ```
 
 | Id | Dim | Licence | Size | Query latency* | Notes |
@@ -33,31 +33,31 @@ Each 384-dimension vector adds about 1.5 KB per passage.
 
 1. **Pre-download and check**, optionally:
    ```bash
-   memo-mcp model pull potion
-   memo-mcp model smoke potion
+   memors-mcp model pull potion
+   memors-mcp model smoke potion
    ```
 2. **Embed the existing passages.** This is optional, because the server does it in the
    background; doing it ahead avoids a degraded period:
    ```bash
-   MEMO_KB=my-project memo-mcp reindex --model potion
+   MEMORS_KB=my-project memors-mcp reindex --model potion
    ```
    `reindex` is resumable. It only embeds passages that lack a vector for that model.
-3. **Record the default** for the file, and **set `MEMO_MODEL`** in the MCP client's server
+3. **Record the default** for the file, and **set `MEMORS_MODEL`** in the MCP client's server
    entry:
    ```bash
-   MEMO_KB=my-project memo-mcp model use potion
+   MEMORS_KB=my-project memors-mcp model use potion
    ```
 4. Restart the client session. At start, the server runs `backfill`, then `reindex` for the
    current model, in the background. Until that finishes, search reports `degraded` and
-   `memo_kb_pending_embeddings{model="potion"}` is above zero.
+   `memors_kb_pending_embeddings{model="potion"}` is above zero.
 
 ## Downloads
 
-- Source: Hugging Face, over HTTPS, into `~/.cache/memo-mcp/models/`.
+- Source: Hugging Face, over HTTPS, into `~/.cache/memors-mcp/models/`.
 - A completed download writes a `.ok` marker. An interrupted one is detected and retried.
-- `memo-mcp model redownload <id>` discards the cache for one model and fetches it again.
+- `memors-mcp model redownload <id>` discards the cache for one model and fetches it again.
   Always pass the id: without one it re-downloads `minilm`.
-- Metrics: `memo_embed_model_downloads_total{model,outcome}`,
-  `memo_embed_model_load_seconds`, `memo_embed_model_loaded`.
+- Metrics: `memors_embed_model_downloads_total{model,outcome}`,
+  `memors_embed_model_load_seconds`, `memors_embed_model_loaded`.
 
 Offline installs: [Air-gapped installs](../install/air-gapped.md).

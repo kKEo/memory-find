@@ -1,5 +1,7 @@
 # memo-mcp roadmap — from journal to explainable knowledge base
 
+> **Renamed.** This document predates the rename to memors (2026-10-10): `memo-mcp` is now `memors-mcp`, `memo-tray` is `memors-tray`, `MEMO_*` is `MEMORS_*` and `~/.memo-mcp` is `~/.memors-mcp`. `memo://` addresses are unchanged.
+
 *Written 2026-10-02 at HEAD `375f24c`. Supersedes the 2026-09-04 review that used to live in
 this file (`git show 375f24c:docs/review-roadmap.md`). Research basis:
 [`knowledge-base-sota.md`](knowledge-base-sota.md). Owner decisions taken 2026-10-02 are listed

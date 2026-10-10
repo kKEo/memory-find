@@ -67,8 +67,8 @@ structures, and a test asserts that the numbers are identical.
 
 If the embedding model is not available, because it is downloading, failed to load or has no
 vectors yet, search runs without the semantic arm. It sets `degraded{flag, reason}`, and the
-`memo_search_degraded_total` metric counts it. Writes made in that state queue their vectors.
-`memo-mcp backfill` or the next server start embeds them.
+`memors_search_degraded_total` metric counts it. Writes made in that state queue their vectors.
+`memors-mcp backfill` or the next server start embeds them.
 
 Tuning these constants: [Profiles and constants](../tuning/profiles.md). Full formulas:
-[architecture §5](https://github.com/kKEo/memory-find/blob/master/docs/architecture.md#5-the-read-path-how-search-decides).
+[architecture §5](https://github.com/kKEo/memors/blob/master/docs/architecture.md#5-the-read-path-how-search-decides).

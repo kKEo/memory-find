@@ -1,4 +1,4 @@
-{{template "head" .}}<h1>Status</h1>{{if not .Live}}<p class="muted">Live server data (connected clients, calls in flight, counters since start) is available when the UI is served by <code>memo-mcp serve --http</code>.</p>{{end}}{{with .Data}}
+{{template "head" .}}<h1>Status</h1>{{if not .Live}}<p class="muted">Live server data (connected clients, calls in flight, counters since start) is available when the UI is served by <code>memors-mcp serve --http</code>.</p>{{end}}{{with .Data}}
 <table><tr><th>file</th><td><code>{{.Status.Path}}</code> · {{f3 .Status.SizeMB}} MB · schema v{{.Status.SchemaVersion}}</td></tr>
 <tr><th>documents</th><td>{{.Status.LiveDocuments}} live, {{.Status.Revisions}} revisions, {{.Status.Sources}} sources</td></tr>
 <tr><th>passages / facts</th><td>{{.Status.Chunks}} / {{.Status.Facts}}</td></tr>
