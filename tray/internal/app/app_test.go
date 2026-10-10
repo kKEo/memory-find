@@ -142,6 +142,7 @@ func newHarness(t *testing.T) *harness {
 		Copy:        func(s string) error { h.copied = append(h.copied, s); return nil },
 		Quit:        func() { h.quit = true },
 		Logf:        func(string, ...any) {},
+		Setup:       fakePages{},
 	})
 	return h
 }
@@ -375,5 +376,78 @@ func TestOpenStatsOnAnOlderServer(t *testing.T) {
 	h.tick()
 	if len(h.win.opens) != 1 || !strings.Contains(h.menuText(), "⚠ open stats window: token refused") {
 		t.Errorf("refused token not reported:\n%s", h.menuText())
+	}
+}
+
+type fakePages struct{}
+
+func (fakePages) Entry(page string) string { return "http://127.0.0.1:1/enter?next=" + page }
+func (fakePages) Origin() string           { return "http://127.0.0.1:1" }
+
+// First launch without memo-mcp and without settings: the setup assistant
+// opens by itself, once.
+func TestFirstRunOpensTheAssistant(t *testing.T) {
+	h := newHarness(t)
+	h.a.d.FindMemo = func(string) (string, error) { return "", errors.New("memo-mcp not found") }
+	h.tick()
+	h.tick()
+	if len(h.win.opens) != 1 || h.win.opens[0] != "tray:setup|http://127.0.0.1:1/enter?next=/wizard|http://127.0.0.1:1" {
+		t.Errorf("opens = %q", h.win.opens)
+	}
+	if h.items[0].Title != "Install memo-mcp…" {
+		t.Errorf("first menu item = %q", h.items[0].Title)
+	}
+
+	h2 := newHarness(t)
+	h2.a.d.FindMemo = h.a.d.FindMemo
+	if err := (&config.Config{}).Save(config.Path(h2.a.d.Home)); err != nil {
+		t.Fatal(err)
+	}
+	h2.tick()
+	if len(h2.win.opens) != 0 {
+		t.Errorf("the assistant opened although memo-tray was set up before: %q", h2.win.opens)
+	}
+	h2.a.handle(context.Background(), menu.Action{Kind: menu.OpenSettings})
+	if len(h2.win.opens) != 1 || !strings.HasPrefix(h2.win.opens[0], "tray:settings|http://127.0.0.1:1/enter?next=/settings|") {
+		t.Errorf("settings window = %q", h2.win.opens)
+	}
+}
+
+// The setup pages save tray.json and ask for a server: it starts with the
+// saved settings, unless it already runs.
+func TestStartIfStopped(t *testing.T) {
+	h := newHarness(t)
+	h.tick()
+	cfg := &config.Config{Servers: []config.Server{{KB: "work", Addr: "127.0.0.1:8790", Auth: "token"}}}
+	if err := cfg.Save(config.Path(h.a.d.Home)); err != nil {
+		t.Fatal(err)
+	}
+	h.a.handle(context.Background(), menu.Action{Kind: startIfStopped, KB: "work"})
+	if len(h.sup.starts) != 1 || h.sup.starts[0].Addr != "127.0.0.1:8790" || h.sup.starts[0].Auth != "token" {
+		t.Fatalf("starts = %+v", h.sup.starts)
+	}
+	h.server(1001, "work", "http://127.0.0.1:8790", "token")
+	h.snaps["http://127.0.0.1:8790"] = live.Snapshot{Schema: 1, Instance: "i1"}
+	h.tick()
+	h.a.handle(context.Background(), menu.Action{Kind: startIfStopped, KB: "work"})
+	if len(h.sup.starts) != 1 {
+		t.Errorf("a running server was started again: %+v", h.sup.starts)
+	}
+}
+
+// After memo-mcp is updated, the servers memo-tray started restart; others
+// are left alone.
+func TestRestartManaged(t *testing.T) {
+	h := newHarness(t)
+	h.a.handle(context.Background(), menu.Action{Kind: menu.Start, KB: "mine"})
+	h.server(1001, "mine", "http://127.0.0.1:8765", "none")
+	h.server(41, "theirs", "http://127.0.0.1:8770", "none")
+	h.snaps["http://127.0.0.1:8765"] = live.Snapshot{Schema: 1, Instance: "i1"}
+	h.snaps["http://127.0.0.1:8770"] = live.Snapshot{Schema: 1, Instance: "i2"}
+	h.tick()
+	h.a.handle(context.Background(), menu.Action{Kind: restartManaged})
+	waitFor(t, func() bool { return !h.a.isBusy("mine") })
+	if !slices.Equal(h.sup.stops, []string{"mine"}) || len(h.stoppedX) != 0 {
+		t.Errorf("stops = %v, external stops = %v", h.sup.stops, h.stoppedX)
 	}
 }

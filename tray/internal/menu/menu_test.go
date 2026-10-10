@@ -40,11 +40,8 @@ func TestEmpty(t *testing.T) {
 ---
 Start Server
   > No knowledge bases yet (memo-mcp ingest creates one) [off]
-Settings
-  > Edit Config…
-  > Open Logs Folder
-  > ---
-  > memo-mcp v1 at /bin/memo-mcp [off]
+Settings…
+Install or Update memo-mcp…
 ---
 Quit memo-tray
 `
@@ -77,11 +74,8 @@ func TestServerWithAgents(t *testing.T) {
 ---
 Start Server
   > default
-Settings
-  > Edit Config…
-  > Open Logs Folder
-  > ---
-  > m [off]
+Settings…
+Install or Update memo-mcp…
 ---
 Quit memo-tray (stops 1 server)
 `
@@ -107,6 +101,9 @@ func TestStoppedCrashedAndProblems(t *testing.T) {
 		{Key: "https://box:9", KB: "c", URL: "https://box:9", Auth: "token", State: Unreachable, Detail: "token refused", MTLS: true},
 	}}
 	got := titles(Build(in), "")
+	if items := Build(in); items[0].Title != "Install memo-mcp…" || items[0].Action.Kind != OpenSetup || items[0].Tooltip != "memo-mcp not found" {
+		t.Errorf("first item when memo-mcp is missing = %+v", items[0])
+	}
 	for _, want := range []string{
 		"⚠ tray.json: bad [off]",
 		"a · crashed (exit status 3)\n  > Start [off]\n  > Show Log\n",

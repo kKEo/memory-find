@@ -17,6 +17,9 @@ security properties come from being local, small and explicit.
 
 - **Model download** from Hugging Face on first use of a model, into
   `~/.cache/memo-mcp/models`. Avoidable; see [Air-gapped installs](../install/air-gapped.md).
+- **memo-tray**, the optional macOS app, contacts GitHub (`api.github.com` and the release
+  download hosts) only while its setup assistant shows the Install step, and installs only a
+  download whose SHA-256 matches the release's `checksums.txt`.
 - Nothing else. The server never fetches URLs. Agents fetch content and pass the text to
   `ingest`. There is no telemetry: metrics are pull-only on loopback, logs go to stderr, and
   the call log is a table in your own file.

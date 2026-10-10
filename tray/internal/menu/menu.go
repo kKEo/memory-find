@@ -32,6 +32,8 @@ const (
 	EditConfig
 	OpenLogs
 	Quit
+	OpenSettings // memo-tray's settings window
+	OpenSetup    // the assistant that installs memo-mcp and sets up a knowledge base
 )
 
 // Action is a click: what to do, to which server or knowledge base.
@@ -104,6 +106,9 @@ const activeWindow = 2 * time.Minute
 // Build returns the menu.
 func Build(in Input) []Item {
 	var items []Item
+	if !in.MemoOK {
+		items = append(items, Item{Key: "install", Title: "Install memo-mcp…", Tooltip: in.Memo, Action: Action{Kind: OpenSetup}}, sep("install"))
+	}
 	if in.Problem != "" {
 		items = append(items, Item{Key: "problem", Title: "⚠ " + in.Problem, Disabled: true}, sep("problem"))
 	}
@@ -121,7 +126,10 @@ func Build(in Input) []Item {
 	if len(servers) == 0 {
 		items = append(items, Item{Key: "none", Title: "No memo-mcp servers running", Disabled: true})
 	}
-	items = append(items, sep("start"), startMenu(in, servers), settingsMenu(in), sep("quit"))
+	items = append(items, sep("start"), startMenu(in, servers),
+		Item{Key: "settings", Title: "Settings…", Action: Action{Kind: OpenSettings}},
+		Item{Key: "setup", Title: "Install or Update memo-mcp…", Tooltip: in.Memo, Action: Action{Kind: OpenSetup}},
+		sep("quit"))
 	quit := "Quit memo-tray"
 	if in.StopsOnQuit > 0 {
 		quit += fmt.Sprintf(" (stops %d server%s)", in.StopsOnQuit, plural(in.StopsOnQuit))
@@ -285,15 +293,6 @@ func startMenu(in Input, servers []ServerView) Item {
 		children = append(children, Item{Key: "start:none", Title: title, Disabled: true})
 	}
 	return Item{Key: "start", Title: "Start Server", Children: children}
-}
-
-func settingsMenu(in Input) Item {
-	return Item{Key: "settings", Title: "Settings", Children: []Item{
-		{Key: "settings:config", Title: "Edit Config…", Action: Action{Kind: EditConfig}},
-		{Key: "settings:logs", Title: "Open Logs Folder", Action: Action{Kind: OpenLogs}},
-		sep("settings:sep"),
-		{Key: "settings:memo", Title: in.Memo, Disabled: true},
-	}}
 }
 
 // ClaudeAddCommand is the line that adds a server to Claude Code. It names

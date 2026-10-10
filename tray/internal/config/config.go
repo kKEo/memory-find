@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/kKEo/memory-find/tray/internal/home"
 )
@@ -86,6 +87,56 @@ func (c *Config) Save(path string) error {
 		return err
 	}
 	return os.Rename(tmp.Name(), path)
+}
+
+// writeMu serialises read-modify-write cycles on tray.json: the menu (an
+// address for a newly started knowledge base) and the settings pages write
+// it from different goroutines.
+var writeMu sync.Mutex
+
+// Update applies change to the settings in path and saves the result,
+// holding writeMu from read to write, so concurrent writers never undo each
+// other. An unreadable file is replaced. Nothing is written when change
+// leaves the settings as they were, or when the result is invalid.
+func Update(path string, change func(c *Config) error) (*Config, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock()
+	c, loadErr := Load(path)
+	if loadErr != nil {
+		c = &Config{}
+	}
+	before, _ := json.Marshal(c)
+	if err := change(c); err != nil {
+		return nil, err
+	}
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
+	if after, _ := json.Marshal(c); loadErr == nil && string(after) == string(before) {
+		return c, nil
+	}
+	return c, c.Save(path)
+}
+
+// SaveIf saves c in place of the settings in path if they are still at
+// revision rev (see Revision); it reports whether it did.
+func SaveIf(path string, c *Config, rev string) (bool, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock()
+	if Revision(path) != rev {
+		return false, nil
+	}
+	return true, c.Save(path)
+}
+
+// Revision changes whenever the file at path does; "none" when there is
+// no file.
+func Revision(path string) string {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return "none"
+	}
+	return fmt.Sprintf("%d-%d", fi.ModTime().UnixNano(), fi.Size())
 }
 
 // StopsOnQuit reports whether quitting stops the servers memo-tray started.

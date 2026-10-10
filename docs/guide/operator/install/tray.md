@@ -30,6 +30,45 @@ make tray-app    # tray/dist/memo-tray.app and the release zip
 make tray-test   # vet and tests of the tray module
 ```
 
+## Installing memo-mcp from the app
+
+The setup assistant installs memo-mcp on demand. On the Install step it asks the GitHub API for
+the latest release (`api.github.com/repos/kKEo/memory-find/releases/latest`). memo-tray makes no
+other outbound connection, and makes this one only when you open that step.
+
+Installing works like this:
+
+1. Download `checksums.txt` and `memo-mcp_<version>_darwin_<arch>.tar.gz` for this Mac. Only
+   https is accepted, redirects included.
+2. Compare the archive's SHA-256 with its line in `checksums.txt`. A release without that line
+   is refused.
+3. Extract only the regular file `memo-mcp` from the archive, into a temporary file in the
+   target folder (default `~/.local/bin`).
+4. Run `memo-mcp version` on it, and only then rename it over `<folder>/memo-mcp`. A failure at
+   any step leaves the previous binary untouched.
+5. Set `memo_binary` in `tray.json` to the new file.
+
+The checksum proves the download is the file the release lists. Like the manual install, it
+does not protect against a compromised release. Servers that are running keep the old binary
+until they restart; the last step offers to restart the ones memo-tray started.
+
+## Settings window and launch at login
+
+The settings window and the setup assistant are pages that memo-tray serves itself:
+
+- They are served on `127.0.0.1:<random port>` and shown in its own WKWebView window.
+- A window enters through a link carrying a per-process secret, passed in process. It then
+  holds an HttpOnly, SameSite=Strict cookie.
+- Requests with any other `Host` header, or without the cookie, are refused.
+- Form posts must be same-origin.
+- Saving checks that `tray.json` has not changed since the form was opened, and validates
+  everything before writing.
+
+**Open memo-tray when you log in** writes `~/Library/LaunchAgents/io.github.kkeo.memo-tray.plist`
+(`RunAtLoad`, the app's own executable) and turning it off removes the file. It takes effect at
+the next login. memo-tray refuses while macOS runs it from a temporary copy (App Translocation:
+move it to Applications first). At each start it updates the path if the app has moved.
+
 ## How it finds servers
 
 Every `serve --http` writes a run file, `$MEMO_HOME/run/serve-<pid>.json` (see
@@ -72,8 +111,10 @@ manager.
 
 ## tray.json
 
-`$MEMO_HOME/tray.json` (0600) is optional. memo-tray rereads it when it changes and adds an entry
-the first time you start a knowledge base from the menu.
+`$MEMO_HOME/tray.json` (0600) is optional. The settings window edits it. memo-tray also rereads
+it when you change it by hand, and adds an entry the first time you start a knowledge base from
+the menu. Every write inside memo-tray goes through one lock, from read to write, so the menu and
+the settings pages never undo each other.
 
 | Key | Meaning |
 |---|---|
@@ -110,3 +151,5 @@ useless once it is used.
 | `$MEMO_HOME/tray.lock` | Held while memo-tray runs; a second copy refuses to start |
 | `$MEMO_HOME/logs/tray.log` | memo-tray's own log (login codes are redacted) |
 | `$MEMO_HOME/logs/serve-<kb>.log` | Output of the servers memo-tray started |
+| `~/Library/LaunchAgents/io.github.kkeo.memo-tray.plist` | Present while "Open memo-tray when you log in" is on |
+| `~/.local/bin/memo-mcp` (or the folder you chose) | memo-mcp, when installed by the setup assistant |

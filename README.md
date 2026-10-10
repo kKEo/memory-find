@@ -23,7 +23,7 @@ Claude (or any MCP client) gets ten tools over one knowledge base:
 | `submit` | Hand back a page, a conflict decision or a merge decision. Pages are stored as derived (`is_inference`) with the passages they cite; the omission check reports facts the page left out; `dry_run` shows the diff first |
 | `status` | Namespaces, the embedding model, pending vectors, background jobs, graph and page counts |
 
-On macOS, the optional menu-bar app **memo-tray** (`tray/`, a separate binary; the only part built with cgo) shows the clients connected to each `memo-mcp serve --http` server, opens a server's Live page in a window, and starts and stops servers. See [`docs/guide/user/menu-bar.md`](docs/guide/user/menu-bar.md).
+On macOS, the optional menu-bar app **memo-tray** (`tray/`, a separate binary; the only part built with cgo) shows the clients connected to each `memo-mcp serve --http` server, opens a server's Live page in a window, and starts and stops servers. Its setup assistant downloads, verifies and installs memo-mcp from the GitHub releases and sets up a first knowledge base, and its settings window covers the rest (launch at login, servers, embedding model). See [`docs/guide/user/menu-bar.md`](docs/guide/user/menu-bar.md).
 
 For a human there is `memo-mcp ui`: a read-only web page on loopback with the same search (and the same explain table the agent gets), documents and passages with provenance and history, the facts timeline, entity neighbourhoods, agent-written pages, status, lint and the query log. Nothing on it can change the knowledge base.
 

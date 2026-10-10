@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"syscall"
 	"time"
@@ -26,9 +27,12 @@ import (
 	"github.com/kKEo/memory-find/tray/internal/discover"
 	"github.com/kKEo/memory-find/tray/internal/home"
 	"github.com/kKEo/memory-find/tray/internal/icon"
+	"github.com/kKEo/memory-find/tray/internal/installer"
 	"github.com/kKEo/memory-find/tray/internal/locate"
+	"github.com/kKEo/memory-find/tray/internal/loginitem"
 	"github.com/kKEo/memory-find/tray/internal/macwin"
 	"github.com/kKEo/memory-find/tray/internal/menu"
+	"github.com/kKEo/memory-find/tray/internal/setup"
 	"github.com/kKEo/memory-find/tray/internal/supervisor"
 	"github.com/kKEo/memory-find/tray/internal/trayui"
 )
@@ -77,6 +81,39 @@ func run() int {
 	cl := client.New()
 	var a *app.App
 	ui := trayui.New(func(act menu.Action) { a.Do(act) })
+	login := loginAgent()
+	if err := login.Repair(); err != nil {
+		logf("login item: %v", err)
+	}
+	pages, err := setup.Start(setup.Deps{
+		Home:        homeDir,
+		TrayVersion: buildVersion(),
+		GOARCH:      runtime.GOARCH,
+		Releases:    installer.New("memo-tray/" + buildVersion()),
+		FindMemo:    locate.MemoBinary,
+		MemoVersion: locate.Version,
+		Models:      setup.ListModels(homeDir),
+		Login:       login,
+		PortFree:    config.PortFree,
+		Copy:        copyText,
+		OpenFile:    openFile,
+		Notify: func(e setup.Event) {
+			switch e.Kind {
+			case setup.ConfigSaved:
+				a.ConfigChanged()
+			case setup.StartServer:
+				a.StartIfStopped(e.KB)
+			case setup.RestartServers:
+				a.RestartManaged()
+			}
+		},
+		Logf: logf,
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "memo-tray:", err)
+		return 1
+	}
+	defer pages.Close()
 	a = app.New(app.Deps{
 		Home:     homeDir,
 		Now:      time.Now,
@@ -100,6 +137,7 @@ func run() int {
 		Copy:        copyText,
 		Quit:        systray.Quit,
 		Logf:        logf,
+		Setup:       pages,
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -137,4 +175,16 @@ func buildVersion() string {
 		return bi.Main.Version
 	}
 	return "dev"
+}
+
+// loginAgent is the LaunchAgent that opens this memo-tray at login.
+func loginAgent() loginitem.Agent {
+	userHome, _ := os.UserHomeDir()
+	exe, err := os.Executable()
+	if err == nil {
+		if real, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = real
+		}
+	}
+	return loginitem.Agent{Home: userHome, Executable: exe}
 }

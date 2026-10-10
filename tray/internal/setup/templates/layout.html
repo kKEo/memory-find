@@ -1,0 +1,31 @@
+{{define "head"}}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+{{- if .Refresh}}<meta http-equiv="refresh" content="{{.Refresh}}">{{end}}
+<title>{{.Title}} · memo-tray</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header class="top"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+<div><div class="app">memo-tray</div><div class="sub">{{.Title}}</div></div></header>
+<main>
+{{- if .Step}}
+<ol class="steps">
+<li class="{{if eq .Step 1}}current{{else if gt .Step 1}}done{{end}}">Welcome</li>
+<li class="{{if eq .Step 2}}current{{else if gt .Step 2}}done{{end}}">Install</li>
+<li class="{{if eq .Step 3}}current{{else if gt .Step 3}}done{{end}}">Knowledge base</li>
+<li class="{{if eq .Step 4}}current{{end}}">Connect</li>
+</ol>
+{{- end}}
+{{end}}
+
+{{define "foot"}}</main></body></html>{{end}}
+
+{{define "modelselect"}}{{if .Models}}<select id="model" name="model">
+<option value=""{{if not .Model}} selected{{end}}>Default{{if .DefaultModel}} ({{.DefaultModel}}){{end}}</option>
+{{- range .Models}}
+<option value="{{.ID}}"{{if eq .ID $.Model}} selected{{end}}>{{.Label}}</option>
+{{- end}}
+{{- if and .Model (not (hasModel .Models .Model))}}
+<option value="{{.Model}}" selected>{{.Model}}</option>
+{{- end}}
+</select>{{else}}<input type="text" id="model" name="model" value="{{.Model}}" placeholder="default">{{end}}{{end}}
+
+{{define "kbs"}}<datalist id="kbs">{{range .}}<option value="{{.}}">{{end}}</datalist>{{end}}

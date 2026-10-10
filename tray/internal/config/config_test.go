@@ -1,9 +1,11 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -79,5 +81,59 @@ func TestAddrFor(t *testing.T) {
 	}
 	if err := c.Validate(); err != nil {
 		t.Errorf("assigned config invalid: %v", err)
+	}
+}
+
+// Writers in different goroutines never lose each other's changes.
+func TestUpdateIsSerialised(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tray.json")
+	var wg sync.WaitGroup
+	for i := range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := Update(path, func(c *Config) error {
+				c.Servers = append(c.Servers, Server{KB: fmt.Sprintf("kb%d", i), Addr: fmt.Sprintf("127.0.0.1:%d", 9000+i)})
+				return nil
+			}); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if c, err := Load(path); err != nil || len(c.Servers) != 20 {
+		t.Errorf("after 20 concurrent updates: %d servers, %v", len(c.Servers), err)
+	}
+}
+
+func TestUpdateAndSaveIf(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tray.json")
+	if err := os.WriteFile(path, []byte("{broken"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Update(path, func(c *Config) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err != nil {
+		t.Errorf("a broken file was not replaced: %v", err)
+	}
+	rev := Revision(path)
+	if _, err := Update(path, func(c *Config) error { return nil }); err != nil || Revision(path) != rev {
+		t.Errorf("a no-op update rewrote the file (%v)", err)
+	}
+	if _, err := Update(path, func(c *Config) error { c.Servers = []Server{{KB: "x", Addr: "8.8.8.8:1"}}; return nil }); err == nil {
+		t.Error("an invalid result was saved")
+	}
+	if Revision(path) != rev {
+		t.Error("a refused update touched the file")
+	}
+	if ok, err := SaveIf(path, &Config{Debug: true}, "stale"); ok || err != nil {
+		t.Errorf("SaveIf with a stale revision: %v %v", ok, err)
+	}
+	if ok, err := SaveIf(path, &Config{Debug: true}, rev); !ok || err != nil {
+		t.Errorf("SaveIf with the current revision: %v %v", ok, err)
+	}
+	if Revision(filepath.Join(t.TempDir(), "none")) != "none" {
+		t.Error("Revision of a missing file")
 	}
 }

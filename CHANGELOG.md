@@ -33,6 +33,14 @@ All notable changes. Tags follow semantic versioning; each tag has an eval repor
   `--behind-proxy` for a TLS-terminating proxy, and `--public-url`. Plain HTTP on a
   non-loopback address and unauthenticated exposure are refused.
 - Fix MCP registry publishing: `server.json` no longer sets `registryBaseUrl` on the MCPB package.
+- memo-tray setup assistant and settings window. **Install or Update memo-mcp…** (and
+  **Install memo-mcp…**, opened by itself on first launch when memo-mcp is missing) downloads
+  the latest release for this Mac from GitHub, checks it against the release's `checksums.txt`,
+  tries it and installs it atomically (default `~/.local/bin`), then sets up a knowledge base
+  (name, embedding model, token, start with memo-tray) and shows the `claude mcp add` line.
+  **Settings…** edits `tray.json` in a form: open at login (LaunchAgent), stop servers on quit,
+  memo-mcp location and version, embedding model, servers (address, token, autostart, add and
+  remove), extra environment. memo-tray contacts GitHub only while the install step is open.
 - **memo-tray**, an optional macOS menu-bar app (`tray/`, its own Go module; the only cgo build,
   memo-mcp stays pure Go): lists the running `serve --http` servers from their run files with
   the agents connected to each (● active, ○ quiet; the count next to the icon), opens a

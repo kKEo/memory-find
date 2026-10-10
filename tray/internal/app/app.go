@@ -66,7 +66,20 @@ type Deps struct {
 	Copy         func(text string) error
 	Quit         func() // ends the menu-bar loop
 	Logf         func(format string, args ...any)
+	Setup        Pages // memo-tray's own pages: settings and the setup assistant
 }
+
+// Pages are memo-tray's own pages (*setup.Server).
+type Pages interface {
+	Entry(page string) string // the link a window opens to land on page
+	Origin() string
+}
+
+// Window keys of memo-tray's own pages; servers' windows use their URL.
+const (
+	settingsWindow = "tray:settings"
+	setupWindow    = "tray:setup"
+)
 
 const (
 	tickEvery   = 2 * time.Second
@@ -97,6 +110,7 @@ type App struct {
 	note       string
 	noteUntil  time.Time
 	autostart  bool
+	firstRun   bool // offer the setup assistant once, if memo-mcp is missing
 	quitting   bool
 	busyMu     sync.Mutex
 	busy       map[string]bool // knowledge bases with a start/stop in progress
@@ -118,7 +132,7 @@ type view struct {
 // New returns a controller; call Run on its own goroutine.
 func New(d Deps) *App {
 	return &App{d: d, actions: make(chan menu.Action, 16), opened: make(chan struct{}, 1), kick: make(chan struct{}, 1),
-		polls: map[string]*poll{}, views: map[string]view{}, instances: map[string]string{}, busy: map[string]bool{}, autostart: true}
+		polls: map[string]*poll{}, views: map[string]view{}, instances: map[string]string{}, busy: map[string]bool{}, autostart: true, firstRun: true}
 }
 
 // Do queues a menu action; it never blocks the caller (the menu thread).
@@ -130,6 +144,17 @@ func (a *App) Do(act menu.Action) {
 }
 
 // MenuOpened asks for an immediate refresh.
+// ConfigChanged makes the controller reread tray.json and look for
+// memo-mcp again now (the settings pages saved them).
+func (a *App) ConfigChanged() { a.Do(menu.Action{Kind: reloadAction}) }
+
+// StartIfStopped starts a knowledge base's server unless one runs.
+func (a *App) StartIfStopped(kb string) { a.Do(menu.Action{Kind: startIfStopped, KB: kb}) }
+
+// RestartManaged restarts the servers memo-tray started (to run a new
+// memo-mcp).
+func (a *App) RestartManaged() { a.Do(menu.Action{Kind: restartManaged}) }
+
 func (a *App) MenuOpened() {
 	select {
 	case a.opened <- struct{}{}:
@@ -184,6 +209,12 @@ func (a *App) tick(ctx context.Context) {
 	now := a.d.Now()
 	a.loadConfig()
 	a.findMemo(ctx, now)
+	if a.firstRun {
+		a.firstRun = false
+		if _, err := os.Stat(config.Path(a.d.Home)); a.memoErr != nil && errors.Is(err, os.ErrNotExist) && a.d.Setup != nil {
+			a.openPage(setupWindow, "Set up memo-mcp", "/wizard") // first launch, nothing installed yet
+		}
+	}
 	entries, scanErr := a.d.Scan(runfile.Dir(a.d.Home))
 	a.pollAll(ctx, entries)
 	views, problem := a.merge(now, entries)
@@ -437,6 +468,10 @@ func (a *App) startAutostart(views []view) {
 }
 
 func (a *App) handle(ctx context.Context, act menu.Action) {
+	if a.cfg == nil { // before the first tick
+		a.loadConfig()
+		a.findMemo(ctx, a.d.Now())
+	}
 	v, hasView := a.views[act.Server]
 	switch act.Kind {
 	case menu.OpenStats:
@@ -486,6 +521,29 @@ func (a *App) handle(ctx context.Context, act menu.Action) {
 	case menu.Quit:
 		a.quitting = true
 		a.d.Quit()
+	case menu.OpenSettings:
+		a.openPage(settingsWindow, "memo-tray Settings", "/settings")
+	case menu.OpenSetup:
+		a.openPage(setupWindow, "Set up memo-mcp", "/wizard")
+	case reloadAction:
+		a.cfgMod, a.memoAt = time.Time{}, time.Time{}
+	case startIfStopped:
+		a.cfgMod, a.memoAt = time.Time{}, time.Time{}
+		a.loadConfig()
+		a.findMemo(ctx, a.d.Now())
+		for _, v := range a.views {
+			if v.KB == act.KB && v.State != menu.Stopped && v.State != menu.Crashed {
+				return
+			}
+		}
+		a.start(act.KB)
+	case restartManaged:
+		a.memoAt = time.Time{}
+		for _, v := range a.views {
+			if v.Managed && v.State != menu.Stopped && v.State != menu.Crashed {
+				a.stop(ctx, v, true)
+			}
+		}
 	case noteAction:
 		a.note, a.noteUntil = act.KB, a.d.Now().Add(noteFor)
 	}
@@ -518,20 +576,22 @@ func (a *App) start(kb string) {
 		a.report("start", fmt.Errorf("invalid knowledge-base name %q", kb))
 		return
 	}
-	addr, added, err := a.cfg.AddrFor(kb, a.d.PortFree)
+	var addr string
+	added := false
+	cfg, err := config.Update(config.Path(a.d.Home), func(c *config.Config) error {
+		var err error
+		addr, added, err = c.AddrFor(kb, a.d.PortFree)
+		return err
+	})
 	if err != nil {
 		a.report("start "+kb, err)
 		return
 	}
-	if added {
-		if err := a.cfg.Save(config.Path(a.d.Home)); err != nil {
-			a.report("save tray.json", err)
-			return
-		}
-		if fi, err := os.Stat(config.Path(a.d.Home)); err == nil {
-			a.cfgMod = fi.ModTime()
-		}
-	} else if !a.d.PortFree(addr) {
+	a.cfg = cfg
+	if fi, err := os.Stat(config.Path(a.d.Home)); err == nil {
+		a.cfgMod = fi.ModTime()
+	}
+	if !added && !a.d.PortFree(addr) {
 		a.report("start "+kb, fmt.Errorf("%s is in use by another program", addr))
 		return
 	}
@@ -626,6 +686,21 @@ func (a *App) queueNote(what string, err error) {
 
 // noteAction carries a message from a worker goroutine to the controller.
 const noteAction menu.ActionKind = -1
+
+// Actions the setup pages ask for (through ConfigChanged and friends).
+const (
+	reloadAction menu.ActionKind = -2 - iota
+	startIfStopped
+	restartManaged
+)
+
+// openPage shows one of memo-tray's own pages in its window.
+func (a *App) openPage(key, title, page string) {
+	if a.d.Setup == nil {
+		return
+	}
+	a.d.Windows.Open(key, title, a.d.Setup.Entry(page), a.d.Setup.Origin())
+}
 
 func describe(err error) string {
 	for _, known := range []error{client.ErrUnauthorized, client.ErrNotSupported, client.ErrMTLS, client.ErrInsecure} {
